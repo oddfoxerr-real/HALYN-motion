@@ -20,7 +20,7 @@ class HalynWallpaperService : WallpaperService() {
 
     inner class MotionEngine : Engine(), SharedPreferences.OnSharedPreferenceChangeListener {
         private val preferences = MotionPreferences(this@HalynWallpaperService)
-        private val renderer = HalynRenderer()
+        private val renderer = HalynRenderer(this@HalynWallpaperService)
         private val clockRenderer = ClockOverlayRenderer()
         private val spatialTracker = SpatialTracker(this@HalynWallpaperService)
         private val handler = Handler(Looper.getMainLooper())
@@ -32,6 +32,9 @@ class HalynWallpaperService : WallpaperService() {
         private var touchX = .5f
         private var touchY = .5f
         private var offsetX = .5f
+        private var touchDownX = 0f
+        private var touchDownY = 0f
+        private var touchDownMs = 0L
         private var startTimeMs = SystemClock.uptimeMillis()
         private val tick = Runnable { renderFrame() }
 
@@ -79,9 +82,24 @@ class HalynWallpaperService : WallpaperService() {
             super.onTouchEvent(event)
             if (!settings.touch) return
             when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
+                MotionEvent.ACTION_DOWN -> {
+                    touchDownX = event.x
+                    touchDownY = event.y
+                    touchDownMs = SystemClock.uptimeMillis()
                     touchX = (event.x / surfaceWidth).coerceIn(0f, 1f)
                     touchY = (event.y / surfaceHeight).coerceIn(0f, 1f)
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    touchX = (event.x / surfaceWidth).coerceIn(0f, 1f)
+                    touchY = (event.y / surfaceHeight).coerceIn(0f, 1f)
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (settings.preset == StarWindowRenderer.SCENE_INDEX &&
+                        SystemClock.uptimeMillis() - touchDownMs <= 330L &&
+                        kotlin.math.abs(event.x - touchDownX) < 30f * resources.displayMetrics.density &&
+                        kotlin.math.abs(event.y - touchDownY) < 30f * resources.displayMetrics.density) {
+                        spatialTracker.warpForward()
+                    }
                 }
             }
         }
