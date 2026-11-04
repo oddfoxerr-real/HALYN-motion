@@ -29,6 +29,7 @@ import kotlin.math.sqrt
  */
 class StarWindowRenderer(context: Context) {
     private val stars = AstronomyCatalog.stars(context)
+    private val cinematicFx = SpaceEffectsRenderer()
     private val constellationLines = loadConstellationLines(context)
     private val buckets = Array(9) { FloatArray(18_300) }
     private val counts = IntArray(9)
@@ -81,15 +82,9 @@ class StarWindowRenderer(context: Context) {
         val accent = if (state.palette == 5) state.customColor
             else HalynRenderer.PALETTE_COLORS[state.palette.coerceIn(0, 4)]
 
-        canvas.drawColor(Color.rgb(2, 4, 10))
-        if (cachedHeight != canvas.height || backgroundColor != accent) {
-            backgroundColor = accent
-            cachedHeight = canvas.height
-            haze.shader = LinearGradient(0f, 0f, 0f, height,
-                intArrayOf(Color.rgb(5, 10, 22), Color.rgb(2, 3, 10), Color.rgb(7, 8, 18)),
-                null, Shader.TileMode.CLAMP)
-        }
-        canvas.drawRect(0f, 0f, width, height, haze)
+        // Material layer is separate from astronomical data; Survey/GPS
+        // mode draws an accurate, uncluttered sky without fictional worlds.
+        cinematicFx.drawBackground(canvas, state, seconds, pose)
 
         val projectionScale = height * .82f
         val right = pose.right
@@ -188,15 +183,9 @@ class StarWindowRenderer(context: Context) {
             namesDrawn++
         }
 
-        // Intentional 1-ly warp is smoothly interpolated by SpatialTracker.
-        // Keep visual treatment extremely subtle instead of flashing/strobing.
-        if (pose.warpProgress < 1f) {
-            val wave = 1f - abs(2f * pose.warpProgress - 1f)
-            bodyGlow.color = Color.argb((18f * wave).toInt().coerceIn(0, 20),
-                Color.red(accent), Color.green(accent), Color.blue(accent))
-            canvas.drawCircle(width * .5f, height * .5f,
-                smaller * (.24f + .24f * pose.warpProgress), bodyGlow)
-        }
+        // Unmistakable warp tunnel + actual travel distance and arrival,
+        // even if the launcher never forwards touch events (the app button does).
+        cinematicFx.drawOverlay(canvas, state, pose)
     }
 
     private fun drawPlanet(
