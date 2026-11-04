@@ -42,6 +42,10 @@ class MainActivity : Activity() {
     private val prefs by lazy { MotionPreferences(this) }
     private lateinit var preview: LivePreview
     private lateinit var scenes: LinearLayout
+    private lateinit var newScenes: LinearLayout
+    private lateinit var clockStyles: LinearLayout
+    private lateinit var clockPositions: LinearLayout
+    private lateinit var clockOptionsPanel: LinearLayout
     private lateinit var palettes: LinearLayout
     private lateinit var frameRates: LinearLayout
     private lateinit var activeSceneName: TextView
@@ -79,6 +83,7 @@ class MainActivity : Activity() {
         buildPreview(column)
         buildScenes(column)
         buildColours(column)
+        buildClock(column)
         buildMotion(column)
         buildBehavior(column)
         buildFooter(column)
@@ -88,6 +93,8 @@ class MainActivity : Activity() {
         refreshScene()
         refreshPalette()
         refreshFps()
+        refreshClockStyles()
+        refreshClockPositions()
     }
 
     private fun buildHeader(root: LinearLayout) {
@@ -161,7 +168,11 @@ class MainActivity : Activity() {
     }
 
     private fun buildScenes(root: LinearLayout) {
-        root.addView(section("The collection", "Six originals. One canvas."))
+        root.addView(section("The collection", "Twelve distinct motion styles."))
+        root.addView(text("HALYN ORIGINALS", 11f, subtle, Typeface.BOLD).apply {
+            letterSpacing = .14f
+            setPadding(0, 0, 0, dp(7))
+        })
         scenes = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -172,6 +183,21 @@ class MainActivity : Activity() {
             addView(scenes)
         }
         root.addView(rail, LinearLayout.LayoutParams(-1, dp(55)))
+
+        root.addView(text("NEW COLLECTION", 11f, subtle, Typeface.BOLD).apply {
+            letterSpacing = .14f
+            setPadding(0, dp(16), 0, dp(7))
+        })
+        newScenes = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val newRail = HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            clipToPadding = false
+            addView(newScenes)
+        }
+        root.addView(newRail, LinearLayout.LayoutParams(-1, dp(55)))
     }
 
     private fun buildColours(root: LinearLayout) {
@@ -211,6 +237,115 @@ class MainActivity : Activity() {
         pickerRow.addView(edit, LinearLayout.LayoutParams(-2, dp(48)))
         panel.addView(pickerRow)
         root.addView(panel)
+    }
+
+    private fun buildClock(root: LinearLayout) {
+        root.addView(section("Clock atelier", "Time, designed into the wallpaper."))
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = rounded(cardColor, 22, borderColor)
+            setPadding(dp(17), dp(17), dp(17), dp(17))
+        }
+        panel.addView(text("CLOCK FACE", 10f, subtle, Typeface.BOLD).apply {
+            letterSpacing = .15f
+            setPadding(0, 0, 0, dp(8))
+        })
+
+        clockStyles = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val stylesRail = HorizontalScrollView(this).apply {
+            clipToPadding = false
+            isHorizontalScrollBarEnabled = false
+            addView(clockStyles)
+        }
+        panel.addView(stylesRail, LinearLayout.LayoutParams(-1, dp(55)))
+
+        clockOptionsPanel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        clockOptionsPanel.addView(text("PLACEMENT", 10f, subtle, Typeface.BOLD).apply {
+            letterSpacing = .15f
+            setPadding(0, dp(14), 0, dp(10))
+        })
+        clockPositions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        clockOptionsPanel.addView(clockPositions, LinearLayout.LayoutParams(-1, dp(45)))
+        val separator = View(this).apply { setBackgroundColor(borderColor) }
+        clockOptionsPanel.addView(separator, LinearLayout.LayoutParams(-1, dp(1)).apply {
+            topMargin = dp(16)
+        })
+        addToggle(clockOptionsPanel, "24-hour time", "Use the system time zone", prefs.get().clock24h) {
+            prefs.setClock24h(it)
+            preview.invalidate()
+        }
+        addToggle(clockOptionsPanel, "Date", "Show today's date beneath the clock", prefs.get().clockDate) {
+            prefs.setClockDate(it)
+            preview.invalidate()
+        }
+        addToggle(clockOptionsPanel, "Seconds", "Animate the seconds indicator", prefs.get().clockSeconds) {
+            prefs.setClockSeconds(it)
+            preview.invalidate()
+        }
+        addToggle(clockOptionsPanel, "Accent colour", "Match the wallpaper palette", prefs.get().clockAccent) {
+            prefs.setClockAccent(it)
+            preview.invalidate()
+        }
+        panel.addView(clockOptionsPanel)
+        root.addView(panel)
+    }
+
+    private fun refreshClockStyles() {
+        clockStyles.removeAllViews()
+        val names = listOf("Off", "Digital", "Stacked", "Mono", "Analogue", "Orbit")
+        val selected = prefs.get().clockStyle
+        names.forEachIndexed { index, name ->
+            val active = index == selected
+            val button = text(name, 13f, if (active) backgroundColor else secondary,
+                if (active) Typeface.BOLD else Typeface.NORMAL).apply {
+                gravity = Gravity.CENTER
+                setPadding(dp(16), 0, dp(16), 0)
+                minHeight = dp(44)
+                background = rounded(if (active) ink else Color.rgb(36, 37, 44), 14)
+                isFocusable = true
+                isClickable = true
+                contentDescription = "${name} clock, ${if (active) "selected" else "not selected"}"
+                setOnClickListener {
+                    prefs.setClockStyle(index)
+                    refreshClockStyles()
+                    preview.invalidate()
+                }
+            }
+            clockStyles.addView(button, LinearLayout.LayoutParams(-2, dp(44)).apply {
+                marginEnd = dp(8)
+            })
+        }
+        clockOptionsPanel.visibility = if (selected == 0) View.GONE else View.VISIBLE
+    }
+
+    private fun refreshClockPositions() {
+        clockPositions.removeAllViews()
+        val names = listOf("Upper", "Centre", "Lower")
+        val selected = prefs.get().clockPosition
+        names.forEachIndexed { index, name ->
+            val active = index == selected
+            val button = text(name, 12f, if (active) backgroundColor else secondary,
+                if (active) Typeface.BOLD else Typeface.NORMAL).apply {
+                gravity = Gravity.CENTER
+                background = rounded(if (active) ink else Color.rgb(36, 37, 44), 13)
+                isFocusable = true
+                isClickable = true
+                contentDescription = "${name} clock placement, ${if (active) "selected" else "not selected"}"
+                setOnClickListener {
+                    prefs.setClockPosition(index)
+                    refreshClockPositions()
+                    preview.invalidate()
+                }
+            }
+            clockPositions.addView(button, LinearLayout.LayoutParams(0, dp(44), 1f).apply {
+                marginEnd = dp(7)
+            })
+        }
     }
 
     private fun buildMotion(root: LinearLayout) {
@@ -294,6 +429,7 @@ class MainActivity : Activity() {
 
     private fun refreshScene() {
         scenes.removeAllViews()
+        newScenes.removeAllViews()
         val selected = prefs.get().preset
         HalynRenderer.PRESETS.forEachIndexed { index, name ->
             val active = selected == index
@@ -305,14 +441,15 @@ class MainActivity : Activity() {
                 background = rounded(if (active) ink else cardColor, 15)
                 isClickable = true
                 isFocusable = true
-                contentDescription = "Wallpaper ${index + 1} of 6, ${name}, ${if (active) "selected" else "not selected"}"
+                contentDescription = "Wallpaper ${index + 1} of 12, ${name}, ${if (active) "selected" else "not selected"}"
                 setOnClickListener {
                     prefs.setPreset(index)
                     refreshScene()
                     preview.invalidate()
                 }
             }
-            scenes.addView(item, LinearLayout.LayoutParams(-2, dp(44)).apply {
+            val target = if (index < 6) scenes else newScenes
+            target.addView(item, LinearLayout.LayoutParams(-2, dp(44)).apply {
                 marginEnd = dp(8)
             })
         }
@@ -514,6 +651,7 @@ class MainActivity : Activity() {
 
     private inner class LivePreview : View(this@MainActivity) {
         private val renderer = HalynRenderer()
+        private val clockRenderer = ClockOverlayRenderer()
         private val startTime = SystemClock.uptimeMillis()
         private var touchX = .5f
         private var touchY = .5f
@@ -531,6 +669,7 @@ class MainActivity : Activity() {
                 (SystemClock.uptimeMillis() - startTime) / 1000f,
                 touchX, touchY
             )
+            clockRenderer.draw(canvas, state)
             if (running) postInvalidateDelayed(1000L / state.fps)
         }
 
