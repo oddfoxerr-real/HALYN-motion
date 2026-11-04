@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">HALYN Motion</string>
+    <string name="wallpaper_name">HALYN Motion · Live Wallpaper</string>
+    <string name="wallpaper_description">Immersive, interactive procedural wallpapers with GPU-rendered movement.</string>
+</resources>
