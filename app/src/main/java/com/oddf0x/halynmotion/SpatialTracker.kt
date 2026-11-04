@@ -69,6 +69,7 @@ class SpatialTracker(context: Context) : SensorEventListener {
     private var lastRotationNs = 0L
     private var previousRotationNs = 0L
     private var lastRenderNs = 0L
+    private var visualClockNs = 0L
 
     private var completedWarpAu = SpacePoint(0.0, 0.0, 0.0)
     private var warpFromAu = SpacePoint(0.0, 0.0, 0.0)
@@ -120,12 +121,14 @@ class SpatialTracker(context: Context) : SensorEventListener {
         }
         baselineReady = lastRotationNs != 0L
         lastRenderNs = 0L
+        visualClockNs = 0L
     }
 
     fun warpForward() {
         val now = SystemClock.elapsedRealtimeNanos()
         val pose = pose(now)
-        val current = currentWarpOffset(now)
+        val frameTime = visualClockNs
+        val current = currentWarpOffset(frameTime)
         val outward = pose.outward
         // A single deliberate tap moves ONE LIGHT YEAR along the view ray.
         val destination = SpacePoint(
@@ -135,7 +138,7 @@ class SpatialTracker(context: Context) : SensorEventListener {
         )
         warpFromAu = current
         warpToAu = destination
-        warpStartNs = now
+        warpStartNs = frameTime
     }
 
     fun pose(nowNs: Long = SystemClock.elapsedRealtimeNanos()): StarPose {
@@ -143,8 +146,13 @@ class SpatialTracker(context: Context) : SensorEventListener {
             for (i in 0..8) smoothed[i] = target[i]
             for (i in 0..2) smoothedPosition[i] = position[i]
             lastRenderNs = nowNs
+            visualClockNs = nowNs
         }
-        val dt = ((nowNs - lastRenderNs) * 1e-9f).coerceIn(0f, .08f)
+        // A delayed UI/GPU frame advances visual time by only a bounded frame
+        // interval. The following frames smoothly catch up to sensor input.
+        val stepNs = (nowNs - lastRenderNs).coerceIn(0L, 52_000_000L)
+        visualClockNs += stepNs
+        val dt = stepNs * 1e-9f
         lastRenderNs = nowNs
 
         val estimated = target.copyOf()
@@ -173,9 +181,9 @@ class SpatialTracker(context: Context) : SensorEventListener {
             smoothedPosition[i] += (position[i] - smoothedPosition[i]) * posAlpha
         }
 
-        val warp = currentWarpOffset(nowNs)
+        val warp = currentWarpOffset(visualClockNs)
         val progress = if (warpStartNs == 0L) 1f
-            else ((nowNs - warpStartNs).toDouble() / warpDurationNs).coerceIn(0.0, 1.0).toFloat()
+            else ((visualClockNs - warpStartNs).toDouble() / warpDurationNs).coerceIn(0.0, 1.0).toFloat()
         return StarPose(
             right = floatArrayOf(smoothed[0], smoothed[3], smoothed[6]),
             up = floatArrayOf(smoothed[1], smoothed[4], smoothed[7]),
