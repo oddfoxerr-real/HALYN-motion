@@ -147,7 +147,8 @@ class HalynWallpaperService : WallpaperService() {
                 // switches to exploration, never a false GPS position.
                 if (preferences.get().skyAligned) preferences.setSkyAligned(false)
                 spatialTracker.configureSky(preferences.get())
-                spatialTracker.warpForward()
+                val ray = preferences.warpCoordinates()
+                spatialTracker.warpToward(ray[0], ray[1], ray[2])
             }
             if (key == "star_destination_token" &&
                 settings.preset == StarWindowRenderer.SCENE_INDEX) {
