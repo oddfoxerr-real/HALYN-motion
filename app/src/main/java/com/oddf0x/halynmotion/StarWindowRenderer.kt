@@ -170,6 +170,17 @@ class StarWindowRenderer(context: Context) {
                 planet.tint, false, scale, ::project, seconds)
         }
 
+        // Free-flight discoveries are anchored in 3D instead of painted at
+        // fixed screen coordinates. They remain in place while you look around.
+        if (!pose.skyAligned && state.starEffects >= 2) {
+            for (world in pose.generatedWorlds) {
+                if ((world.center - origin).length() > 1.5) continue
+                drawPlanet(canvas, world.center, world.name, world.tint,
+                    false, scale, ::project, seconds, simulated = true,
+                    rings = world.ringed)
+            }
+        }
+
         // When approaching a named catalogue star, add coherent hypothetical
         // companion worlds. Positions are deterministic within that star's
         // frame, but the worlds are explicitly marked GENERATED: their orbits,
