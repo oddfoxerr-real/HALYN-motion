@@ -78,9 +78,9 @@ class SpaceEffectsRenderer {
             canvas.drawRect(0f, 0f, w, h, cloudPaint)
             cloudPaint.shader = null
         }
-        if (state.starEffects >= 2 && pose.travelLy >= .35) {
-            drawFictionalWorld(canvas, state, elapsedSeconds, pose)
-        }
+        // Fictional planetary systems are rendered exclusively in the actual
+        // catalog-star coordinate system by StarWindowRenderer. A screen-fixed
+        // planet here would falsely appear to exist at every destination.
     }
 
     fun drawOverlay(canvas: Canvas, state: MotionState, pose: StarPose) {
@@ -128,7 +128,11 @@ class SpaceEffectsRenderer {
             typePaint.textSize = max(13f, size * .036f)
             typePaint.color = Color.WHITE
             typePaint.alpha = (strength * 230).toInt().coerceIn(0, 255)
-            canvas.drawText("HYPERSPACE  ·  1 LIGHT-YEAR", centerX, h * .19f, typePaint)
+            val caption = if (pose.destinationName.isNotEmpty() &&
+                pose.destinationName != "Deep space")
+                "APPROACHING  ·  ${pose.destinationName.uppercase(java.util.Locale.US)}"
+            else "HYPERSPACE  ·  1 LIGHT-YEAR"
+            canvas.drawText(caption, centerX, h * .19f, typePaint)
         } else {
             if (activeWarp) {
                 activeWarp = false
@@ -156,8 +160,11 @@ class SpaceEffectsRenderer {
             typePaint.color = Color.rgb(215, 221, 237)
             typePaint.alpha = 180
             val ly = String.format(java.util.Locale.US, "%.2f ly", pose.travelLy)
-            canvas.drawText("DISTANCE FROM ORIGIN  ·  $ly",
-                w * .5f, h * .88f, typePaint)
+            val status = if (pose.destinationName.isNotBlank() &&
+                pose.destinationName != "Deep space")
+                "DESTINATION: ${pose.destinationName.uppercase(java.util.Locale.US)}  ·  $ly FROM ORIGIN"
+            else "DISTANCE FROM ORIGIN  ·  $ly"
+            canvas.drawText(status, w * .5f, h * .88f, typePaint)
         }
     }
 
