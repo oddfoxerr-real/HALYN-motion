@@ -4,6 +4,8 @@ import android.app.Activity
 import android.app.WallpaperManager
 import android.content.ComponentName
 import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import android.content.res.ColorStateList
 import android.graphics.Canvas
 import android.graphics.Color
@@ -55,6 +57,10 @@ class MainActivity : Activity() {
     private lateinit var newScenes: LinearLayout
     private lateinit var clockStyles: LinearLayout
     private lateinit var clockPositions: LinearLayout
+    private lateinit var clockFonts: LinearLayout
+    private lateinit var clockPlacementToggle: Switch
+    private var awaitingClockOverlayPermission = false
+    private lateinit var mountainScenes: LinearLayout
     private lateinit var clockOptionsPanel: LinearLayout
     private lateinit var starControls: LinearLayout
     private lateinit var densityChoices: LinearLayout
@@ -111,6 +117,7 @@ class MainActivity : Activity() {
         refreshFps()
         refreshClockStyles()
         refreshClockPositions()
+        refreshClockFonts()
         refreshStarDensity()
         refreshStarEffects()
         refreshSkyUi()
@@ -188,7 +195,7 @@ class MainActivity : Activity() {
     }
 
     private fun buildScenes(root: LinearLayout) {
-        root.addView(section("The collection", "Thirteen distinct motion styles."))
+        root.addView(section("The collection", "21 live wallpaper styles, individually selectable."))
         root.addView(text("HALYN ORIGINALS", 11f, subtle, Typeface.BOLD).apply {
             letterSpacing = .14f
             setPadding(0, 0, 0, dp(7))
@@ -218,6 +225,20 @@ class MainActivity : Activity() {
             addView(newScenes)
         }
         root.addView(newRail, LinearLayout.LayoutParams(-1, dp(159)))
+
+        root.addView(text("MOUNTAIN SERIES", 11f, subtle, Typeface.BOLD).apply {
+            letterSpacing = .14f
+            setPadding(0, dp(16), 0, dp(7))
+        })
+        mountainScenes = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        root.addView(HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            clipToPadding = false
+            addView(mountainScenes)
+        }, LinearLayout.LayoutParams(-1, dp(159)))
     }
 
     private fun buildColours(root: LinearLayout) {
@@ -291,6 +312,49 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
         }
         clockOptionsPanel.addView(clockPositions, LinearLayout.LayoutParams(-1, dp(45)))
+
+        clockOptionsPanel.addView(text("FONT", 10f, subtle, Typeface.BOLD).apply {
+            letterSpacing = .15f
+            setPadding(0, dp(18), 0, dp(9))
+        })
+        clockFonts = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        clockOptionsPanel.addView(HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(clockFonts)
+        }, LinearLayout.LayoutParams(-1, dp(48)))
+        clockOptionsPanel.addView(text("Import .ttf / .otf  ↗", 13f, ink, Typeface.BOLD).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(4), dp(8), dp(4), dp(8))
+            minimumHeight = dp(46)
+            isFocusable = true
+            isClickable = true
+            contentDescription = "Import a custom TTF or OTF font for the wallpaper clock"
+            setOnClickListener { chooseClockFont() }
+        })
+        val editClockRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = dp(77)
+        }
+        editClockRow.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(text("Move clock on Home screen", 14f, ink, Typeface.BOLD))
+            addView(text("5% snap grid · Drag and tap X to finish", 12f, secondary).apply {
+                setPadding(0, dp(5), 0, 0)
+            })
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        clockPlacementToggle = Switch(this).apply {
+            isChecked = false
+            contentDescription = "Enter live home-screen clock placement mode"
+            thumbTintList = ColorStateList.valueOf(ink)
+            trackTintList = ColorStateList.valueOf(Color.rgb(72, 73, 80))
+            setOnCheckedChangeListener { _, checked -> if (checked) requestClockPlacement() }
+        }
+        editClockRow.addView(clockPlacementToggle)
+        clockOptionsPanel.addView(editClockRow)
         val separator = View(this).apply { setBackgroundColor(borderColor) }
         clockOptionsPanel.addView(separator, LinearLayout.LayoutParams(-1, dp(1)).apply {
             topMargin = dp(16)
@@ -313,6 +377,102 @@ class MainActivity : Activity() {
         }
         panel.addView(clockOptionsPanel)
         root.addView(panel)
+    }
+
+    private fun refreshClockFonts() {
+        if (!::clockFonts.isInitialized) return
+        clockFonts.removeAllViews()
+        val selected = prefs.get().clockFont
+        ClockFontStore.names.forEachIndexed { index, label ->
+            val active = selected == index
+            val chip = text(label, 12f, if (active) backgroundColor else secondary,
+                if (active) Typeface.BOLD else Typeface.NORMAL).apply {
+                gravity = Gravity.CENTER
+                setPadding(dp(14), 0, dp(14), 0)
+                background = rounded(if (active) ink else Color.rgb(36, 37, 44), 13)
+                minHeight = dp(44)
+                isClickable = true
+                isFocusable = true
+                contentDescription = "Clock font: " + label + (if (active) ", selected" else "")
+                setOnClickListener {
+                    if (index == 6 && !ClockFontStore.hasCustomFont(this@MainActivity)) {
+                        chooseClockFont()
+                    } else {
+                        prefs.setClockFont(index)
+                        refreshClockFonts()
+                        preview.invalidate()
+                    }
+                }
+            }
+            clockFonts.addView(chip, LinearLayout.LayoutParams(-2, dp(44)).apply {
+                marginEnd = dp(7)
+            })
+        }
+    }
+
+    private fun chooseClockFont() {
+        val pick = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+        }
+        try {
+            startActivityForResult(pick, REQUEST_CLOCK_FONT)
+        } catch (_: android.content.ActivityNotFoundException) {
+            Toast.makeText(this, "No document picker available", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun requestClockPlacement() {
+        if (prefs.get().clockStyle == 0) {
+            Toast.makeText(this, "Select a clock face first", Toast.LENGTH_SHORT).show()
+            clockPlacementToggle.isChecked = false
+            return
+        }
+        if (!Settings.canDrawOverlays(this)) {
+            awaitingClockOverlayPermission = true
+            Toast.makeText(this, "Allow HALYN to draw over apps for this editor only", Toast.LENGTH_LONG).show()
+            try {
+                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + packageName)))
+            } catch (_: android.content.ActivityNotFoundException) {
+                awaitingClockOverlayPermission = false
+                clockPlacementToggle.isChecked = false
+                Toast.makeText(this, "Overlay permission settings unavailable", Toast.LENGTH_LONG).show()
+            }
+            return
+        }
+        launchClockPlacement()
+    }
+
+    private fun launchClockPlacement() {
+        awaitingClockOverlayPermission = false
+        if (!Settings.canDrawOverlays(this)) {
+            clockPlacementToggle.isChecked = false
+            return
+        }
+        try {
+            startForegroundService(Intent(this, ClockPlacementService::class.java))
+            val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(home)
+        } catch (_: RuntimeException) {
+            clockPlacementToggle.isChecked = false
+            Toast.makeText(this, "Could not open home-screen clock editor", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_CLOCK_FONT && resultCode == RESULT_OK && data?.data != null) {
+            if (ClockFontStore.install(this, data.data!!)) {
+                prefs.importedClockFont()
+                refreshClockFonts()
+                preview.invalidate()
+                Toast.makeText(this, "Clock font imported locally", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Select a valid .ttf or .otf file under 3 MB", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun refreshClockStyles() {
@@ -723,6 +883,7 @@ class MainActivity : Activity() {
     private fun refreshScene() {
         scenes.removeAllViews()
         newScenes.removeAllViews()
+        mountainScenes.removeAllViews()
         val selected = prefs.get().preset
         HalynRenderer.PRESETS.forEachIndexed { index, name ->
             val active = selected == index
@@ -732,7 +893,7 @@ class MainActivity : Activity() {
                     dp(if (active) 2 else 1), dp(if (active) 2 else 1))
                 isClickable = true
                 isFocusable = true
-                contentDescription = "Wallpaper ${index + 1} of 13, ${name}, ${if (active) "selected" else "not selected"}"
+                contentDescription = "Wallpaper ${index + 1} of ${HalynRenderer.PRESETS.size}, ${name}, ${if (active) "selected" else "not selected"}"
                 setOnClickListener {
                     prefs.setPreset(index)
                     refreshScene()
@@ -763,7 +924,11 @@ class MainActivity : Activity() {
             }
             art.addView(caption, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
             item.addView(art, FrameLayout.LayoutParams(-1, -1))
-            val target = if (index < 6) scenes else newScenes
+            val target = when {
+                index < 6 -> scenes
+                index < MountainSceneRenderer.FIRST -> newScenes
+                else -> mountainScenes
+            }
             target.addView(item, LinearLayout.LayoutParams(dp(120), dp(154)).apply {
                 marginEnd = dp(10)
             })
@@ -943,6 +1108,15 @@ class MainActivity : Activity() {
         super.onResume()
         if (::preview.isInitialized) preview.running = true
         syncStarTracking()
+        if (awaitingClockOverlayPermission) {
+            if (Settings.canDrawOverlays(this)) launchClockPlacement()
+            else {
+                awaitingClockOverlayPermission = false
+                if (::clockPlacementToggle.isInitialized) clockPlacementToggle.isChecked = false
+            }
+        } else if (::clockPlacementToggle.isInitialized) {
+            clockPlacementToggle.isChecked = false
+        }
     }
 
     override fun onPause() {
@@ -957,6 +1131,10 @@ class MainActivity : Activity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         skyLocation.handlePermissionResult(requestCode)
+    }
+
+    companion object {
+        private const val REQUEST_CLOCK_FONT = 6208
     }
 
     override fun onDestroy() {
@@ -997,7 +1175,7 @@ class MainActivity : Activity() {
 
     private inner class LivePreview : View(this@MainActivity) {
         private val renderer = HalynRenderer(this@MainActivity)
-        private val clockRenderer = ClockOverlayRenderer()
+        private val clockRenderer = ClockOverlayRenderer(this@MainActivity)
         private val startTime = SystemClock.uptimeMillis()
         private var touchX = .5f
         private var touchY = .5f
@@ -1020,6 +1198,7 @@ class MainActivity : Activity() {
                 starPose = if (state.preset == StarWindowRenderer.SCENE_INDEX) previewTracker.pose() else null
             )
             clockRenderer.draw(canvas, state)
+            renderer.drawForeground(canvas, state)
             if (running) postInvalidateDelayed(1000L / state.fps)
         }
 
