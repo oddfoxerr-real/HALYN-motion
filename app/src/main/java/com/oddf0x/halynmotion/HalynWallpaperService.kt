@@ -154,7 +154,8 @@ class HalynWallpaperService : WallpaperService() {
                 settings.preset == StarWindowRenderer.SCENE_INDEX) {
                 val destination = SpaceNavigation.destinationForName(
                     preferences.destinationName(),
-                    AstronomyCatalog.stars(this@HalynWallpaperService)
+                    AstronomyCatalog.stars(this@HalynWallpaperService),
+                    discoveries = spatialTracker.pose().generatedWorlds
                 )
                 if (destination != null) {
                     if (preferences.get().skyAligned) preferences.setSkyAligned(false)
