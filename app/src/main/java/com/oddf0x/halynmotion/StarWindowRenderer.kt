@@ -1,149 +1,257 @@
 package com.oddf0x.halynmotion
 
+import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
-import android.graphics.RuntimeShader
+import android.graphics.Shader
+import android.graphics.Typeface
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.sqrt
 
 /**
- * Fixed-world star sphere. Rays are rotated with the rotation-vector sensor
- * and originate at the bounded inertial position. Three concentric shells
- * create actual view-dependent parallax as the virtual camera translates.
+ * Astronomical Star Window.
  *
- * Stars are deterministic in spherical world coordinates, so they do not
- * follow the phone when its attitude changes. No camera, Unity or ARCore.
+ * Stars are real J2000 Yale/Hipparcos catalogue positions and known distances.
+ * The Sun and 8 planets use JPL's 1800–2050 approximate Keplerian orbital
+ * elements. No random procedural stars or decorative fake constellations.
+ *
+ * Physics coordinates are Double in AU. The user's estimated inertial camera
+ * motion and exact 1-ly intentional warp affect actual 3D projection. Planet
+ * glyph radii are intentionally enlarged for visibility — body distances and
+ * angles are NOT exaggerated.
+ *
+ * Hardware-accelerated Canvas is used for grouped point rendering. Buffers
+ * and catalog coordinates are cached, preventing per-frame 9k-star allocation.
  */
-class StarWindowRenderer {
-    private val shader = try { RuntimeShader(AGSL) } catch (_: IllegalArgumentException) { null }
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
-        isDither = true
-        if (this@StarWindowRenderer.shader != null) this.shader = this@StarWindowRenderer.shader
-        else color = Color.rgb(3, 6, 17)
+class StarWindowRenderer(context: Context) {
+    private val stars = AstronomyCatalog.stars(context)
+    private val constellationLines = loadConstellationLines(context)
+    private val buckets = Array(9) { FloatArray(18_300) }
+    private val counts = IntArray(9)
+    private val paintBuckets = Array(9) { idx ->
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+            val hueGroup = idx % 3
+            val brightness = idx / 3
+            val color = when (hueGroup) {
+                0 -> Color.rgb(178, 202, 245)
+                2 -> Color.rgb(255, 209, 173)
+                else -> Color.rgb(244, 247, 255)
+            }
+            this.color = color
+            alpha = intArrayOf(115, 205, 250)[brightness]
+            strokeWidth = floatArrayOf(1.35f, 2.2f, 3.45f)[brightness]
+        }
     }
+    private val haze = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val guide = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(52, 147, 176, 230)
+        style = Paint.Style.STROKE
+        strokeWidth = 1.1f
+    }
+    private val bodyGlow = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val bodyCore = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val label = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
+        color = Color.argb(221, 243, 246, 255)
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        textSize = 23f
+        setShadowLayer(6f, 0f, 1f, Color.BLACK)
+    }
+    private var backgroundColor = Color.TRANSPARENT
+    private var cachedHeight = -1
+
+    private data class Projection(val x: Float, val y: Float, val distance: Double)
+    private data class StrokedDirection(val path: List<SpacePoint>)
 
     fun draw(
         canvas: Canvas,
         state: MotionState,
         seconds: Float,
-        pose: StarPose = StarPose()
+        pose: StarPose
     ) {
-        canvas.drawColor(Color.rgb(3, 5, 15))
-        if (canvas.isHardwareAccelerated && shader != null) {
-            val color = if (state.palette == 5) state.customColor
-                else HalynRenderer.PALETTE_COLORS[state.palette.coerceIn(0, 4)]
-            shader.setFloatUniform("u_resolution",
-                canvas.width.coerceAtLeast(1).toFloat(),
-                canvas.height.coerceAtLeast(1).toFloat())
-            shader.setFloatUniform("u_time", seconds)
-            shader.setFloatUniform("u_right", pose.right[0], pose.right[1], pose.right[2])
-            shader.setFloatUniform("u_up", pose.up[0], pose.up[1], pose.up[2])
-            shader.setFloatUniform("u_out", pose.outward[0], pose.outward[1], pose.outward[2])
-            shader.setFloatUniform("u_origin", pose.origin[0], pose.origin[1], pose.origin[2])
-            shader.setFloatUniform("u_accent",
-                Color.red(color) / 255f, Color.green(color) / 255f, Color.blue(color) / 255f)
-            shader.setFloatUniform("u_density", when (state.starDensity) {
-                0 -> .75f
-                2 -> 1.5f
-                else -> 1f
-            })
-            shader.setFloatUniform("u_lines", if (state.starLines) 1f else 0f)
+        val width = canvas.width.coerceAtLeast(1).toFloat()
+        val height = canvas.height.coerceAtLeast(1).toFloat()
+        val smaller = min(width, height)
+        val scale = max(.62f, width / 1080f)
+        val accent = if (state.palette == 5) state.customColor
+            else HalynRenderer.PALETTE_COLORS[state.palette.coerceIn(0, 4)]
+
+        canvas.drawColor(Color.rgb(2, 4, 10))
+        if (cachedHeight != canvas.height || backgroundColor != accent) {
+            backgroundColor = accent
+            cachedHeight = canvas.height
+            haze.shader = LinearGradient(0f, 0f, 0f, height,
+                intArrayOf(Color.rgb(5, 10, 22), Color.rgb(2, 3, 10), Color.rgb(7, 8, 18)),
+                null, Shader.TileMode.CLAMP)
         }
-        canvas.drawRect(0f, 0f,
-            canvas.width.coerceAtLeast(1).toFloat(),
-            canvas.height.coerceAtLeast(1).toFloat(), paint)
+        canvas.drawRect(0f, 0f, width, height, haze)
+
+        val projectionScale = height * .82f
+        val right = pose.right
+        val up = pose.up
+        val outward = pose.outward
+        val origin = pose.originAu
+
+        fun project(point: SpacePoint): Projection? {
+            val dx = point.x - origin.x
+            val dy = point.y - origin.y
+            val dz = point.z - origin.z
+            val forward = -(dx * outward[0] + dy * outward[1] + dz * outward[2])
+            if (forward <= 0.001) return null
+            val side = dx * right[0] + dy * right[1] + dz * right[2]
+            val vertical = dx * up[0] + dy * up[1] + dz * up[2]
+            val x = (width * .5 + projectionScale * side / forward).toFloat()
+            val y = (height * .5 - projectionScale * vertical / forward).toFloat()
+            if (!x.isFinite() || !y.isFinite()) return null
+            if (x < -35f || x > width + 35f || y < -35f || y > height + 35f) return null
+            return Projection(x, y, sqrt(dx * dx + dy * dy + dz * dz))
+        }
+
+        val maxStars = when (state.starDensity) {
+            0 -> min(1600, stars.size)
+            2 -> stars.size
+            else -> min(5200, stars.size)
+        }
+        counts.fill(0)
+        for (i in 0 until maxStars) {
+            val star = stars[i]
+            val point = project(star.location) ?: continue
+            val brightness = when {
+                star.magnitude < 1.9f -> 2
+                star.magnitude < 4.2f -> 1
+                else -> 0
+            }
+            val temp = when {
+                star.bv < .20f -> 0
+                star.bv > 1.05f -> 2
+                else -> 1
+            }
+            val group = brightness * 3 + temp
+            val offset = counts[group]
+            val points = buckets[group]
+            if (offset + 1 >= points.size) continue
+            points[offset] = point.x
+            points[offset + 1] = point.y
+            counts[group] += 2
+        }
+        for (i in 0..8) {
+            val count = counts[i]
+            if (count <= 0) continue
+            val ink = paintBuckets[i]
+            ink.strokeWidth = floatArrayOf(1.35f, 2.2f, 3.45f)[i / 3] * scale
+            canvas.drawPoints(buckets[i], 0, count, ink)
+        }
+
+        // BSD-3-clause d3-celestial constellation paths in actual J2000 sky
+        // directions. Lines are traditional visual groupings, not physical
+        // structures or claimed interstellar navigation routes.
+        if (state.starLines) {
+            guide.strokeWidth = max(1f, scale)
+            for (constellation in constellationLines) {
+                var previous: Projection? = null
+                for (point in constellation.path) {
+                    val projected = project(point)
+                    if (previous != null && projected != null) {
+                        canvas.drawLine(previous.x, previous.y, projected.x, projected.y, guide)
+                    }
+                    previous = projected
+                }
+            }
+        }
+
+        // Solar System world coordinates, in AU, from JPL's Keplerian model.
+        // Visibility requires looking in the actual object's direction.
+        val planets = SolarEphemeris.positions(System.currentTimeMillis())
+        drawPlanet(canvas, SpacePoint(0.0,0.0,0.0), "Sun",
+            Color.rgb(255, 234, 181), true, scale, ::project)
+        for (planet in planets) {
+            drawPlanet(canvas, planet.location, planet.name,
+                planet.tint, false, scale, ::project)
+        }
+
+        // Named stars retain correct catalog directions. Labels are selective
+        // to avoid visually overwhelming a minimalist live wallpaper.
+        var namesDrawn = 0
+        for (star in stars) {
+            if (namesDrawn >= 5 || star.magnitude > .9f) break
+            if (star.name.isEmpty()) continue
+            val point = project(star.location) ?: continue
+            label.textSize = 20f * scale
+            label.color = Color.argb(165, 226, 232, 250)
+            canvas.drawText(star.name, point.x + 9f * scale,
+                point.y - 9f * scale, label)
+            namesDrawn++
+        }
+
+        // Intentional 1-ly warp is smoothly interpolated by SpatialTracker.
+        // Keep visual treatment extremely subtle instead of flashing/strobing.
+        if (pose.warpProgress < 1f) {
+            val wave = 1f - abs(2f * pose.warpProgress - 1f)
+            bodyGlow.color = Color.argb((18f * wave).toInt().coerceIn(0, 20),
+                Color.red(accent), Color.green(accent), Color.blue(accent))
+            canvas.drawCircle(width * .5f, height * .5f,
+                smaller * (.24f + .24f * pose.warpProgress), bodyGlow)
+        }
+    }
+
+    private fun drawPlanet(
+        canvas: Canvas,
+        location: SpacePoint,
+        name: String,
+        colour: Int,
+        sun: Boolean,
+        scale: Float,
+        project: (SpacePoint) -> Projection?
+    ) {
+        val point = project(location) ?: return
+        val radius = (if (sun) 6.5f else 3.8f) * scale
+        bodyGlow.color = Color.argb(if (sun) 30 else 19,
+            Color.red(colour), Color.green(colour), Color.blue(colour))
+        canvas.drawCircle(point.x, point.y, radius * 3.2f, bodyGlow)
+        bodyCore.color = colour
+        canvas.drawCircle(point.x, point.y, radius, bodyCore)
+        label.textSize = if (sun) 22f * scale else 19f * scale
+        label.color = Color.argb(215, 240, 243, 251)
+        canvas.drawText(name, point.x + radius + 9f * scale,
+            point.y - radius * .8f, label)
+    }
+
+    private fun loadConstellationLines(context: Context): List<StrokedDirection> {
+        val result = ArrayList<StrokedDirection>()
+        val tilt = Math.toRadians(23.43929111)
+        context.assets.open("constellation_strokes.csv").bufferedReader().useLines { rows ->
+            rows.forEach { row ->
+                if (row.isBlank() || row.startsWith("#") || !row.contains(':')) return@forEach
+                val parts = row.substringAfter(':').trim().split(' ')
+                val points = parts.mapNotNull { pair ->
+                    val coords = pair.split(',')
+                    if (coords.size != 2) return@mapNotNull null
+                    val ra = coords[0].toDoubleOrNull() ?: return@mapNotNull null
+                    val dec = coords[1].toDoubleOrNull() ?: return@mapNotNull null
+                    val raRad = Math.toRadians(ra)
+                    val decRad = Math.toRadians(dec)
+                    val x = kotlin.math.cos(decRad) * kotlin.math.cos(raRad)
+                    val y = kotlin.math.cos(decRad) * kotlin.math.sin(raRad)
+                    val z = kotlin.math.sin(decRad)
+                    val distance = 1.0e12
+                    SpacePoint(
+                        x * distance,
+                        (y * kotlin.math.cos(tilt) + z * kotlin.math.sin(tilt)) * distance,
+                        (-y * kotlin.math.sin(tilt) + z * kotlin.math.cos(tilt)) * distance
+                    )
+                }
+                if (points.size > 1) result.add(StrokedDirection(points))
+            }
+        }
+        return result
     }
 
     companion object {
         const val SCENE_INDEX = 12
-        private val AGSL = """
-uniform float2 u_resolution;
-uniform float u_time;
-uniform float3 u_right;
-uniform float3 u_up;
-uniform float3 u_out;
-uniform float3 u_origin;
-uniform float3 u_accent;
-uniform float u_density;
-uniform float u_lines;
-
-float hash21(float2 p) {
-    return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453123);
-}
-float2 hash22(float2 p) {
-    return float2(hash21(p), hash21(p + float2(37.719, 61.317)));
-}
-// Each layer is a fixed spherical map around the virtual world's origin.
-// Sampling the ray intersection gives position-dependent parallax.
-float4 starLayer(float3 origin, float3 dir, float distance, float density, float seed) {
-    float b = dot(origin, dir);
-    float c = dot(origin, origin) - distance * distance;
-    float t = -b + sqrt(max(0.001, b * b - c));
-    float3 surface = normalize(origin + t * dir);
-    float2 lonLat = float2(atan(surface.x, surface.z) / 6.2831853 + .5,
-        asin(clamp(surface.y, -1.0, 1.0)) / 3.1415927 + .5);
-    float2 p = lonLat * float2(density, density * .5);
-    float2 cell = floor(p);
-    float2 local = fract(p);
-    float rnd = hash21(cell + float2(seed, seed * 2.13));
-    float2 center = .12 + .76 * hash22(cell + float2(seed * 4.7, seed));
-    float diameter = .035 + .048 * hash21(cell + float2(seed, 8.71));
-    float star = (1.0 - smoothstep(diameter, diameter + .022, length(local - center)))
-        * smoothstep(.78, .985, rnd);
-    float glow = exp(-17.0 * length(local - center)) * pow(max(0.0, rnd - .90), 1.4) * 1.7;
-    float twinkle = .87 + .13 * sin(u_time * (0.45 + rnd * 1.15) + rnd * 30.0);
-    return float4(star * twinkle, glow * twinkle, rnd, star);
-}
-float segmentGlow(float3 ray, float3 start, float3 end) {
-    float3 delta = end - start;
-    float ratio = clamp(dot(ray - start, delta) / max(dot(delta, delta), .0001), 0.0, 1.0);
-    float3 nearest = normalize(start + ratio * delta);
-    float d = length(ray - nearest);
-    float line = (1.0 - smoothstep(.0015, .0045, d)) * .30;
-    float vertex = (1.0 - smoothstep(.003, .008, length(ray - start))) * .8;
-    return line + vertex;
-}
-half4 main(float2 frag) {
-    float2 uv = frag / u_resolution;
-    float aspect = u_resolution.x / u_resolution.y;
-    float2 view = float2((uv.x - .5) * aspect, .5 - uv.y);
-    float3 dir = normalize(view.x * u_right + view.y * u_up - u_out * .91);
-    float3 origin = u_origin;
-
-    float4 nearStars = starLayer(origin, dir, 4.5, 115.0 * u_density, 2.4);
-    float4 midStars  = starLayer(origin, dir, 15.0, 178.0 * u_density, 6.1);
-    float4 farStars  = starLayer(origin, dir, 75.0, 265.0 * u_density, 10.5);
-
-    float3 white = float3(.93, .96, 1.0);
-    float3 tint = mix(float3(.45, .64, .96), u_accent, .48);
-    float3 color = float3(.006, .009, .022);
-    color += white * (farStars.x * .40 + midStars.x * .66 + nearStars.x * .95);
-    color += tint * (farStars.y * .12 + midStars.y * .28 + nearStars.y * .40);
-    color += tint * (farStars.x * farStars.z * .10 + nearStars.x * nearStars.z * .20);
-
-    // Volumetric-looking haze is still a faint deterministic world direction
-    // function, not a drifting screen-space overlay.
-    float haloA = exp(-12.0 * length(dir - normalize(float3(.51, -.15, -.84))));
-    float haloB = exp(-6.0 * length(dir - normalize(float3(-.50, .31, -.81))));
-    color += tint * haloA * .036 + float3(.12, .16, .27) * haloB * .03;
-
-    if (u_lines > .5) {
-        // Hand-authored decorative celestial geometry, not an astronomy catalog.
-        float3 a = normalize(float3(-.42, .32, -.85));
-        float3 b = normalize(float3(-.24, .41, -.88));
-        float3 c = normalize(float3(-.10, .18, -.97));
-        float3 d = normalize(float3(.14, .29, -.94));
-        float3 e = normalize(float3(.36, .11, -.92));
-        float3 f = normalize(float3(.49, .36, -.79));
-        float tracing = segmentGlow(dir,a,b) + segmentGlow(dir,b,c)
-            + segmentGlow(dir,c,d) + segmentGlow(dir,d,e)
-            + segmentGlow(dir,e,f);
-        color += tint * tracing * .55;
-    }
-
-    float edge = length(float2((uv.x - .5) * .9, (uv.y - .5) * .65));
-    color *= 1.0 - smoothstep(.34, .83, edge) * .17;
-    return half4(half3(max(color, float3(0.0))), 1.0);
-}
-""".trimIndent()
     }
 }
