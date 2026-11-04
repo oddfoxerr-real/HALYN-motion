@@ -29,7 +29,12 @@ data class MotionState(
     val clockAccent: Boolean = false,
     val starSensitivity: Float = .55f,
     val starDensity: Int = 1,
-    val starLines: Boolean = true
+    val starLines: Boolean = true,
+    val starEffects: Int = 2,
+    val skyAligned: Boolean = false,
+    val skyLatitude: Double = 0.0,
+    val skyLongitude: Double = 0.0,
+    val skyFixTime: Long = 0L
 )
 
 class MotionPreferences(context: Context) {
@@ -64,7 +69,12 @@ class MotionPreferences(context: Context) {
             clockAccent = preferences.getBoolean("clock_accent", false),
             starSensitivity = float("star_sensitivity", .55f, .15f, 1.4f),
             starDensity = preferences.getInt("star_density", 1).coerceIn(0, 2),
-            starLines = preferences.getBoolean("star_lines", true)
+            starLines = preferences.getBoolean("star_lines", true),
+            starEffects = preferences.getInt("star_effects", 2).coerceIn(0, 2),
+            skyAligned = preferences.getBoolean("sky_aligned", false) && preferences.contains("sky_latitude"),
+            skyLatitude = Double.fromBits(preferences.getLong("sky_latitude", 0L)).takeIf { it.isFinite() && it in -90.0..90.0 } ?: 0.0,
+            skyLongitude = Double.fromBits(preferences.getLong("sky_longitude", 0L)).takeIf { it.isFinite() && it in -180.0..180.0 } ?: 0.0,
+            skyFixTime = preferences.getLong("sky_fix_time", 0L)
         )
     }
 
@@ -88,6 +98,23 @@ class MotionPreferences(context: Context) {
     fun setStarSensitivity(value: Float) = preferences.edit().putFloat("star_sensitivity", value.coerceIn(.15f, 1.4f)).apply()
     fun setStarDensity(value: Int) = preferences.edit().putInt("star_density", value.coerceIn(0, 2)).apply()
     fun setStarLines(value: Boolean) = preferences.edit().putBoolean("star_lines", value).apply()
+    fun setStarEffects(value: Int) = preferences.edit().putInt("star_effects", value.coerceIn(0, 2)).apply()
+    fun setSkyAligned(value: Boolean) = preferences.edit().putBoolean("sky_aligned", value).apply()
+    fun saveSkyFix(latitude: Double, longitude: Double, timestampMs: Long) {
+        if (!latitude.isFinite() || !longitude.isFinite() || latitude !in -90.0..90.0 || longitude !in -180.0..180.0) return
+        preferences.edit()
+            .putLong("sky_latitude", latitude.toBits())
+            .putLong("sky_longitude", longitude.toBits())
+            .putLong("sky_fix_time", timestampMs)
+            .putBoolean("sky_aligned", true).apply()
+    }
+    fun clearSkyFix() = preferences.edit()
+        .putBoolean("sky_aligned", false)
+        .remove("sky_latitude").remove("sky_longitude").remove("sky_fix_time").apply()
+    fun requestWarp() {
+        val next = preferences.getInt("star_warp_token", 0) + 1
+        preferences.edit().putInt("star_warp_token", next).apply()
+    }
     fun recenterStarWindow() {
         val token = preferences.getInt("star_recenter_token", 0)
         preferences.edit().putInt("star_recenter_token", token + 1).apply()
