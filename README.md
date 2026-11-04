@@ -1,6 +1,16 @@
 # HALYN Motion
 
-Minimalist native Android live wallpaper studio featuring **13 animated GPU wallpaper scenes** and **5 real-time clock styles**.
+Minimalist native Android live wallpaper studio featuring **21 live wallpaper scenes** and **5 real-time clock styles**, including four layered mountain landscapes.
+
+## What's new in v0.7 — Mountain Clock Studio
+
+- **21 scenes:** Keeps all 13 original wallpapers and adds *Orbital Halo*, *Cosmic Rain*, *Plasma Loom* and *Eclipse Glass* (procedural artistic visuals), plus *Twilight Peaks*, *Moonlit Ridge*, *Alpine Mist* and *Ember Valley* (minimal mountain landscapes).
+- **Clock behind mountains:** Mountain wallpapers render the sky and distant ridges first, then the clock, then the foreground mountain silhouette. This provides real partial clock occlusion as the clock moves.
+- **Clock font selector:** Default, Rounded, Serif, Mono, Condensed, Bold, and locally imported .ttf/.otf fonts (3 MB size limit, validated before replacing an existing font).
+- **Move clock on Home screen:** Turn on the placement toggle in Clock atelier. Android requests permission for **Draw over other apps** on first use. HALYN opens the actual launcher with a transparent **5% snap grid**. Drag anywhere to reposition the clock; tap the **X in the top-right corner** to exit. The grid disappears, the clock position remains saved, and a temporary foreground notification also provides Exit.
+- **Permission lifecycle:** No overlay is created unless you start the editor; no persistent overlay survives editing. No image captures, location polling or network communication are needed for clock placement.
+- **Reset placement:** Tapping Upper, Centre or Lower in Clock atelier disables the custom grid placement and reuses the chosen preset. The mountain scene's Centre default is intentionally placed near the front ridge.
+- **Important:** A genuine launcher overlay requires user-granted Android overlay permission; the service uses Android 14+ `specialUse` foreground service declaration. Test Samsung launcher alignment/permissions on the phone. Debug builds are not Play Store production-signed.
 
 ## What's new in v0.6.2
 
