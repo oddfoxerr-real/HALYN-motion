@@ -447,6 +447,17 @@ class MainActivity : Activity() {
         panel.addView(warp, LinearLayout.LayoutParams(-1, dp(50)).apply {
             topMargin = dp(16)
         })
+        val destinationButton = text("Explore a destination    ✦", 14f, ink, Typeface.BOLD).apply {
+            gravity = Gravity.CENTER
+            background = rounded(Color.rgb(42, 44, 53), 15)
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Choose the Sun, a planet or a nearby real star to visit"
+            setOnClickListener { showDestinations() }
+        }
+        panel.addView(destinationButton, LinearLayout.LayoutParams(-1, dp(50)).apply {
+            topMargin = dp(9)
+        })
         panel.addView(recenter, LinearLayout.LayoutParams(-1, dp(50)).apply {
             topMargin = dp(12)
         })
@@ -495,9 +506,9 @@ class MainActivity : Activity() {
         ).apply { setPadding(0, dp(11), 0, dp(2)) })
 
         panel.addView(text(
-            "Tap the wallpaper to warp 1 light-year in the direction you're facing. " +
-                "Planet positions follow NASA/JPL orbital elements; 9,096 real catalog stars " +
-                "supply the sky. The Warp button works even when the launcher doesn't forward taps.",
+            "Tap anywhere to travel in that exact direction. Aim at a known object " +
+                "to approach it instead. Planets around uncharted stars are visually " +
+                "generated and labelled simulated, not reported NASA discoveries.",
             11f, subtle
         ).apply { setPadding(0, dp(16), 0, 0) })
         starControls.addView(panel)
@@ -566,6 +577,31 @@ class MainActivity : Activity() {
             "$aligned  ·  $latitude / $longitude"
         }
         skyToggle.visibility = if (state.skyAligned) View.VISIBLE else View.GONE
+    }
+
+    private fun showDestinations() {
+        val names = arrayOf("Sun", "Mercury", "Venus", "Earth", "Mars",
+            "Jupiter", "Saturn", "Uranus", "Neptune", "Sirius", "Rigil Kentaurus",
+            "Vega", "Arcturus")
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Navigate to…")
+            .setItems(names) { _, index ->
+                val destination = SpaceNavigation.destinationForName(
+                    names[index], AstronomyCatalog.stars(this)
+                )
+                if (destination != null) {
+                    if (prefs.get().skyAligned) prefs.setSkyAligned(false)
+                    refreshSkyUi()
+                    previewTracker.configureSky(prefs.get())
+                    previewTracker.flyTo(destination)
+                    prefs.requestDestination(destination.name)
+                    preview.invalidate()
+                    Toast.makeText(this, "Approaching ${destination.name}", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "Catalog coordinates unavailable", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .show()
     }
 
     private fun triggerStarWarp() {
@@ -997,7 +1033,24 @@ class MainActivity : Activity() {
                         SystemClock.uptimeMillis() - pointerDownMs <= 330L &&
                         kotlin.math.abs(event.x - pointerDownX) < dp(24) &&
                         kotlin.math.abs(event.y - pointerDownY) < dp(24)) {
-                        triggerStarWarp()
+                        if (prefs.get().skyAligned) prefs.setSkyAligned(false)
+                        refreshSkyUi()
+                        previewTracker.configureSky(prefs.get())
+                        val pose = previewTracker.pose()
+                        val destination = SpaceNavigation.pick(
+                            pose, event.x, event.y, width.toFloat(), height.toFloat(),
+                            AstronomyCatalog.stars(this@MainActivity)
+                        )
+                        if (destination != null) {
+                            previewTracker.flyTo(destination)
+                            prefs.requestDestination(destination.name)
+                        } else {
+                            val nx = event.x / width.coerceAtLeast(1)
+                            val ny = event.y / height.coerceAtLeast(1)
+                            val aspect = width.toFloat() / height.coerceAtLeast(1)
+                            previewTracker.warpToward(nx, ny, aspect)
+                            prefs.requestWarpToward(nx, ny, aspect)
+                        }
                     }
                     performClick()
                     invalidate()
