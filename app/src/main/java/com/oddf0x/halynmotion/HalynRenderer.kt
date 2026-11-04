@@ -15,6 +15,7 @@ import android.os.Build
 data class MotionState(
     val preset: Int = 0,
     val palette: Int = 0,
+    val customColor: Int = Color.rgb(185, 174, 255),
     val intensity: Float = 1.0f,
     val speed: Float = 1.0f,
     val fps: Int = 30,
@@ -35,7 +36,8 @@ class MotionPreferences(context: Context) {
         }
         return MotionState(
             preset = preferences.getInt("preset", 0).coerceIn(0, 5),
-            palette = preferences.getInt("palette", 0).coerceIn(0, 4),
+            palette = preferences.getInt("palette", 0).coerceIn(0, 5),
+            customColor = preferences.getInt("custom_color", Color.rgb(185, 174, 255)) or -0x1000000,
             intensity = float("intensity", 1f, .35f, 2.3f),
             speed = float("speed", 1f, .25f, 2f),
             fps = when (preferences.getInt("fps", 30)) {
@@ -49,7 +51,11 @@ class MotionPreferences(context: Context) {
     }
 
     fun setPreset(value: Int) = preferences.edit().putInt("preset", value.coerceIn(0, 5)).apply()
-    fun setPalette(value: Int) = preferences.edit().putInt("palette", value.coerceIn(0, 4)).apply()
+    fun setPalette(value: Int) = preferences.edit().putInt("palette", value.coerceIn(0, 5)).apply()
+    fun setCustomColor(color: Int) = preferences.edit()
+        .putInt("custom_color", color or -0x1000000)
+        .putInt("palette", 5)
+        .apply()
     fun setIntensity(value: Float) = preferences.edit().putFloat("intensity", value.coerceIn(.35f, 2.3f)).apply()
     fun setSpeed(value: Float) = preferences.edit().putFloat("speed", value.coerceIn(.25f, 2f)).apply()
     fun setFps(value: Int) = preferences.edit().putInt("fps", value).apply()
@@ -92,6 +98,11 @@ class HalynRenderer {
             current.setFloatUniform("u_time", elapsedSeconds)
             current.setFloatUniform("u_variant", state.preset.toFloat())
             current.setFloatUniform("u_palette", state.palette.toFloat())
+            current.setFloatUniform("u_customColor",
+                Color.red(state.customColor) / 255f,
+                Color.green(state.customColor) / 255f,
+                Color.blue(state.customColor) / 255f
+            )
             current.setFloatUniform("u_intensity", state.intensity)
             current.setFloatUniform("u_speed", state.speed)
             current.setFloatUniform(
@@ -126,6 +137,7 @@ uniform float2 u_touch;
 uniform float u_time;
 uniform float u_variant;
 uniform float u_palette;
+uniform float3 u_customColor;
 uniform float u_intensity;
 uniform float u_speed;
 uniform float u_offset;
@@ -151,6 +163,9 @@ half4 main(float2 frag) {
         accent = float3(1.0, 0.35, 0.66);
     } else if (u_palette > 3.5) {
         accent = float3(0.30, 0.96, 0.64);
+    }
+    if (u_palette > 4.5) {
+        accent = u_customColor;
     }
     float3 companion = accent.zxy * 0.74 + accent * 0.26;
     float3 col = float3(0.014, 0.018, 0.038);
