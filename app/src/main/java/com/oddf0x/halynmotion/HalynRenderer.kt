@@ -20,6 +20,7 @@ data class MotionState(
     val speed: Float = 1.0f,
     val fps: Int = 30,
     val touch: Boolean = true,
+    val starTapTravel: Boolean = false,
     val parallax: Boolean = true,
     val clockStyle: Int = 0,
     val clockPosition: Int = 1,
@@ -60,6 +61,7 @@ class MotionPreferences(context: Context) {
                 else -> 30
             },
             touch = preferences.getBoolean("touch", true),
+            starTapTravel = preferences.getBoolean("star_tap_travel", false),
             parallax = preferences.getBoolean("parallax", true),
             clockStyle = preferences.getInt("clock_style", 0).coerceIn(0, 5),
             clockPosition = preferences.getInt("clock_position", 1).coerceIn(0, 2),
@@ -88,6 +90,7 @@ class MotionPreferences(context: Context) {
     fun setSpeed(value: Float) = preferences.edit().putFloat("speed", value.coerceIn(.25f, 2f)).apply()
     fun setFps(value: Int) = preferences.edit().putInt("fps", value).apply()
     fun setTouch(value: Boolean) = preferences.edit().putBoolean("touch", value).apply()
+    fun setStarTapTravel(value: Boolean) = preferences.edit().putBoolean("star_tap_travel", value).apply()
     fun setParallax(value: Boolean) = preferences.edit().putBoolean("parallax", value).apply()
     fun setClockStyle(value: Int) = preferences.edit().putInt("clock_style", value.coerceIn(0, 5)).apply()
     fun setClockPosition(value: Int) = preferences.edit().putInt("clock_position", value.coerceIn(0, 2)).apply()

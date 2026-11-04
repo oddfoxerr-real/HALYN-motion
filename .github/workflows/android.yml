@@ -52,11 +52,11 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='7'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='8'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.6.1-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.6.1-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.6.2-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.6.2-preview.apk > SHA256SUMS.txt)
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -75,26 +75,32 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.6 expedition wallpaper
+      - name: Publish HALYN v0.6.2 optional touch controls
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.6.1-preview.1
+          TAG: v0.6.2-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.6.1-preview.apk
-          unzip -t dist/HALYN-Motion-v0.6.1-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.6.2-preview.apk
+          unzip -t dist/HALYN-Motion-v0.6.2-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN Motion v0.6.1 Preview
+          # HALYN Motion v0.6.2 Preview
 
-          Warp now has a visible animated star tunnel, central portal,
-          arrival pulse and distance HUD; the dedicated in-app warp button
-          signals the actual live wallpaper engine as well as the studio.
-          Physics still moves the virtual camera one real light-year.
+          Star Window now has an independent "Tap to travel" toggle,
+          disabled by default to prevent accidental hops while using your
+          launcher. Enabling it restores tap-a-planet, tap-a-star and
+          tap-empty-space movement in both the studio and the live wallpaper.
+          The in-app Warp and Explore destination buttons always work.
+          Other wallpaper scenes retain their separate Touch interaction
+          preference.
+
+          Warp retains its animated star tunnel, central portal,
+          arrival pulse, distance HUD and 1-light-year virtual movement.
 
           Survey / Nebula / Expedition atmospheres add optional GPU cosmic
           clouds and clearly fictional ringed worlds, while retaining
@@ -119,7 +125,7 @@ jobs:
           - Unsupported vendor AGSL rendering falls back to a readable gradient.
           - Hardware performance on the Samsung Galaxy A56 is unverified.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.6.1-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.6.2-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.6.1 — Expedition stability and navigation" \
+            --title "HALYN Motion v0.6.2 — Optional Tap to Travel" \
             --notes-file notes.md --prerelease

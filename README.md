@@ -2,6 +2,14 @@
 
 Minimalist native Android live wallpaper studio featuring **13 animated GPU wallpaper scenes** and **5 real-time clock styles**.
 
+## What's new in v0.6.2
+
+**Tap to travel is now optional and switched off by default.** In **Star Window → Tap to travel**, turn it on to navigate by tapping the studio preview or your home-screen live wallpaper. Tap a planet or named star to approach it; tap empty space to warp forward. When disabled, Star Window ignores touch-based navigation and does not request home-screen touch events, preventing accidental travel while using your launcher.
+
+The **Warp one light-year**, **Explore a destination**, and **Return to the Solar System** buttons work regardless of the toggle. Device tilt and motion-based sky viewing are unchanged. The independent **Touch interaction** option under Preferences continues to control the other 12 GPU scenes, not Star Window navigation.
+
+Existing installations with no saved Star Window touch preference will default to off. The preference is remembered across launches.
+
 ## What's new in v0.6
 
 - **Warp fixed visually and functionally:** A travel tunnel with moving star streaks, a central portal ring, progress animation, one-light-year displacement in J2000 coordinates, distance HUD, and a visible arrival pulse. The app's Warp action now also signals the live wallpaper engine instead of affecting only its preview.
@@ -12,7 +20,7 @@ Minimalist native Android live wallpaper studio featuring **13 animated GPU wall
 ### How to use the new Star Window
 
 1. Choose **Star Window** in the New Collection, then **Expedition** under Visual Atmosphere.
-2. Tap **Warp one light-year** in the studio (always works when the app is open), or tap the live wallpaper when your launcher forwards wallpaper touches.
+2. Tap **Warp one light-year** in the studio (always works when the app is open). To tap the wallpaper to travel, enable **Tap to travel** under Star Window first (off by default); launcher support varies.
 3. You'll see an animated hyperspace tunnel, distance-from-origin label and warp-complete effect. **Return to the Solar System** resets the virtual camera.
 4. For the *real sky above your location*, choose **Sync sky location** and grant approximate or precise location. This uses the saved coordinates and Earth's rotation, not live GPS polling. Warping switches back into exploration mode.
 

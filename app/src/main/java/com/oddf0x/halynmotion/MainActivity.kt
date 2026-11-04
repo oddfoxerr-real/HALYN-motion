@@ -423,6 +423,18 @@ class MainActivity : Activity() {
             11f, secondary
         ).apply { setPadding(0, dp(10), 0, dp(5)) })
 
+        panel.addView(View(this).apply { setBackgroundColor(borderColor) },
+            LinearLayout.LayoutParams(-1, dp(1)).apply { topMargin = dp(16) })
+        addToggle(
+            panel,
+            "Tap to travel",
+            "Off by default · Tap planets or space to warp when enabled",
+            prefs.get().starTapTravel
+        ) { enabled ->
+            prefs.setStarTapTravel(enabled)
+            preview.invalidate()
+        }
+
         val recenter = text("Return to the Solar System    ⟲", 14f, ink, Typeface.BOLD).apply {
             gravity = Gravity.CENTER
             background = rounded(Color.rgb(42, 44, 53), 15)
@@ -506,9 +518,9 @@ class MainActivity : Activity() {
         ).apply { setPadding(0, dp(11), 0, dp(2)) })
 
         panel.addView(text(
-            "Tap anywhere to travel in that exact direction. Aim at a known object " +
-                "to approach it instead. Planets around uncharted stars are visually " +
-                "generated and labelled simulated, not reported NASA discoveries.",
+            "When Tap to travel is on, tap a planet or star to approach it, " +
+                "or empty space to warp in that direction. When off, only the " +
+                "Warp and Explore buttons navigate. Fictional worlds are marked simulated.",
             11f, subtle
         ).apply { setPadding(0, dp(16), 0, 0) })
         starControls.addView(panel)
@@ -654,7 +666,7 @@ class MainActivity : Activity() {
             background = rounded(cardColor, 22, borderColor)
             setPadding(dp(17), dp(6), dp(17), dp(14))
         }
-        addToggle(panel, "Touch interaction", "Respond to your gestures", prefs.get().touch) {
+        addToggle(panel, "Touch interaction", "Gesture response for the other 12 scenes", prefs.get().touch) {
             prefs.setTouch(it)
         }
         panel.addView(View(this).apply { setBackgroundColor(borderColor) }, LinearLayout.LayoutParams(-1, dp(1)))
@@ -1012,6 +1024,12 @@ class MainActivity : Activity() {
         }
 
         override fun onTouchEvent(event: MotionEvent): Boolean {
+            // Do not intercept taps or scrolling in the Star Window preview
+            // when the user prefers a passive live wallpaper.
+            val state = prefs.get()
+            if (state.preset == StarWindowRenderer.SCENE_INDEX && !state.starTapTravel) {
+                return false
+            }
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     pointerDownMs = SystemClock.uptimeMillis()

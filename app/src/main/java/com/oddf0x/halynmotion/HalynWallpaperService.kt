@@ -64,7 +64,7 @@ class HalynWallpaperService : WallpaperService() {
 
         override fun onCreate(surfaceHolder: SurfaceHolder) {
             super.onCreate(surfaceHolder)
-            setTouchEventsEnabled(true)
+            setTouchEventsEnabled(acceptsTouch(settings))
             preferences.raw.registerOnSharedPreferenceChangeListener(this)
         }
 
@@ -104,7 +104,8 @@ class HalynWallpaperService : WallpaperService() {
 
         override fun onTouchEvent(event: MotionEvent) {
             super.onTouchEvent(event)
-            if (!settings.touch && settings.preset != StarWindowRenderer.SCENE_INDEX) return
+            // The star scene must not hijack home-screen taps unless opted in.
+            if (!acceptsTouch(settings)) return
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     touchDownX = event.x
@@ -183,7 +184,13 @@ class HalynWallpaperService : WallpaperService() {
             super.onDestroy()
         }
 
+        private fun acceptsTouch(state: MotionState): Boolean =
+            if (state.preset == StarWindowRenderer.SCENE_INDEX) state.starTapTravel else state.touch
+
         private fun refresh() {
+            // Android launchers stop forwarding taps when the wallpaper does not
+            // request them. This also protects users who disable tap-to-travel.
+            setTouchEventsEnabled(acceptsTouch(settings))
             stopFrames()
             if (visible && surfaceReady && settings.preset == StarWindowRenderer.SCENE_INDEX) {
                 spatialTracker.configureSky(settings)
