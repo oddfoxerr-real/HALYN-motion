@@ -26,7 +26,10 @@ data class MotionState(
     val clock24h: Boolean = true,
     val clockDate: Boolean = true,
     val clockSeconds: Boolean = true,
-    val clockAccent: Boolean = false
+    val clockAccent: Boolean = false,
+    val starSensitivity: Float = 1.0f,
+    val starDensity: Int = 1,
+    val starLines: Boolean = true
 )
 
 class MotionPreferences(context: Context) {
@@ -41,7 +44,7 @@ class MotionPreferences(context: Context) {
             return if (result.isFinite()) result.coerceIn(min, max) else default
         }
         return MotionState(
-            preset = preferences.getInt("preset", 0).coerceIn(0, 11),
+            preset = preferences.getInt("preset", 0).coerceIn(0, 12),
             palette = preferences.getInt("palette", 0).coerceIn(0, 5),
             customColor = preferences.getInt("custom_color", Color.rgb(185, 174, 255)) or -0x1000000,
             intensity = float("intensity", 1f, .35f, 2.3f),
@@ -58,11 +61,14 @@ class MotionPreferences(context: Context) {
             clock24h = preferences.getBoolean("clock_24h", true),
             clockDate = preferences.getBoolean("clock_date", true),
             clockSeconds = preferences.getBoolean("clock_seconds", true),
-            clockAccent = preferences.getBoolean("clock_accent", false)
+            clockAccent = preferences.getBoolean("clock_accent", false),
+            starSensitivity = float("star_sensitivity", 1f, .35f, 2.2f),
+            starDensity = preferences.getInt("star_density", 1).coerceIn(0, 2),
+            starLines = preferences.getBoolean("star_lines", true)
         )
     }
 
-    fun setPreset(value: Int) = preferences.edit().putInt("preset", value.coerceIn(0, 11)).apply()
+    fun setPreset(value: Int) = preferences.edit().putInt("preset", value.coerceIn(0, 12)).apply()
     fun setPalette(value: Int) = preferences.edit().putInt("palette", value.coerceIn(0, 5)).apply()
     fun setCustomColor(color: Int) = preferences.edit()
         .putInt("custom_color", color or -0x1000000)
@@ -79,6 +85,13 @@ class MotionPreferences(context: Context) {
     fun setClockDate(value: Boolean) = preferences.edit().putBoolean("clock_date", value).apply()
     fun setClockSeconds(value: Boolean) = preferences.edit().putBoolean("clock_seconds", value).apply()
     fun setClockAccent(value: Boolean) = preferences.edit().putBoolean("clock_accent", value).apply()
+    fun setStarSensitivity(value: Float) = preferences.edit().putFloat("star_sensitivity", value.coerceIn(.35f, 2.2f)).apply()
+    fun setStarDensity(value: Int) = preferences.edit().putInt("star_density", value.coerceIn(0, 2)).apply()
+    fun setStarLines(value: Boolean) = preferences.edit().putBoolean("star_lines", value).apply()
+    fun recenterStarWindow() {
+        val token = preferences.getInt("star_recenter_token", 0)
+        preferences.edit().putInt("star_recenter_token", token + 1).apply()
+    }
 }
 
 /**
@@ -89,6 +102,7 @@ class MotionPreferences(context: Context) {
  * All six scenes have separate silhouettes and motion formulas.
  */
 class HalynRenderer {
+    private val starRenderer by lazy { StarWindowRenderer() }
     private val shader: RuntimeShader? = try {
         if (Build.VERSION.SDK_INT >= 33) RuntimeShader(AGSL) else null
     } catch (_: IllegalArgumentException) {
@@ -105,8 +119,13 @@ class HalynRenderer {
         elapsedSeconds: Float,
         touchX: Float = .5f,
         touchY: Float = .5f,
-        offsetX: Float = .5f
+        offsetX: Float = .5f,
+        starPose: StarPose? = null
     ) {
+        if (state.preset == StarWindowRenderer.SCENE_INDEX) {
+            starRenderer.draw(canvas, state, elapsedSeconds, starPose ?: StarPose())
+            return
+        }
         val width = canvas.width.coerceAtLeast(1).toFloat()
         val height = canvas.height.coerceAtLeast(1).toFloat()
         canvas.drawColor(Color.rgb(5, 7, 13))
@@ -138,7 +157,8 @@ class HalynRenderer {
             "Ion Veil", "Liquid Chrome", "Nebula Drift",
             "Electric Silk", "Solar Bloom", "Prism Tide",
             "Silk Reactor", "Glass Orbit", "Magnetic Dust",
-            "Midnight Horizon", "Chromatic Flow", "Circuit Pulse"
+            "Midnight Horizon", "Chromatic Flow", "Circuit Pulse",
+            "Star Window"
         )
         val PALETTES = listOf(
             "Arctic", "Ultraviolet", "Ember", "Rose", "Verdant"
