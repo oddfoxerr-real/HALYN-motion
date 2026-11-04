@@ -16,7 +16,7 @@ object SpaceNavigation {
         val stopDistanceAu: Double,
         val kind: Kind
     )
-    enum class Kind { SUN, PLANET, CATALOG_STAR }
+    enum class Kind { SUN, PLANET, CATALOG_STAR, GENERATED }
 
     fun ray(pose: StarPose, normalizedX: Float, normalizedY: Float, aspect: Float): SpacePoint {
         // Inverse of the star renderer's perspective projection:
@@ -94,6 +94,17 @@ object SpaceNavigation {
             if (star.name.isBlank() || star.location.length() > 1e10) continue
             consider(Destination(star.name, star.location, .12, Kind.CATALOG_STAR))
         }
+        for (world in pose.generatedWorlds) {
+            consider(Destination(world.name, world.center, .004, Kind.GENERATED))
+        }
+        for (star in stars) {
+            if (star.name.isNotBlank() && star.location.length() < 1e10 &&
+                (star.location - pose.originAu).length() < 12.0) {
+                for (world in ImaginedWorlds.around(star)) {
+                    consider(Destination(world.name, world.location, .004, Kind.GENERATED))
+                }
+            }
+        }
         return best
     }
 
@@ -110,13 +121,24 @@ object SpaceNavigation {
     }
 
     fun destinationForName(
-        name: String, stars: List<CatalogStar>, nowMs: Long = System.currentTimeMillis()
+        name: String, stars: List<CatalogStar>,
+        nowMs: Long = System.currentTimeMillis(),
+        discoveries: List<GeneratedWorld> = emptyList()
     ): Destination? {
         if (name == "Sun") return Destination(name, SpacePoint(0.0, 0.0, 0.0), .032, Kind.SUN)
         val planet = SolarEphemeris.positions(nowMs).firstOrNull { it.name == name }
         if (planet != null) return Destination(name, planet.location, planetStopDistance(name), Kind.PLANET)
         val star = stars.firstOrNull { it.name == name && it.location.length() < 1e10 }
-        return star?.let { Destination(name, it.location, .12, Kind.CATALOG_STAR) }
+        if (star != null) return Destination(name, star.location, .12, Kind.CATALOG_STAR)
+        val generated = discoveries.firstOrNull { it.name == name }
+        if (generated != null) return Destination(name, generated.center, .004, Kind.GENERATED)
+        if (name.startsWith("Simulated ") && " · " in name) {
+            val host = name.substringAfterLast(" · ")
+            val parent = stars.firstOrNull { it.name == host }
+            val world = parent?.let { ImaginedWorlds.around(it).firstOrNull { w -> w.name == name } }
+            if (world != null) return Destination(name, world.location, .004, Kind.GENERATED)
+        }
+        return null
     }
 }
 
@@ -143,7 +165,7 @@ object ImaginedWorlds {
             )
             World(
                 star.location + offset,
-                "Simulated ${i + 1}",
+                "Simulated ${i + 1} · ${star.name}",
                 palette[((seed ushr 3) + i * 3) % palette.size],
                 i == count - 1 && seed % 3 == 0
             )
