@@ -104,7 +104,7 @@ class SpaceEffectsRenderer {
                 val s = stars[i]
                 val angle = s[0]
                 val speed = .19f + s[2] * .42f
-                val phase = fract(s[1] + progress * (1.3f + speed))
+                val phase = fract((s[1] + progress * (1.3f + speed)).toDouble())
                 val inner = (phase * phase) * radius
                 val outer = inner + radius * (.10f + phase * .23f) * strength
                 val dx = cos(angle)
