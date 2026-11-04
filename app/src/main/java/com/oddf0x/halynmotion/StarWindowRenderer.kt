@@ -30,6 +30,7 @@ import kotlin.math.sqrt
 class StarWindowRenderer(context: Context) {
     private val stars = AstronomyCatalog.stars(context)
     private val cinematicFx = SpaceEffectsRenderer()
+    private val worldPainter = SpaceWorldPainter()
     private val constellationLines = loadConstellationLines(context)
     private val buckets = Array(9) { FloatArray(18_300) }
     private val counts = IntArray(9)
@@ -163,10 +164,28 @@ class StarWindowRenderer(context: Context) {
         // Visibility requires looking in the actual object's direction.
         val planets = SolarEphemeris.positions(System.currentTimeMillis())
         drawPlanet(canvas, SpacePoint(0.0,0.0,0.0), "Sun",
-            Color.rgb(255, 234, 181), true, scale, ::project)
+            Color.rgb(255, 234, 181), true, scale, ::project, seconds)
         for (planet in planets) {
             drawPlanet(canvas, planet.location, planet.name,
-                planet.tint, false, scale, ::project)
+                planet.tint, false, scale, ::project, seconds)
+        }
+
+        // When approaching a named catalogue star, add coherent hypothetical
+        // companion worlds. Positions are deterministic within that star's
+        // frame, but the worlds are explicitly marked GENERATED: their orbits,
+        // surfaces and existence are not claimed as NASA discoveries.
+        if (state.starEffects >= 2 && !pose.skyAligned) {
+            val closestNamed = stars.asSequence()
+                .filter { it.name.isNotEmpty() && it.location.length() < 1e10 }
+                .filter { (it.location - origin).length() < 12.0 }
+                .minByOrNull { (it.location - origin).length() }
+            if (closestNamed != null) {
+                for (world in ImaginedWorlds.around(closestNamed)) {
+                    drawPlanet(canvas, world.location, world.name, world.tint,
+                        false, scale, ::project, seconds, simulated = true,
+                        rings = world.ring)
+                }
+            }
         }
 
         // Named stars retain correct catalog directions. Labels are selective
@@ -195,19 +214,32 @@ class StarWindowRenderer(context: Context) {
         colour: Int,
         sun: Boolean,
         scale: Float,
-        project: (SpacePoint) -> Projection?
+        project: (SpacePoint) -> Projection?,
+        seconds: Float,
+        simulated: Boolean = false,
+        rings: Boolean = false
     ) {
         val point = project(location) ?: return
-        val radius = (if (sun) 6.5f else 3.8f) * scale
-        bodyGlow.color = Color.argb(if (sun) 30 else 19,
-            Color.red(colour), Color.green(colour), Color.blue(colour))
-        canvas.drawCircle(point.x, point.y, radius * 3.2f, bodyGlow)
-        bodyCore.color = colour
-        canvas.drawCircle(point.x, point.y, radius, bodyCore)
-        label.textSize = if (sun) 22f * scale else 19f * scale
-        label.color = Color.argb(215, 240, 243, 251)
-        canvas.drawText(name, point.x + radius + 9f * scale,
-            point.y - radius * .8f, label)
+        val radiusAu = when(name) {
+            "Sun" -> .00465047
+            "Mercury" -> .0000163
+            "Venus" -> .00004045
+            "Earth" -> .0000426
+            "Mars" -> .0000227
+            "Jupiter" -> .000467
+            "Saturn" -> .000389
+            "Uranus" -> .000169
+            "Neptune" -> .000165
+            else -> if(simulated) .00032 else .0042
+        }
+        val apparent = (radiusAu * canvas.height.toDouble() * .82 /
+            point.distance.coerceAtLeast(.00001)).toFloat()
+        // Far-away planets remain visible as legible markers; nearby planets
+        // become large discs at the actual catalogued viewing direction.
+        val radius = max((if (sun) 5f else 3.5f) * scale,
+            apparent).coerceAtMost(min(canvas.width,canvas.height)*.45f)
+        worldPainter.render(canvas,point.x,point.y,radius,colour,name,
+            seconds,rings || name=="Saturn" || name=="Uranus",simulated,sun)
     }
 
     private fun loadConstellationLines(context: Context): List<StrokedDirection> {
