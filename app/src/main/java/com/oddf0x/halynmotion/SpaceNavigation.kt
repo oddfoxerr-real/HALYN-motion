@@ -128,7 +128,7 @@ object ImaginedWorlds {
             World(
                 star.location + offset,
                 "Simulated ${i + 1}",
-                palette[(seed ushr 3 and 7).rem(palette.size) xor (i % palette.size)],
+                palette[((seed ushr 3) + i * 3) % palette.size],
                 i == count - 1 && seed % 3 == 0
             )
         }
