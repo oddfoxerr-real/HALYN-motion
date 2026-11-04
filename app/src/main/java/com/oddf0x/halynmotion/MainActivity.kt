@@ -410,7 +410,7 @@ class MainActivity : Activity() {
         parent.addView(title)
 
         val slider = SeekBar(this).apply {
-            max = 100
+            this.max = 100
             progress = (((current - min) / (max - min)) * 100f).roundToInt().coerceIn(0, 100)
             progressTintList = ColorStateList.valueOf(ink)
             thumbTintList = ColorStateList.valueOf(ink)
