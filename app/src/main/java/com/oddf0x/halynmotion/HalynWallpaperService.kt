@@ -104,7 +104,7 @@ class HalynWallpaperService : WallpaperService() {
 
         override fun onTouchEvent(event: MotionEvent) {
             super.onTouchEvent(event)
-            if (!settings.touch) return
+            if (!settings.touch && settings.preset != StarWindowRenderer.SCENE_INDEX) return
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     touchDownX = event.x
@@ -122,7 +122,7 @@ class HalynWallpaperService : WallpaperService() {
                         SystemClock.uptimeMillis() - touchDownMs <= 330L &&
                         kotlin.math.abs(event.x - touchDownX) < 30f * resources.displayMetrics.density &&
                         kotlin.math.abs(event.y - touchDownY) < 30f * resources.displayMetrics.density) {
-                        spatialTracker.warpForward()
+                        preferences.requestWarp()
                     }
                 }
             }
@@ -130,6 +130,13 @@ class HalynWallpaperService : WallpaperService() {
 
         override fun onSharedPreferenceChanged(prefs: SharedPreferences?, key: String?) {
             if (key == "star_recenter_token") spatialTracker.recenter()
+            if (key == "star_warp_token") {
+                // Location tracking is for the terrestrial sky. Hyperspace
+                // switches to exploration, never a false GPS position.
+                if (preferences.get().skyAligned) preferences.setSkyAligned(false)
+                spatialTracker.configureSky(preferences.get())
+                spatialTracker.warpForward()
+            }
             settings = preferences.get()
             refresh()
         }
@@ -153,6 +160,7 @@ class HalynWallpaperService : WallpaperService() {
         private fun refresh() {
             stopFrames()
             if (visible && surfaceReady && settings.preset == StarWindowRenderer.SCENE_INDEX) {
+                spatialTracker.configureSky(settings)
                 spatialTracker.start(settings.starSensitivity)
                 spatialTracker.setSensitivity(settings.starSensitivity)
             } else {
