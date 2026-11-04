@@ -54,8 +54,11 @@ class ClockOverlayRenderer {
         val shownHour = if (state.clock24h) hour else (hour % 12).let { if (it == 0) 12 else it }
         hours = if (state.clock24h) shownHour.toString().padStart(2, '0') else shownHour.toString()
         minutes = minute.toString().padStart(2, '0')
-        time = hours + ":" + minutes + if (state.clockSeconds) ":"
-            + second.toString().padStart(2, '0') else ""
+        time = hours + ":" + minutes + (if (state.clockSeconds) {
+            ":" + second.toString().padStart(2, '0')
+        } else {
+            ""
+        })
         suffix = if (state.clock24h) "" else if (hour < 12) "AM" else "PM"
         date = dateFormatter.format(Date(now)).uppercase(Locale.getDefault())
     }
