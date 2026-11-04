@@ -26,8 +26,12 @@ import kotlin.math.sin
  * the streak tunnel, travel HUD and arrival pulse use Android Canvas.
  */
 class SpaceEffectsRenderer {
-    private val clouds: RuntimeShader? = try { RuntimeShader(NEBULA_SHADER) }
+    // Lazy creation is essential: the shader source property is initialized
+    // later in the class. Reading it eagerly would produce a null source.
+    private val clouds: RuntimeShader? by lazy {
+        try { RuntimeShader(NEBULA_SHADER) }
         catch (_: IllegalArgumentException) { null }
+    }
     private val cloudPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val fxPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
