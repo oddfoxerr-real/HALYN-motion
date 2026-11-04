@@ -41,6 +41,15 @@ import kotlin.math.roundToInt
 class MainActivity : Activity() {
     private val prefs by lazy { MotionPreferences(this) }
     private val previewTracker by lazy { SpatialTracker(this) }
+    private val skyLocation by lazy {
+        SkyLocationController(this, prefs,
+            onStatus = { message -> if (::skyStatus.isInitialized) skyStatus.text = message },
+            onSaved = {
+                refreshSkyUi()
+                syncStarTracking()
+                if (::preview.isInitialized) preview.invalidate()
+            })
+    }
     private lateinit var preview: LivePreview
     private lateinit var scenes: LinearLayout
     private lateinit var newScenes: LinearLayout
@@ -49,6 +58,9 @@ class MainActivity : Activity() {
     private lateinit var clockOptionsPanel: LinearLayout
     private lateinit var starControls: LinearLayout
     private lateinit var densityChoices: LinearLayout
+    private lateinit var effectsChoices: LinearLayout
+    private lateinit var skyStatus: TextView
+    private lateinit var skyToggle: TextView
     private lateinit var palettes: LinearLayout
     private lateinit var frameRates: LinearLayout
     private lateinit var activeSceneName: TextView
@@ -100,6 +112,8 @@ class MainActivity : Activity() {
         refreshClockStyles()
         refreshClockPositions()
         refreshStarDensity()
+        refreshStarEffects()
+        refreshSkyUi()
         syncStarTracking()
     }
 
@@ -395,6 +409,19 @@ class MainActivity : Activity() {
             prefs.setStarLines(it)
             preview.invalidate()
         }
+        panel.addView(text("VISUAL ATMOSPHERE", 10f, subtle, Typeface.BOLD).apply {
+            letterSpacing = .12f
+            setPadding(0, dp(13), 0, dp(10))
+        })
+        effectsChoices = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        panel.addView(effectsChoices, LinearLayout.LayoutParams(-1, dp(44)))
+        panel.addView(text(
+            "Survey: real astronomy only. Nebula: luminous cosmic clouds. " +
+                "Expedition: atmospheric light, rings and artistic worlds beyond the Solar System.",
+            11f, secondary
+        ).apply { setPadding(0, dp(10), 0, dp(5)) })
 
         val recenter = text("Return to the Solar System    ⟲", 14f, ink, Typeface.BOLD).apply {
             gravity = Gravity.CENTER
@@ -415,22 +442,62 @@ class MainActivity : Activity() {
             isClickable = true
             isFocusable = true
             contentDescription = "Travel one light-year in the viewing direction"
-            setOnClickListener {
-                previewTracker.warpForward()
-                preview.invalidate()
-            }
+            setOnClickListener { triggerStarWarp() }
         }
         panel.addView(warp, LinearLayout.LayoutParams(-1, dp(50)).apply {
             topMargin = dp(16)
         })
         panel.addView(recenter, LinearLayout.LayoutParams(-1, dp(50)).apply {
-            topMargin = dp(18)
+            topMargin = dp(12)
         })
+
+        panel.addView(text("SKY AT YOUR LOCATION", 10f, subtle, Typeface.BOLD).apply {
+            letterSpacing = .12f
+            setPadding(0, dp(25), 0, dp(7))
+        })
+        skyStatus = text("", 12f, secondary)
+        panel.addView(skyStatus)
+        val locationRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(12), 0, 0)
+        }
+        val locate = text("Sync sky location", 13f, backgroundColor, Typeface.BOLD).apply {
+            gravity = Gravity.CENTER
+            background = rounded(ink, 14)
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Request location permission and align the sky to where you are"
+            setOnClickListener { skyLocation.sync() }
+        }
+        locationRow.addView(locate, LinearLayout.LayoutParams(0, dp(49), 1.35f))
+        skyToggle = text("Disable", 13f, ink, Typeface.BOLD).apply {
+            gravity = Gravity.CENTER
+            background = rounded(Color.rgb(42, 44, 53), 14)
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Turn off location-based sky alignment and explore deep space"
+            setOnClickListener {
+                prefs.setSkyAligned(false)
+                refreshSkyUi()
+                syncStarTracking()
+                preview.invalidate()
+            }
+        }
+        locationRow.addView(skyToggle, LinearLayout.LayoutParams(0, dp(49), 0.8f).apply {
+            marginStart = dp(9)
+        })
+        panel.addView(locationRow)
+        panel.addView(text(
+            "Location is requested only when you tap Sync. " +
+                "The saved coordinates stay on your phone; GPS is not continually polled.",
+            11f, subtle
+        ).apply { setPadding(0, dp(11), 0, dp(2)) })
 
         panel.addView(text(
             "Tap the wallpaper to warp 1 light-year in the direction you're facing. " +
                 "Planet positions follow NASA/JPL orbital elements; 9,096 real catalog stars " +
-                "supply the sky. Accelerometer movement is approximate and may drift.",
+                "supply the sky. The Warp button works even when the launcher doesn't forward taps.",
             11f, subtle
         ).apply { setPadding(0, dp(16), 0, 0) })
         starControls.addView(panel)
@@ -461,9 +528,65 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun refreshStarEffects() {
+        effectsChoices.removeAllViews()
+        val selected = prefs.get().starEffects
+        listOf("Survey", "Nebula", "Expedition").forEachIndexed { index, title ->
+            val active = index == selected
+            val chip = text(title, 12f, if (active) backgroundColor else secondary,
+                if (active) Typeface.BOLD else Typeface.NORMAL).apply {
+                gravity = Gravity.CENTER
+                background = rounded(if (active) ink else Color.rgb(36, 37, 44), 13)
+                isClickable = true
+                isFocusable = true
+                contentDescription = "$title space atmosphere, ${if (active) "selected" else "not selected"}"
+                setOnClickListener {
+                    prefs.setStarEffects(index)
+                    refreshStarEffects()
+                    preview.invalidate()
+                }
+            }
+            effectsChoices.addView(chip, LinearLayout.LayoutParams(0, dp(44), 1f).apply {
+                marginEnd = dp(7)
+            })
+        }
+    }
+
+    private fun refreshSkyUi() {
+        if (!::skyStatus.isInitialized) return
+        val state = prefs.get()
+        skyStatus.text = if (state.skyFixTime == 0L) {
+            "Exploration mode  ·  Location not shared"
+        } else {
+            val lat = kotlin.math.abs(state.skyLatitude)
+            val lon = kotlin.math.abs(state.skyLongitude)
+            val latitude = String.format(Locale.US, "%.2f°%s", lat, if (state.skyLatitude < 0) "S" else "N")
+            val longitude = String.format(Locale.US, "%.2f°%s", lon, if (state.skyLongitude < 0) "W" else "E")
+            val aligned = if (state.skyAligned) "Local sky active" else "Saved · Exploration mode"
+            "$aligned  ·  $latitude / $longitude"
+        }
+        skyToggle.visibility = if (state.skyAligned) View.VISIBLE else View.GONE
+    }
+
+    private fun triggerStarWarp() {
+        // The GPS-aligned sky is meaningful on Earth. A hyperspace jump
+        // explicitly switches to deep-space exploration.
+        if (prefs.get().skyAligned) {
+            prefs.setSkyAligned(false)
+            refreshSkyUi()
+        }
+        previewTracker.configureSky(prefs.get())
+        previewTracker.warpForward()
+        // The wallpaper process has an independent tracker. Notify it too:
+        // the former v0.5 only warped the in-app preview.
+        prefs.requestWarp()
+        preview.invalidate()
+    }
+
     private fun syncStarTracking() {
         if (prefs.get().preset == StarWindowRenderer.SCENE_INDEX &&
             ::preview.isInitialized && preview.running) {
+            previewTracker.configureSky(prefs.get())
             previewTracker.start(prefs.get().starSensitivity)
         } else {
             previewTracker.stop()
@@ -777,7 +900,20 @@ class MainActivity : Activity() {
     override fun onPause() {
         if (::preview.isInitialized) preview.running = false
         previewTracker.stop()
+        skyLocation.cancel()
         super.onPause()
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int, permissions: Array<out String>, grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        skyLocation.handlePermissionResult(requestCode)
+    }
+
+    override fun onDestroy() {
+        skyLocation.cancel()
+        super.onDestroy()
     }
 
     private fun text(value: String, size: Float, color: Int, weight: Int = Typeface.NORMAL): TextView =
@@ -861,7 +997,7 @@ class MainActivity : Activity() {
                         SystemClock.uptimeMillis() - pointerDownMs <= 330L &&
                         kotlin.math.abs(event.x - pointerDownX) < dp(24) &&
                         kotlin.math.abs(event.y - pointerDownY) < dp(24)) {
-                        previewTracker.warpForward()
+                        triggerStarWarp()
                     }
                     performClick()
                     invalidate()
