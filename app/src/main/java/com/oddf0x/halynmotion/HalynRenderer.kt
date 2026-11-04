@@ -35,7 +35,12 @@ data class MotionState(
     val skyAligned: Boolean = false,
     val skyLatitude: Double = 0.0,
     val skyLongitude: Double = 0.0,
-    val skyFixTime: Long = 0L
+    val skyFixTime: Long = 0L,
+    val clockFont: Int = 0,
+    val clockFontRevision: Int = 0,
+    val clockCustomPlacement: Boolean = false,
+    val clockX: Float = .5f,
+    val clockY: Float = .68f
 )
 
 class MotionPreferences(context: Context) {
@@ -50,7 +55,7 @@ class MotionPreferences(context: Context) {
             return if (result.isFinite()) result.coerceIn(min, max) else default
         }
         return MotionState(
-            preset = preferences.getInt("preset", 0).coerceIn(0, 12),
+            preset = preferences.getInt("preset", 0).coerceIn(0, 20),
             palette = preferences.getInt("palette", 0).coerceIn(0, 5),
             customColor = preferences.getInt("custom_color", Color.rgb(185, 174, 255)) or -0x1000000,
             intensity = float("intensity", 1f, .35f, 2.3f),
@@ -76,11 +81,16 @@ class MotionPreferences(context: Context) {
             skyAligned = preferences.getBoolean("sky_aligned", false) && preferences.contains("sky_latitude"),
             skyLatitude = Double.fromBits(preferences.getLong("sky_latitude", 0L)).takeIf { it.isFinite() && it in -90.0..90.0 } ?: 0.0,
             skyLongitude = Double.fromBits(preferences.getLong("sky_longitude", 0L)).takeIf { it.isFinite() && it in -180.0..180.0 } ?: 0.0,
-            skyFixTime = preferences.getLong("sky_fix_time", 0L)
+            skyFixTime = preferences.getLong("sky_fix_time", 0L),
+            clockFont = preferences.getInt("clock_font", 0).coerceIn(0, 6),
+            clockFontRevision = preferences.getInt("clock_font_revision", 0),
+            clockCustomPlacement = preferences.getBoolean("clock_custom_placement", false),
+            clockX = float("clock_x", .5f, .08f, .92f),
+            clockY = float("clock_y", .68f, .14f, .88f)
         )
     }
 
-    fun setPreset(value: Int) = preferences.edit().putInt("preset", value.coerceIn(0, 12)).apply()
+    fun setPreset(value: Int) = preferences.edit().putInt("preset", value.coerceIn(0, 20)).apply()
     fun setPalette(value: Int) = preferences.edit().putInt("palette", value.coerceIn(0, 5)).apply()
     fun setCustomColor(color: Int) = preferences.edit()
         .putInt("custom_color", color or -0x1000000)
@@ -93,7 +103,17 @@ class MotionPreferences(context: Context) {
     fun setStarTapTravel(value: Boolean) = preferences.edit().putBoolean("star_tap_travel", value).apply()
     fun setParallax(value: Boolean) = preferences.edit().putBoolean("parallax", value).apply()
     fun setClockStyle(value: Int) = preferences.edit().putInt("clock_style", value.coerceIn(0, 5)).apply()
-    fun setClockPosition(value: Int) = preferences.edit().putInt("clock_position", value.coerceIn(0, 2)).apply()
+    fun setClockPosition(value: Int) = preferences.edit()
+        .putInt("clock_position", value.coerceIn(0, 2))
+        .putBoolean("clock_custom_placement", false).apply()
+    fun setClockFont(value: Int) = preferences.edit().putInt("clock_font", value.coerceIn(0, 6)).apply()
+    fun importedClockFont() = preferences.edit()
+        .putInt("clock_font", 6)
+        .putInt("clock_font_revision", preferences.getInt("clock_font_revision", 0) + 1).apply()
+    fun setClockPlacement(x: Float, y: Float) = preferences.edit()
+        .putFloat("clock_x", x.coerceIn(.08f, .92f))
+        .putFloat("clock_y", y.coerceIn(.14f, .88f))
+        .putBoolean("clock_custom_placement", true).apply()
     fun setClock24h(value: Boolean) = preferences.edit().putBoolean("clock_24h", value).apply()
     fun setClockDate(value: Boolean) = preferences.edit().putBoolean("clock_date", value).apply()
     fun setClockSeconds(value: Boolean) = preferences.edit().putBoolean("clock_seconds", value).apply()
@@ -152,6 +172,8 @@ class MotionPreferences(context: Context) {
  */
 class HalynRenderer(private val context: Context) {
     private val starRenderer by lazy { StarWindowRenderer(context) }
+    private val mountainRenderer = MountainSceneRenderer()
+    private var shaderFailed = false
     private val shader: RuntimeShader? = try {
         if (Build.VERSION.SDK_INT >= 33) RuntimeShader(AGSL) else null
     } catch (_: IllegalArgumentException) {
@@ -175,11 +197,16 @@ class HalynRenderer(private val context: Context) {
             starRenderer.draw(canvas, state, elapsedSeconds, starPose ?: StarPose())
             return
         }
+        if (MountainSceneRenderer.isMountain(state.preset)) {
+            mountainRenderer.drawBackground(canvas, state, elapsedSeconds)
+            return
+        }
         val width = canvas.width.coerceAtLeast(1).toFloat()
         val height = canvas.height.coerceAtLeast(1).toFloat()
         canvas.drawColor(Color.rgb(5, 7, 13))
         val current = shader
-        if (current != null && canvas.isHardwareAccelerated) {
+        if (current != null && !shaderFailed && canvas.isHardwareAccelerated) {
+            try {
             current.setFloatUniform("u_resolution", width, height)
             current.setFloatUniform("u_time", elapsedSeconds)
             current.setFloatUniform("u_variant", state.preset.toFloat())
@@ -197,8 +224,21 @@ class HalynRenderer(private val context: Context) {
                 if (state.touch) touchY.coerceIn(0f, 1f) else .5f
             )
             current.setFloatUniform("u_offset", if (state.parallax) offsetX else .5f)
+                canvas.drawRect(0f, 0f, width, height, paint)
+                return
+            } catch (_: RuntimeException) {
+                shaderFailed = true
+                paint.shader = null
+                paint.color = Color.rgb(9, 12, 22)
+            }
         }
         canvas.drawRect(0f, 0f, width, height, paint)
+    }
+
+    fun drawForeground(canvas: Canvas, state: MotionState) {
+        if (MountainSceneRenderer.isMountain(state.preset)) {
+            mountainRenderer.drawForeground(canvas, state)
+        }
     }
 
     companion object {
@@ -207,7 +247,9 @@ class HalynRenderer(private val context: Context) {
             "Electric Silk", "Solar Bloom", "Prism Tide",
             "Silk Reactor", "Glass Orbit", "Magnetic Dust",
             "Midnight Horizon", "Chromatic Flow", "Circuit Pulse",
-            "Star Window"
+            "Star Window",
+            "Orbital Halo", "Cosmic Rain", "Plasma Loom", "Eclipse Glass",
+            "Twilight Peaks", "Moonlit Ridge", "Alpine Mist", "Ember Valley"
         )
         val PALETTES = listOf(
             "Arctic", "Ultraviolet", "Ember", "Rose", "Verdant"
@@ -381,7 +423,7 @@ half4 main(float2 frag) {
         v = contrast * .72 + pow(max(0.0, bloom), 8.0) * .16;
         glow = pow(max(0.0, contour), 2.0) * .36
             * (1.0 - smoothstep(.25, .85, length(p)));
-    } else {
+    } else if (u_variant < 12.5) {
         // Circuit Pulse: clean technical trace geometry, rhythmic crossings.
         float2 q = p * 11.0;
         q.x += .12 * sin(t * .5 + floor(q.y) * 3.0);
@@ -392,6 +434,46 @@ half4 main(float2 frag) {
         float window = exp(-3.8 * length(p));
         v = (trace * .31 + dot * .8) * pulse * window;
         glow = trace * window * .075 + exp(-7.0 * length(p)) * .09;
+    } else if (u_variant < 13.5) {
+        // Orbital Halo: multiple moving luminous concentric orbital paths.
+        float phi = atan(p.y, p.x);
+        float deformation = .022 * sin(phi * 7.0 + t * .35);
+        float ringA = exp(-150.0 * abs(r - .22 - deformation));
+        float ringB = exp(-105.0 * abs(r - .31 + .018 * sin(phi * 4.0 - t * .7)));
+        float sphere = exp(-6.0 * length(p - float2(.17 * sin(t * .29), .17 * cos(t * .29))));
+        v = ringA + .72 * ringB + .3 * sphere;
+        glow = .28 * exp(-12.0 * abs(r - .24)) + .28 * exp(-6.0 * r);
+    } else if (u_variant < 14.5) {
+        // Cosmic Rain: drifting tapered lights in deep parallax.
+        float2 q = p * float2(24.0, 36.0);
+        q.y += t * 1.15;
+        float2 cell = floor(q);
+        float2 within = fract(q) - .5;
+        float seed = noise21(float2(cell.x * 1.2, cell.y * .64));
+        float strand = exp(-pow((within.x + .25 * sin(seed * 12.0)), 2.0) * 200.0)
+            * smoothstep(.6, .9, seed);
+        v = strand * (.2 + .8 * smoothstep(.5, -.45, within.y));
+        glow = .22 * exp(-3.0 * length(p + float2(.13, .15)));
+    } else if (u_variant < 15.5) {
+        // Plasma Loom: interwoven fine silk bands, not flat straight lines.
+        float warp = sin(p.y * 12.0 - t * .37) * .08;
+        float ribbon = sin((p.x + warp) * 22.0 + sin(p.y * 6.0 + t * .6) * 2.0);
+        float cross = cos(p.y * 19.0 - p.x * 6.0 + t * .4);
+        float focus = exp(-3.5 * length(p));
+        v = (pow(abs(ribbon), 26.0) * .75 + pow(abs(cross), 35.0) * .4) * focus;
+        glow = (pow(abs(ribbon), 5.0) + pow(abs(cross), 7.0)) * focus * .16;
+    } else {
+        // Eclipse Glass: illuminated crescent with a soft diffractive corona.
+        float2 q = p - float2(.02 * sin(t * .1), .015 * cos(t * .12));
+        float disc = length(q);
+        float outer = exp(-60.0 * abs(disc - .19));
+        float inner = 1.0 - smoothstep(.18, .19, disc);
+        float eclipse = 1.0 - smoothstep(.18, .20,
+            length(q - float2(.066 + .03 * sin(t * .17), -.03)));
+        float crescent = inner * (1.0 - eclipse);
+        float diffraction = pow(max(0.0, cos(atan(q.y,q.x) * 15.0 + t * .13)), 8.0);
+        v = crescent * .91 + outer * (.66 + diffraction * .28);
+        glow = exp(-10.0 * abs(disc - .19)) * .33 + exp(-4.0 * disc) * .13;
     }
     v = max(0.0, v) * k;
     glow = max(0.0, glow) * k;
