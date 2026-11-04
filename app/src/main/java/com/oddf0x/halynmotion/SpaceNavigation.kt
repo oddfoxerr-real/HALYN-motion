@@ -19,12 +19,15 @@ object SpaceNavigation {
     enum class Kind { SUN, PLANET, CATALOG_STAR }
 
     fun ray(pose: StarPose, normalizedX: Float, normalizedY: Float, aspect: Float): SpacePoint {
-        val dx = (normalizedX.coerceIn(0f, 1f) - .5) * aspect
-        val dy = .5 - normalizedY.coerceIn(0f, 1f)
+        // Inverse of the star renderer's perspective projection:
+        // pixelX = width/2 + height*0.82*side/forward.
+        // This makes the travelled ray pass through the exact tapped pixel.
+        val dx = (normalizedX.coerceIn(0f, 1f) - .5) * aspect / .82
+        val dy = (.5 - normalizedY.coerceIn(0f, 1f)) / .82
         val out = SpacePoint(
-            dx * pose.right[0] + dy * pose.up[0] - .91 * pose.outward[0],
-            dx * pose.right[1] + dy * pose.up[1] - .91 * pose.outward[1],
-            dx * pose.right[2] + dy * pose.up[2] - .91 * pose.outward[2]
+            dx * pose.right[0] + dy * pose.up[0] - pose.outward[0],
+            dx * pose.right[1] + dy * pose.up[1] - pose.outward[1],
+            dx * pose.right[2] + dy * pose.up[2] - pose.outward[2]
         )
         return normalize(out)
     }
