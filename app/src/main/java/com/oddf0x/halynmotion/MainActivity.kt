@@ -812,7 +812,7 @@ class MainActivity : Activity() {
     }
 
     private inner class LivePreview : View(this@MainActivity) {
-        private val renderer = HalynRenderer()
+        private val renderer = HalynRenderer(this@MainActivity)
         private val clockRenderer = ClockOverlayRenderer()
         private val startTime = SystemClock.uptimeMillis()
         private var touchX = .5f
