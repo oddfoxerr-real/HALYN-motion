@@ -30,7 +30,7 @@ class SpaceEffectsRenderer {
     // later in the class. Reading it eagerly would produce a null source.
     private val clouds: RuntimeShader? by lazy {
         try { RuntimeShader(NEBULA_SHADER) }
-        catch (_: IllegalArgumentException) { null }
+        catch (_: RuntimeException) { null }
     }
     private val cloudPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val fxPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -49,6 +49,8 @@ class SpaceEffectsRenderer {
     private var lastFinishedLy = 0.0
     private var arrivalAtMs = 0L
     private var activeWarp = false
+    // A defective GPU driver must not blank the live wallpaper forever.
+    private var shaderDisabled = false
 
     fun drawBackground(canvas: Canvas, state: MotionState, elapsedSeconds: Float, pose: StarPose) {
         val w = canvas.width.coerceAtLeast(1).toFloat()
@@ -58,25 +60,38 @@ class SpaceEffectsRenderer {
             canvas.drawColor(Color.rgb(3, 6, 14))
             return
         }
-        val shader = clouds
-        if (shader != null && canvas.isHardwareAccelerated) {
-            shader.setFloatUniform("u_resolution", w, h)
-            shader.setFloatUniform("u_time", elapsedSeconds)
-            shader.setFloatUniform("u_mode", state.starEffects.toFloat())
-            shader.setFloatUniform("u_warp", 1f - pose.warpProgress)
-            shader.setFloatUniform("u_color",
-                Color.red(accent) / 255f,
-                Color.green(accent) / 255f,
-                Color.blue(accent) / 255f)
-            cloudPaint.shader = shader
-            canvas.drawRect(0f, 0f, w, h, cloudPaint)
-            cloudPaint.shader = null
-        } else {
+        val shader = if (shaderDisabled || !canvas.isHardwareAccelerated) null else clouds
+        var rendered = false
+        if (shader != null) {
+            try {
+                shader.setFloatUniform("u_resolution", w, h)
+                shader.setFloatUniform("u_time", elapsedSeconds)
+                shader.setFloatUniform("u_mode", state.starEffects.toFloat())
+                shader.setFloatUniform("u_warp", 1f - pose.warpProgress)
+                shader.setFloatUniform("u_color",
+                    Color.red(accent) / 255f,
+                    Color.green(accent) / 255f,
+                    Color.blue(accent) / 255f)
+                cloudPaint.shader = shader
+                canvas.drawRect(0f, 0f, w, h, cloudPaint)
+                rendered = true
+            } catch (_: RuntimeException) {
+                // Some vendor AGSL implementations accept a shader but fail
+                // while binding uniforms or drawing. Use a stable fallback.
+                shaderDisabled = true
+            } finally {
+                cloudPaint.shader = null
+            }
+        }
+        if (!rendered) {
             cloudPaint.shader = LinearGradient(0f, 0f, w, h,
                 intArrayOf(Color.rgb(8, 17, 34), Color.rgb(18, 9, 34), Color.rgb(2, 4, 14)),
                 null, Shader.TileMode.CLAMP)
-            canvas.drawRect(0f, 0f, w, h, cloudPaint)
-            cloudPaint.shader = null
+            try {
+                canvas.drawRect(0f, 0f, w, h, cloudPaint)
+            } finally {
+                cloudPaint.shader = null
+            }
         }
         // Fictional planetary systems are rendered exclusively in the actual
         // catalog-star coordinate system by StarWindowRenderer. A screen-fixed
