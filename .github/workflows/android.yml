@@ -3,6 +3,8 @@ name: HALYN Motion Android APK
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -50,10 +52,11 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='7'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.6.0-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.6.0-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.6.1-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.6.1-preview.apk > SHA256SUMS.txt)
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -76,17 +79,17 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.6.0-preview.1
+          TAG: v0.6.1-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.6.0-preview.apk
-          unzip -t dist/HALYN-Motion-v0.6.0-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.6.1-preview.apk
+          unzip -t dist/HALYN-Motion-v0.6.1-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN Motion v0.6.0 Preview
+          # HALYN Motion v0.6.1 Preview
 
           Warp now has a visible animated star tunnel, central portal,
           arrival pulse and distance HUD; the dedicated in-app warp button
@@ -113,9 +116,10 @@ jobs:
           - No Unity, PC companion, ads or network permissions.
           - Debug-signed preview: later Play Store production updates require
             a stable release signing key.
+          - Unsupported vendor AGSL rendering falls back to a readable gradient.
           - Hardware performance on the Samsung Galaxy A56 is unverified.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.6.0-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.6.1-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.6 — Expedition, Warp and Location Sky" \
+            --title "HALYN Motion v0.6.1 — Expedition stability and navigation" \
             --notes-file notes.md --prerelease
