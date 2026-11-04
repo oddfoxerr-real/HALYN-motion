@@ -1,0 +1,105 @@
+name: HALYN Motion Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: halyn-motion-android-preview
+  cancel-in-progress: true
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android command-line tools
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
+
+      - name: Android SDK 35
+        shell: bash
+        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+
+      - name: Compile HALYN Motion
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+
+      - name: Verify Android package and wallpaper service
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$apk"
+          unzip -t "$apk" >/dev/null
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
+          mkdir -p dist
+          cp "$apk" dist/HALYN-Motion-v0.1.0-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.1.0-preview.apk > SHA256SUMS.txt)
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HALYN-Motion-Android
+          path: dist/
+          retention-days: 30
+          if-no-files-found: error
+
+  release:
+    runs-on: ubuntu-latest
+    needs: android
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: HALYN-Motion-Android
+          path: dist
+      - name: Publish initial Android preview
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v0.1.0-preview.1
+        run: |
+          set -euo pipefail
+          test -s dist/HALYN-Motion-v0.1.0-preview.apk
+          unzip -t dist/HALYN-Motion-v0.1.0-preview.apk >/dev/null
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Initial preview already exists. Keeping its original immutable version."
+            exit 0
+          fi
+          cat > notes.md <<'NOTES'
+          # HALYN Motion v0.1.0 Preview
+
+          Standalone Android live wallpaper studio. Six distinct procedural GPU
+          scenes, dark studio preview, five palettes, intensity/speed controls,
+          frame rate preferences, touch effects, home-screen parallax, and the
+          native Android wallpaper chooser.
+
+          - Minimum Android 13.
+          - No Unity, PC companion, ads or network permissions.
+          - Debug-signed preview: later Play Store production updates require
+            a stable release signing key.
+          - Hardware performance on the Samsung Galaxy A56 is unverified.
+          NOTES
+          gh release create "$TAG" dist/HALYN-Motion-v0.1.0-preview.apk dist/SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "HALYN Motion v0.1 — Android Live Wallpapers" \
+            --notes-file notes.md --prerelease
