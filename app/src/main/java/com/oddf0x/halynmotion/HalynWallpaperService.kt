@@ -2,13 +2,11 @@ package com.oddf0x.halynmotion
 
 import android.content.SharedPreferences
 import android.graphics.Canvas
-import android.os.Handler
-import android.os.Looper
 import android.os.SystemClock
 import android.service.wallpaper.WallpaperService
 import android.view.MotionEvent
+import android.view.Choreographer
 import android.view.SurfaceHolder
-import kotlin.math.max
 
 /**
  * Genuine Android live wallpaper. The renderer is active only while the
@@ -23,7 +21,9 @@ class HalynWallpaperService : WallpaperService() {
         private val renderer = HalynRenderer(this@HalynWallpaperService)
         private val clockRenderer = ClockOverlayRenderer()
         private val spatialTracker = SpatialTracker(this@HalynWallpaperService)
-        private val handler = Handler(Looper.getMainLooper())
+        private val choreographer = Choreographer.getInstance()
+        private var framePosted = false
+        private var lastFrameNs = 0L
         private var settings = preferences.get()
         private var visible = false
         private var surfaceReady = false
@@ -36,7 +36,31 @@ class HalynWallpaperService : WallpaperService() {
         private var touchDownY = 0f
         private var touchDownMs = 0L
         private var startTimeMs = SystemClock.uptimeMillis()
-        private val tick = Runnable { renderFrame() }
+        private val frameCallback = object : Choreographer.FrameCallback {
+            override fun doFrame(frameTimeNanos: Long) {
+                framePosted = false
+                if (!visible || !surfaceReady) return
+                val targetIntervalNs = 1_000_000_000L / settings.fps.coerceIn(15, 60)
+                if (lastFrameNs == 0L || frameTimeNanos - lastFrameNs >= targetIntervalNs - 1_000_000L) {
+                    lastFrameNs = frameTimeNanos
+                    renderFrame()
+                }
+                scheduleFrame()
+            }
+        }
+
+        private fun stopFrames() {
+            choreographer.removeFrameCallback(frameCallback)
+            framePosted = false
+            lastFrameNs = 0L
+        }
+
+        private fun scheduleFrame() {
+            if (visible && surfaceReady && !framePosted) {
+                framePosted = true
+                choreographer.postFrameCallback(frameCallback)
+            }
+        }
 
         override fun onCreate(surfaceHolder: SurfaceHolder) {
             super.onCreate(surfaceHolder)
@@ -65,7 +89,7 @@ class HalynWallpaperService : WallpaperService() {
                 settings = preferences.get()
                 refresh()
             } else {
-                handler.removeCallbacks(tick)
+                stopFrames()
                 spatialTracker.stop()
             }
         }
@@ -112,7 +136,7 @@ class HalynWallpaperService : WallpaperService() {
 
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
             surfaceReady = false
-            handler.removeCallbacks(tick)
+            stopFrames()
             spatialTracker.stop()
             super.onSurfaceDestroyed(holder)
         }
@@ -120,21 +144,21 @@ class HalynWallpaperService : WallpaperService() {
         override fun onDestroy() {
             visible = false
             surfaceReady = false
-            handler.removeCallbacks(tick)
+            stopFrames()
             spatialTracker.stop()
             preferences.raw.unregisterOnSharedPreferenceChangeListener(this)
             super.onDestroy()
         }
 
         private fun refresh() {
-            handler.removeCallbacks(tick)
+            stopFrames()
             if (visible && surfaceReady && settings.preset == StarWindowRenderer.SCENE_INDEX) {
                 spatialTracker.start(settings.starSensitivity)
                 spatialTracker.setSensitivity(settings.starSensitivity)
             } else {
                 spatialTracker.stop()
             }
-            if (visible && surfaceReady) handler.post(tick)
+            if (visible && surfaceReady) scheduleFrame()
         }
 
         private fun renderFrame() {
@@ -163,10 +187,9 @@ class HalynWallpaperService : WallpaperService() {
                     }
                 }
             }
-            if (!visible || !surfaceReady) return
-            val frameMs = 1000L / settings.fps.coerceIn(15, 60)
-            val elapsedMs = SystemClock.uptimeMillis() - startedMs
-            handler.postDelayed(tick, max(8L, frameMs - elapsedMs))
+            // Choreographer schedules the next vsync callback instead of
+            // accumulating timer-driven render work after a dropped frame.
+
         }
     }
 }
