@@ -27,7 +27,7 @@ data class MotionState(
     val clockDate: Boolean = true,
     val clockSeconds: Boolean = true,
     val clockAccent: Boolean = false,
-    val starSensitivity: Float = 1.0f,
+    val starSensitivity: Float = .55f,
     val starDensity: Int = 1,
     val starLines: Boolean = true
 )
@@ -62,7 +62,7 @@ class MotionPreferences(context: Context) {
             clockDate = preferences.getBoolean("clock_date", true),
             clockSeconds = preferences.getBoolean("clock_seconds", true),
             clockAccent = preferences.getBoolean("clock_accent", false),
-            starSensitivity = float("star_sensitivity", 1f, .35f, 2.2f),
+            starSensitivity = float("star_sensitivity", .55f, .15f, 1.4f),
             starDensity = preferences.getInt("star_density", 1).coerceIn(0, 2),
             starLines = preferences.getBoolean("star_lines", true)
         )
@@ -85,7 +85,7 @@ class MotionPreferences(context: Context) {
     fun setClockDate(value: Boolean) = preferences.edit().putBoolean("clock_date", value).apply()
     fun setClockSeconds(value: Boolean) = preferences.edit().putBoolean("clock_seconds", value).apply()
     fun setClockAccent(value: Boolean) = preferences.edit().putBoolean("clock_accent", value).apply()
-    fun setStarSensitivity(value: Float) = preferences.edit().putFloat("star_sensitivity", value.coerceIn(.35f, 2.2f)).apply()
+    fun setStarSensitivity(value: Float) = preferences.edit().putFloat("star_sensitivity", value.coerceIn(.15f, 1.4f)).apply()
     fun setStarDensity(value: Int) = preferences.edit().putInt("star_density", value.coerceIn(0, 2)).apply()
     fun setStarLines(value: Boolean) = preferences.edit().putBoolean("star_lines", value).apply()
     fun recenterStarWindow() {
@@ -101,8 +101,8 @@ class MotionPreferences(context: Context) {
  * Android 13+ AGSL produces a shader directly on a hardware-accelerated Canvas.
  * All six scenes have separate silhouettes and motion formulas.
  */
-class HalynRenderer {
-    private val starRenderer by lazy { StarWindowRenderer() }
+class HalynRenderer(private val context: Context) {
+    private val starRenderer by lazy { StarWindowRenderer(context) }
     private val shader: RuntimeShader? = try {
         if (Build.VERSION.SDK_INT >= 33) RuntimeShader(AGSL) else null
     } catch (_: IllegalArgumentException) {
