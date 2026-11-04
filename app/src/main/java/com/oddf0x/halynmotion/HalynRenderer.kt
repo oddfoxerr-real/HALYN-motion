@@ -72,7 +72,7 @@ class HalynRenderer {
     }
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
         isDither = true
-        if (shader != null) this.shader = shader else color = Color.rgb(9, 12, 22)
+        if (this@HalynRenderer.shader != null) this.shader = this@HalynRenderer.shader else color = Color.rgb(9, 12, 22)
     }
 
     fun draw(
@@ -190,7 +190,7 @@ half4 main(float2 frag) {
         float center = abs(filament);
         v = pow(center, 20.0) * .9;
         glow = pow(center, 3.0) * .38;
-        v *= smoothstep(.48, .08, abs(p.x));
+        v *= (1.0 - smoothstep(.08, .48, abs(p.x)));
     } else if (u_variant < 4.5) {
         // Solar Bloom: a radiating luminous core and moving petals.
         float angle = atan(p.y, p.x);
