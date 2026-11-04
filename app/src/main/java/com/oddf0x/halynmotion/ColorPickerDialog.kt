@@ -191,7 +191,9 @@ class ColorPickerDialog(
         updateReadout()
         spectrum.invalidate()
         hue.invalidate()
-        if (!hexField.hasFocus()) hexField.setText(hex(selectedColor))
+        // A drag always becomes the current colour, even if the HEX field was
+        // previously focused. Otherwise Apply could restore a stale typed value.
+        hexField.setText(hex(selectedColor))
     }
 
     private fun updateFromHex() {
