@@ -29,7 +29,8 @@ data class StarPose(
     val originAu: SpacePoint = SpacePoint(0.0, 0.0, 2.5),
     val warpProgress: Float = 1f,
     val travelLy: Double = 0.0,
-    val skyAligned: Boolean = false
+    val skyAligned: Boolean = false,
+    val destinationName: String = ""
 )
 
 /**
@@ -83,7 +84,8 @@ class SpatialTracker(context: Context) : SensorEventListener {
     private var warpFromAu = SpacePoint(0.0, 0.0, 0.0)
     private var warpToAu = SpacePoint(0.0, 0.0, 0.0)
     private var warpStartNs = 0L
-    private val warpDurationNs = 2_600_000_000L
+    private var warpDurationNs = 2_600_000_000L
+    private var destinationName = ""
 
     val hasTrackingSensors: Boolean get() = rotationSensor != null && motionSensor != null
     val hasCompassHeading: Boolean get() = absoluteNorthAvailable
@@ -132,6 +134,7 @@ class SpatialTracker(context: Context) : SensorEventListener {
         filteredAcceleration.fill(0f)
         completedWarpAu = SpacePoint(0.0, 0.0, 0.0)
         warpStartNs = 0L
+        destinationName = ""
         lastMotionNs = 0L
         // Calibrate forward again using the most recently accepted device pose.
         for (i in 0..8) baseline[i] = screen[i]
@@ -145,21 +148,41 @@ class SpatialTracker(context: Context) : SensorEventListener {
         visualClockNs = 0L
     }
 
-    fun warpForward() {
-        val now = SystemClock.elapsedRealtimeNanos()
-        val pose = pose(now)
-        val frameTime = visualClockNs
-        val current = currentWarpOffset(frameTime)
-        val outward = pose.outward
-        // A single deliberate tap moves ONE LIGHT YEAR along the view ray.
-        val destination = SpacePoint(
-            current.x - outward[0].toDouble() * AstronomyCatalog.AU_PER_LY,
-            current.y - outward[1].toDouble() * AstronomyCatalog.AU_PER_LY,
-            current.z - outward[2].toDouble() * AstronomyCatalog.AU_PER_LY
-        )
+    /**
+     * Free flight travels in the actual tapped pixel ray, not just forward.
+     * The start position is the currently interpolated pose.
+     */
+    fun warpToward(normalizedX: Float, normalizedY: Float, aspect: Float) {
+        val pose = pose()
+        val ray = SpaceNavigation.ray(pose, normalizedX, normalizedY, aspect)
+        val current = currentWarpOffset(visualClockNs)
+        beginTravel(current + ray * AstronomyCatalog.AU_PER_LY, "Deep space", 3_200_000_000L)
+    }
+
+    fun warpForward() = warpToward(.5f, .5f, .46f)
+
+    /**
+     * Navigate to a known physical coordinate on AU scale. A one-light-year
+     * hop near the Solar System would skip every planet; using the object's
+     * actual coordinate solves that issue without changing astronomy data.
+     */
+    fun flyTo(destination: SpaceNavigation.Destination) {
+        val currentPose = pose()
+        val diff = destination.point - currentPose.originAu
+        val direction = SpaceNavigation.normalize(diff)
+        val cameraStop = destination.point - direction * destination.stopDistanceAu
+        val offset = currentWarpOffset(visualClockNs)
+        val baseWithInertia = currentPose.originAu - offset
+        beginTravel(cameraStop - baseWithInertia, destination.name, 4_000_000_000L)
+    }
+
+    private fun beginTravel(end: SpacePoint, name: String, durationNs: Long) {
+        val current = currentWarpOffset(visualClockNs)
         warpFromAu = current
-        warpToAu = destination
-        warpStartNs = frameTime
+        warpToAu = end
+        destinationName = name
+        warpDurationNs = durationNs
+        warpStartNs = visualClockNs.coerceAtLeast(1L)
     }
 
     fun pose(nowNs: Long = SystemClock.elapsedRealtimeNanos()): StarPose {
@@ -220,7 +243,8 @@ class SpatialTracker(context: Context) : SensorEventListener {
             ),
             warpProgress = progress,
             travelLy = warp.length() / AstronomyCatalog.AU_PER_LY,
-            skyAligned = useLocalSky
+            skyAligned = useLocalSky,
+            destinationName = destinationName
         )
     }
 
