@@ -52,11 +52,11 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='8'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='9'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.6.2-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.6.2-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.7.0-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.7.0-preview.apk > SHA256SUMS.txt)
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -75,57 +75,57 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.6.2 optional touch controls
+      - name: Publish HALYN v0.7.0 Mountain Clock Studio
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.6.2-preview.1
+          TAG: v0.7.0-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.6.2-preview.apk
-          unzip -t dist/HALYN-Motion-v0.6.2-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.7.0-preview.apk
+          unzip -t dist/HALYN-Motion-v0.7.0-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN Motion v0.6.2 Preview
+          # HALYN Motion v0.7.0 Preview
 
-          Star Window now has an independent "Tap to travel" toggle,
-          disabled by default to prevent accidental hops while using your
-          launcher. Enabling it restores tap-a-planet, tap-a-star and
-          tap-empty-space movement in both the studio and the live wallpaper.
-          The in-app Warp and Explore destination buttons always work.
-          Other wallpaper scenes retain their separate Touch interaction
-          preference.
+          The original 13 wallpapers remain intact. Four additional
+          procedural originals — Orbital Halo, Cosmic Rain, Plasma Loom
+          and Eclipse Glass — bring the collection to 17 abstract/space
+          scenes. Twilight Peaks, Moonlit Ridge, Alpine Mist and Ember
+          Valley complete a 21-scene library of animated wallpapers.
 
-          Warp retains its animated star tunnel, central portal,
-          arrival pulse, distance HUD and 1-light-year virtual movement.
+          Mountain foreground silhouettes draw above the clock, allowing
+          every clock face to pass behind the terrain naturally. The clock
+          supports six built-in font choices plus imported .ttf/.otf files
+          (validated, stored locally and limited to 3 MB).
 
-          Survey / Nebula / Expedition atmospheres add optional GPU cosmic
-          clouds and clearly fictional ringed worlds, while retaining
-          the 9,096 actual Yale/Hipparcos star positions, real constellation
-          outlines and JPL approximate planet positions.
+          Clock placement mode opens the actual home screen and provides
+          a temporary draggable 5%-snap grid with a top-corner X to save
+          and exit. This is an explicit user-initiated Android overlay
+          permission, and a temporary foreground notification provides
+          an additional exit action. The grid and overlay disappear when
+          editing ends; the normalized clock position is saved locally.
 
-          Location Sky enables an opt-in foreground one-time GPS/network
-          fix used with sidereal time and the rotation-vector compass to
-          orient the local night sky. The cached fix is private and local;
-          there is NO continuous background GPS tracking. An attempted
-          warp exits Location Sky and returns to space exploration.
+          Existing Star Window navigation and the independent opt-in
+          Tap to travel toggle are preserved. All 5 clock faces, original
+          scenes, custom palettes and astronomy data remain available.
 
-          All thirteen wallpapers, five clock styles and the precision
-          HSV colour picker remain available. Device-specific runtime
-          visuals, GPS permission flow and launcher touch behavior
-          still require on-phone validation.
+          NOTE: The home-screen drag overlay requires the user's explicit
+          Draw over other apps permission. Launcher behaviour, edge-to-edge
+          alignment, sensors and thermal performance require device tests.
 
           - Minimum Android 13.
-          - No Unity, PC companion, ads or network permissions.
+          - No Unity, PC companion, ads or network calls.
+          - Temporary overlay and foreground service only during placement.
           - Debug-signed preview: later Play Store production updates require
             a stable release signing key.
           - Unsupported vendor AGSL rendering falls back to a readable gradient.
           - Hardware performance on the Samsung Galaxy A56 is unverified.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.6.2-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.7.0-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.6.2 — Optional Tap to Travel" \
+            --title "HALYN Motion v0.7 — Mountain Clock Studio" \
             --notes-file notes.md --prerelease

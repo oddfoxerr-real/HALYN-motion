@@ -19,7 +19,7 @@ class HalynWallpaperService : WallpaperService() {
     inner class MotionEngine : Engine(), SharedPreferences.OnSharedPreferenceChangeListener {
         private val preferences = MotionPreferences(this@HalynWallpaperService)
         private val renderer = HalynRenderer(this@HalynWallpaperService)
-        private val clockRenderer = ClockOverlayRenderer()
+        private val clockRenderer = ClockOverlayRenderer(this@HalynWallpaperService)
         private val spatialTracker = SpatialTracker(this@HalynWallpaperService)
         private val choreographer = Choreographer.getInstance()
         private var framePosted = false
@@ -165,7 +165,15 @@ class HalynWallpaperService : WallpaperService() {
                 }
             }
             settings = preferences.get()
-            refresh()
+            // Dragging the clock updates several preference keys in quick
+            // succession. Do not tear down the animation/sensors per pixel.
+            if (key == "clock_x" || key == "clock_y" ||
+                key == "clock_custom_placement" || key == "clock_font" ||
+                key == "clock_font_revision") {
+                scheduleFrame()
+            } else {
+                refresh()
+            }
         }
 
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
@@ -215,6 +223,8 @@ class HalynWallpaperService : WallpaperService() {
                     if (settings.preset == StarWindowRenderer.SCENE_INDEX) spatialTracker.pose() else null
                 )
                 clockRenderer.draw(canvas, settings)
+                // Mountain foreground deliberately occludes the clock.
+                renderer.drawForeground(canvas, settings)
             } catch (_: IllegalArgumentException) {
                 // The system may be replacing the wallpaper surface.
             } catch (_: IllegalStateException) {

@@ -1,5 +1,6 @@
 package com.oddf0x.halynmotion
 
+import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -21,7 +22,10 @@ import kotlin.math.sin
  * Styles: Digital, Split, Monospace, Analog, and Orbit. Every style supports
  * optional date, 12/24 hour formatting and a live seconds indicator.
  */
-class ClockOverlayRenderer {
+class ClockOverlayRenderer(private val context: Context) {
+    private var selectedFont: Typeface? = null
+    private var lastFontStyle = -1
+    private var lastFontRevision = -1
     private val typefaceLight = Typeface.create("sans-serif-light", Typeface.NORMAL)
     private val typefaceMedium = Typeface.create("sans-serif-medium", Typeface.NORMAL)
     private val typefaceMono = Typeface.create("monospace", Typeface.NORMAL)
@@ -65,15 +69,21 @@ class ClockOverlayRenderer {
 
     fun draw(canvas: Canvas, state: MotionState, now: Long = System.currentTimeMillis()) {
         if (state.clockStyle == 0) return
+        if (lastFontStyle != state.clockFont || lastFontRevision != state.clockFontRevision) {
+            lastFontStyle = state.clockFont
+            lastFontRevision = state.clockFontRevision
+            selectedFont = ClockFontStore.resolve(context, state.clockFont)
+        }
         updateTime(now, state)
 
         val w = canvas.width.toFloat().coerceAtLeast(1f)
         val h = canvas.height.toFloat().coerceAtLeast(1f)
-        val centerX = w * .5f
-        val centerY = when (state.clockPosition) {
+        val centerX = if (state.clockCustomPlacement) w * state.clockX else w * .5f
+        val centerY = if (state.clockCustomPlacement) h * state.clockY else when (state.clockPosition) {
             0 -> h * .265f
             2 -> h * .71f
-            else -> h * .49f
+            // Landscapes place the default clock near the foreground ridge.
+            else -> h * if (MountainSceneRenderer.isMountain(state.preset)) .71f else .49f
         }
         val size = min(w, h * .74f)
         val white = Color.rgb(252, 251, 253)
@@ -101,7 +111,7 @@ class ClockOverlayRenderer {
         labelPaint.color = color
         labelPaint.alpha = alpha
         labelPaint.textSize = size
-        labelPaint.typeface = font
+        labelPaint.typeface = selectedFont ?: font
         labelPaint.textAlign = Paint.Align.CENTER
         labelPaint.setShadowLayer(size * .08f, 0f, size * .03f, Color.argb(120, 3, 5, 10))
     }
