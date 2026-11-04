@@ -52,8 +52,8 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.2.0-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.2.0-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.3.0-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.3.0-preview.apk > SHA256SUMS.txt)
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -72,15 +72,15 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish refined studio preview
+      - name: Publish wallpapers and clock preview
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.2.0-preview.1
+          TAG: v0.3.0-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.2.0-preview.apk
-          unzip -t dist/HALYN-Motion-v0.2.0-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.3.0-preview.apk
+          unzip -t dist/HALYN-Motion-v0.3.0-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
@@ -88,12 +88,12 @@ jobs:
           cat > notes.md <<'NOTES'
           # HALYN Motion v0.1.0 Preview
 
-          Refined HALYN Motion studio with a restrained, premium dark interface,
-          six preserved original wallpapers, five built-in palettes and a true
-          HSV colour editor (saturation, brightness, hue and HEX input).
-          Custom colours flow directly into the live GPU shader.
-          Includes live wallpaper preview, motion controls, 30/45/60 FPS,
-          touch interaction, parallax, and native Android wallpaper setup.
+          HALYN Motion now features twelve animated GPU wallpaper scenes:
+          six preserved originals and six new material and atmospheric styles.
+          Clock Atelier adds five real-time digital and analogue faces, date,
+          12/24-hour formatting, seconds animation, placement and accent matching.
+          Includes the v0.2 minimal studio, real HSV/HEX colour picker,
+          adjustable motion, touch interaction and native Android wallpaper setup.
 
           - Minimum Android 13.
           - No Unity, PC companion, ads or network permissions.
@@ -101,7 +101,7 @@ jobs:
             a stable release signing key.
           - Hardware performance on the Samsung Galaxy A56 is unverified.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.2.0-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.3.0-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.2 — Refined Studio & Colour Picker" \
+            --title "HALYN Motion v0.3 — New Wallpapers & Live Clocks" \
             --notes-file notes.md --prerelease
