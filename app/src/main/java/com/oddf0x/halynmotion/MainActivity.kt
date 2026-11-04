@@ -40,12 +40,15 @@ import kotlin.math.roundToInt
  */
 class MainActivity : Activity() {
     private val prefs by lazy { MotionPreferences(this) }
+    private val previewTracker by lazy { SpatialTracker(this) }
     private lateinit var preview: LivePreview
     private lateinit var scenes: LinearLayout
     private lateinit var newScenes: LinearLayout
     private lateinit var clockStyles: LinearLayout
     private lateinit var clockPositions: LinearLayout
     private lateinit var clockOptionsPanel: LinearLayout
+    private lateinit var starControls: LinearLayout
+    private lateinit var densityChoices: LinearLayout
     private lateinit var palettes: LinearLayout
     private lateinit var frameRates: LinearLayout
     private lateinit var activeSceneName: TextView
@@ -84,6 +87,7 @@ class MainActivity : Activity() {
         buildScenes(column)
         buildColours(column)
         buildClock(column)
+        buildStarWindow(column)
         buildMotion(column)
         buildBehavior(column)
         buildFooter(column)
@@ -95,6 +99,8 @@ class MainActivity : Activity() {
         refreshFps()
         refreshClockStyles()
         refreshClockPositions()
+        refreshStarDensity()
+        syncStarTracking()
     }
 
     private fun buildHeader(root: LinearLayout) {
@@ -168,7 +174,7 @@ class MainActivity : Activity() {
     }
 
     private fun buildScenes(root: LinearLayout) {
-        root.addView(section("The collection", "Twelve distinct motion styles."))
+        root.addView(section("The collection", "Thirteen distinct motion styles."))
         root.addView(text("HALYN ORIGINALS", 11f, subtle, Typeface.BOLD).apply {
             letterSpacing = .14f
             setPadding(0, 0, 0, dp(7))
@@ -348,6 +354,107 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun buildStarWindow(root: LinearLayout) {
+        starControls = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        starControls.addView(section("Star Window", "Walk through a fixed field of stars."))
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = rounded(cardColor, 22, borderColor)
+            setPadding(dp(17), dp(18), dp(17), dp(16))
+        }
+        panel.addView(text("MOVE THE PHONE, NOT THE UNIVERSE", 10f, secondary, Typeface.BOLD).apply {
+            letterSpacing = .10f
+            setPadding(0, 0, 0, dp(8))
+        })
+        panel.addView(text(
+            "Rotation sets where you look. Linear acceleration adds bounded movement in that direction. No camera required.",
+            12f, secondary
+        ).apply { setPadding(0, 0, 0, dp(16)) })
+
+        addSlider(panel, "Movement response", prefs.get().starSensitivity,
+            .35f, 2.2f) { value ->
+            prefs.setStarSensitivity(value)
+            previewTracker.setSensitivity(value)
+        }
+
+        panel.addView(text("STAR DENSITY", 10f, subtle, Typeface.BOLD).apply {
+            letterSpacing = .12f
+            setPadding(0, dp(13), 0, dp(10))
+        })
+        densityChoices = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        panel.addView(densityChoices, LinearLayout.LayoutParams(-1, dp(44)))
+
+        panel.addView(View(this).apply { setBackgroundColor(borderColor) },
+            LinearLayout.LayoutParams(-1, dp(1)).apply { topMargin = dp(15) })
+        addToggle(panel, "Constellation lines", "Delicate fixed celestial geometry",
+            prefs.get().starLines) {
+            prefs.setStarLines(it)
+            preview.invalidate()
+        }
+
+        val recenter = text("Recenter spatial view    ⟲", 14f, ink, Typeface.BOLD).apply {
+            gravity = Gravity.CENTER
+            background = rounded(Color.rgb(42, 44, 53), 15)
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Reset Star Window inertial movement to the centre"
+            setOnClickListener {
+                previewTracker.recenter()
+                prefs.recenterStarWindow()
+                preview.invalidate()
+                Toast.makeText(this@MainActivity, "Star Window recentered", Toast.LENGTH_SHORT).show()
+            }
+        }
+        panel.addView(recenter, LinearLayout.LayoutParams(-1, dp(50)).apply {
+            topMargin = dp(18)
+        })
+
+        panel.addView(text(
+            "Movement is estimated from phone sensors and can drift. " +
+                "Recenter restores the virtual starting point; accurate room tracking needs camera-based AR.",
+            11f, subtle
+        ).apply { setPadding(0, dp(16), 0, 0) })
+        starControls.addView(panel)
+        root.addView(starControls)
+    }
+
+    private fun refreshStarDensity() {
+        densityChoices.removeAllViews()
+        val selected = prefs.get().starDensity
+        listOf("Sparse", "Balanced", "Rich").forEachIndexed { index, name ->
+            val active = selected == index
+            val item = text(name, 12f, if (active) backgroundColor else secondary,
+                if (active) Typeface.BOLD else Typeface.NORMAL).apply {
+                gravity = Gravity.CENTER
+                background = rounded(if (active) ink else Color.rgb(36, 37, 44), 13)
+                isClickable = true
+                isFocusable = true
+                contentDescription = "${name} star density, ${if (active) "selected" else "not selected"}"
+                setOnClickListener {
+                    prefs.setStarDensity(index)
+                    refreshStarDensity()
+                    preview.invalidate()
+                }
+            }
+            densityChoices.addView(item, LinearLayout.LayoutParams(0, dp(44), 1f).apply {
+                marginEnd = dp(7)
+            })
+        }
+    }
+
+    private fun syncStarTracking() {
+        if (prefs.get().preset == StarWindowRenderer.SCENE_INDEX &&
+            ::preview.isInitialized && preview.running) {
+            previewTracker.start(prefs.get().starSensitivity)
+        } else {
+            previewTracker.stop()
+        }
+    }
+
     private fun buildMotion(root: LinearLayout) {
         root.addView(section("Motion", "Quiet, or full of life."))
         val panel = LinearLayout(this).apply {
@@ -439,10 +546,11 @@ class MainActivity : Activity() {
                     dp(if (active) 2 else 1), dp(if (active) 2 else 1))
                 isClickable = true
                 isFocusable = true
-                contentDescription = "Wallpaper ${index + 1} of 12, ${name}, ${if (active) "selected" else "not selected"}"
+                contentDescription = "Wallpaper ${index + 1} of 13, ${name}, ${if (active) "selected" else "not selected"}"
                 setOnClickListener {
                     prefs.setPreset(index)
                     refreshScene()
+                    syncStarTracking()
                     preview.invalidate()
                 }
             }
@@ -475,6 +583,8 @@ class MainActivity : Activity() {
             })
         }
         activeSceneName.text = HalynRenderer.PRESETS[selected]
+        if (::starControls.isInitialized) starControls.visibility =
+            if (selected == StarWindowRenderer.SCENE_INDEX) View.VISIBLE else View.GONE
     }
 
     private fun refreshPalette() {
@@ -646,10 +756,12 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         if (::preview.isInitialized) preview.running = true
+        syncStarTracking()
     }
 
     override fun onPause() {
         if (::preview.isInitialized) preview.running = false
+        previewTracker.stop()
         super.onPause()
     }
 
@@ -702,7 +814,8 @@ class MainActivity : Activity() {
             renderer.draw(
                 canvas, state,
                 (SystemClock.uptimeMillis() - startTime) / 1000f,
-                touchX, touchY
+                touchX, touchY,
+                starPose = if (state.preset == StarWindowRenderer.SCENE_INDEX) previewTracker.pose() else null
             )
             clockRenderer.draw(canvas, state)
             if (running) postInvalidateDelayed(1000L / state.fps)
