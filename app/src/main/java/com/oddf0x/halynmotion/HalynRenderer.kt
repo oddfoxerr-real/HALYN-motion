@@ -452,7 +452,7 @@ half4 main(float2 frag) {
         float seed = noise21(float2(cell.x * 1.2, cell.y * .64));
         float strand = exp(-pow((within.x + .25 * sin(seed * 12.0)), 2.0) * 200.0)
             * smoothstep(.6, .9, seed);
-        v = strand * (.2 + .8 * smoothstep(.5, -.45, within.y));
+        v = strand * (.2 + .8 * (1.0 - smoothstep(-.45, .5, within.y)));
         glow = .22 * exp(-3.0 * length(p + float2(.13, .15)));
     } else if (u_variant < 15.5) {
         // Plasma Loom: interwoven fine silk bands, not flat straight lines.
