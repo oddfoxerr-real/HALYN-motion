@@ -1,47 +1,30 @@
 # HALYN Motion
 
-**GPU-powered, minimalist live wallpapers for Android.**
+Minimalist native Android live wallpaper studio featuring **12 animated GPU wallpaper scenes** and **5 real-time clock styles**.
 
-A separate wallpaper studio in the same visual family as CYN and HALO. This is not a notification overlay or a PC companion.
+## What's new in v0.3
 
-## Preview v0.1
+- **Six preserved HALYN Originals:** Ion Veil, Liquid Chrome, Nebula Drift, Electric Silk, Solar Bloom and Prism Tide.
+- **Six additional scenes:** Silk Reactor, Glass Orbit, Magnetic Dust, Midnight Horizon, Chromatic Flow and Circuit Pulse.
+- **Clock Atelier:** Digital, Stacked, Mono, Analogue and Orbit clock faces, directly rendered on the live wallpaper and live preview (not a separate widget).
+- **Clock options:** Show/hide, Upper/Centre/Lower position, 12h or 24h format, date, seconds indicator and tint to the custom wallpaper colour.
+- **Precision colour editor:** HSV canvas, hue rail, arbitrary HEX colours and five original palettes.
+- True Android WallpaperService; GPU procedural rendering, no Unity, ads, external PC or network permission.
+- Android 13+; hardware performance still requires real-device verification.
 
-- Six procedural, visually distinct live wallpaper scenes: **Ion Veil**, **Liquid Chrome**, **Nebula Drift**, **Electric Silk**, **Solar Bloom**, and **Prism Tide**.
-- Five accent palettes, two motion controls (intensity and speed) and configurable 30/45/60 FPS.
-- Full-screen, native Android `WallpaperService` with a hardware-accelerated AGSL `RuntimeShader`; no video loops or remote assets.
-- A dark wallpaper studio with animated preview, touch interaction and an **Apply live wallpaper** button that opens Android's system wallpaper picker.
-- Optional home-screen parallax and touch response. When the wallpaper is hidden or its surface is removed, the render loop stops.
-- No network, microphone, audio recording, accessibility, notification-listener or overlay permission.
+## Download
 
-**Device floor:** Android 13+ (API 33) for AGSL, targeting modern Samsung One UI and Galaxy A56.
-
-## Install
-
-Use the `HALYN-Motion-Android` artifact from a successful GitHub Actions build, or install the APK attached to a preview release. Open the app and select **Apply live wallpaper**.
-
-> Development preview. The code compiles in CI before a release is published; actual performance on a Galaxy A56 and Samsung's wallpaper picker must still be verified on-device. Motion is procedural, not currently synchronized with music or wallpaper colors.
-
-## Build
-
-- Java 17
-- Gradle 8.11.1
-- Android Gradle Plugin 8.9.2 / Kotlin 2.1.20
-- Android SDK 35
-
-Run: `gradle :app:assembleDebug`.
-
-GitHub Actions handles the Android SDK setup and produces an installable APK. **No Unity editor or Unity account required.**
+[Latest releases](https://github.com/oddfoxerr-real/HALYN-motion/releases)
 
 ## Architecture
 
-- `HalynWallpaperService.kt`: Android live wallpaper service, render scheduling, parallax/touch, visibility lifecycle.
-- `HalynRenderer.kt`: six AGSL shaders with palette controls, settings persistence and GPU-only frame rendering.
-- `MainActivity.kt`: native responsive wallpaper studio, live preview and system wallpaper picker.
+- `MainActivity.kt`: native minimalist wallpaper studio and Clock Atelier UI.
+- `ClockOverlayRenderer.kt`: 5 live-time clock face renderers on a hardware-accelerated Android Canvas.
+- `HalynRenderer.kt`: 12 procedural AGSL GPU wallpaper scenes and preferences.
+- `HalynWallpaperService.kt`: Android live wallpaper service that draws wallpaper and clock in the same frame and stops when hidden.
+- `ColorPickerDialog.kt`: HSV + HEX colour editor.
 
-## Privacy
+### Important engineering distinctions
 
-All settings are kept in local `SharedPreferences`. The app declares no dangerous permissions. No telemetry, ads, analytics or network access.
+The new Glass Orbit, Magnetic Dust and Chromatic Flow scenes are procedural shader effects. Chromatic Flow is **not a persistent fluid physics solver**; adding a multi-pass fluid simulation is future work. The original six scene formulas remain unchanged. Samsung launcher placement, thermal performance, Always On Display and lock-screen behaviour must be tested on the actual phone.
 
-## License
-
-Copyright (c) the repository owner. No license has been granted for redistribution beyond applicable law.
