@@ -21,6 +21,7 @@ class HalynWallpaperService : WallpaperService() {
     inner class MotionEngine : Engine(), SharedPreferences.OnSharedPreferenceChangeListener {
         private val preferences = MotionPreferences(this@HalynWallpaperService)
         private val renderer = HalynRenderer()
+        private val clockRenderer = ClockOverlayRenderer()
         private val handler = Handler(Looper.getMainLooper())
         private var settings = preferences.get()
         private var visible = false
@@ -118,6 +119,7 @@ class HalynWallpaperService : WallpaperService() {
                     (startedMs - startTimeMs) / 1000f,
                     touchX, touchY, offsetX
                 )
+                clockRenderer.draw(canvas, settings)
             } catch (_: IllegalArgumentException) {
                 // The system may be replacing the wallpaper surface.
             } catch (_: IllegalStateException) {
