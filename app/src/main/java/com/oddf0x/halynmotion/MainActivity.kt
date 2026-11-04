@@ -182,7 +182,7 @@ class MainActivity : Activity() {
             clipToPadding = false
             addView(scenes)
         }
-        root.addView(rail, LinearLayout.LayoutParams(-1, dp(55)))
+        root.addView(rail, LinearLayout.LayoutParams(-1, dp(159)))
 
         root.addView(text("NEW COLLECTION", 11f, subtle, Typeface.BOLD).apply {
             letterSpacing = .14f
@@ -197,7 +197,7 @@ class MainActivity : Activity() {
             clipToPadding = false
             addView(newScenes)
         }
-        root.addView(newRail, LinearLayout.LayoutParams(-1, dp(55)))
+        root.addView(newRail, LinearLayout.LayoutParams(-1, dp(159)))
     }
 
     private fun buildColours(root: LinearLayout) {
@@ -433,12 +433,10 @@ class MainActivity : Activity() {
         val selected = prefs.get().preset
         HalynRenderer.PRESETS.forEachIndexed { index, name ->
             val active = selected == index
-            val item = text(String.format(Locale.US, "%02d   %s", index + 1, name),
-                13f, if (active) backgroundColor else secondary,
-                if (active) Typeface.BOLD else Typeface.NORMAL).apply {
-                gravity = Gravity.CENTER
-                setPadding(dp(16), 0, dp(16), 0)
-                background = rounded(if (active) ink else cardColor, 15)
+            val item = FrameLayout(this).apply {
+                background = rounded(if (active) ink else borderColor, 19)
+                setPadding(dp(if (active) 2 else 1), dp(if (active) 2 else 1),
+                    dp(if (active) 2 else 1), dp(if (active) 2 else 1))
                 isClickable = true
                 isFocusable = true
                 contentDescription = "Wallpaper ${index + 1} of 12, ${name}, ${if (active) "selected" else "not selected"}"
@@ -448,9 +446,32 @@ class MainActivity : Activity() {
                     preview.invalidate()
                 }
             }
+            val art = FrameLayout(this).apply {
+                background = rounded(Color.rgb(10, 12, 21), 17)
+                clipToOutline = true
+            }
+            art.addView(SceneTilePreview(index), FrameLayout.LayoutParams(-1, -1))
+            val fade = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(Color.TRANSPARENT, Color.argb(230, 6, 7, 11))
+            )
+            val caption = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                background = fade
+                setPadding(dp(9), dp(16), dp(9), dp(9))
+                addView(text(String.format(Locale.US, "%02d", index + 1), 9f,
+                    Color.rgb(202, 201, 211), Typeface.BOLD))
+                addView(text(name, 12f, ink, Typeface.BOLD).apply {
+                    setSingleLine(true)
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    setPadding(0, dp(4), 0, 0)
+                })
+            }
+            art.addView(caption, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
+            item.addView(art, FrameLayout.LayoutParams(-1, -1))
             val target = if (index < 6) scenes else newScenes
-            target.addView(item, LinearLayout.LayoutParams(-2, dp(44)).apply {
-                marginEnd = dp(8)
+            target.addView(item, LinearLayout.LayoutParams(dp(120), dp(154)).apply {
+                marginEnd = dp(10)
             })
         }
         activeSceneName.text = HalynRenderer.PRESETS[selected]
@@ -473,6 +494,7 @@ class MainActivity : Activity() {
                 setOnClickListener {
                     prefs.setPalette(index)
                     refreshPalette()
+                    refreshScene()
                     preview.invalidate()
                 }
             }
@@ -505,6 +527,7 @@ class MainActivity : Activity() {
         ColorPickerDialog(this, current) { selected ->
             prefs.setCustomColor(selected)
             refreshPalette()
+            refreshScene()
             preview.invalidate()
         }.show()
     }
@@ -648,6 +671,18 @@ class MainActivity : Activity() {
 
     private fun hex(color: Int): String = String.format(Locale.US, "#%06X", color and 0x00FFFFFF)
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).roundToInt()
+
+    private inner class SceneTilePreview(private val sceneIndex: Int) : View(this@MainActivity) {
+        private val renderer = HalynRenderer()
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val state = prefs.get().copy(preset = sceneIndex, clockStyle = 0)
+            // Thumbnails are intentionally static to avoid rendering twelve extra
+            // continuously animated views while browsing the gallery.
+            renderer.draw(canvas, state, 7f + sceneIndex * 1.7f)
+        }
+    }
 
     private inner class LivePreview : View(this@MainActivity) {
         private val renderer = HalynRenderer()
