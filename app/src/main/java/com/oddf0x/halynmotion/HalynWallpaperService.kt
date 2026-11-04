@@ -165,7 +165,15 @@ class HalynWallpaperService : WallpaperService() {
                 }
             }
             settings = preferences.get()
-            refresh()
+            // Dragging the clock updates several preference keys in quick
+            // succession. Do not tear down the animation/sensors per pixel.
+            if (key == "clock_x" || key == "clock_y" ||
+                key == "clock_custom_placement" || key == "clock_font" ||
+                key == "clock_font_revision") {
+                scheduleFrame()
+            } else {
+                refresh()
+            }
         }
 
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
