@@ -122,7 +122,19 @@ class HalynWallpaperService : WallpaperService() {
                         SystemClock.uptimeMillis() - touchDownMs <= 330L &&
                         kotlin.math.abs(event.x - touchDownX) < 30f * resources.displayMetrics.density &&
                         kotlin.math.abs(event.y - touchDownY) < 30f * resources.displayMetrics.density) {
-                        preferences.requestWarp()
+                        val pose = spatialTracker.pose()
+                        val destination = SpaceNavigation.pick(
+                            pose, event.x, event.y,
+                            surfaceWidth.toFloat(), surfaceHeight.toFloat(),
+                            AstronomyCatalog.stars(this@HalynWallpaperService)
+                        )
+                        if (settings.skyAligned) preferences.setSkyAligned(false)
+                        if (destination != null) spatialTracker.flyTo(destination)
+                        else spatialTracker.warpToward(
+                            event.x / surfaceWidth.coerceAtLeast(1),
+                            event.y / surfaceHeight.coerceAtLeast(1),
+                            surfaceWidth.toFloat() / surfaceHeight.coerceAtLeast(1)
+                        )
                     }
                 }
             }
@@ -136,6 +148,18 @@ class HalynWallpaperService : WallpaperService() {
                 if (preferences.get().skyAligned) preferences.setSkyAligned(false)
                 spatialTracker.configureSky(preferences.get())
                 spatialTracker.warpForward()
+            }
+            if (key == "star_destination_token" &&
+                settings.preset == StarWindowRenderer.SCENE_INDEX) {
+                val destination = SpaceNavigation.destinationForName(
+                    preferences.destinationName(),
+                    AstronomyCatalog.stars(this@HalynWallpaperService)
+                )
+                if (destination != null) {
+                    if (preferences.get().skyAligned) preferences.setSkyAligned(false)
+                    spatialTracker.configureSky(preferences.get())
+                    spatialTracker.flyTo(destination)
+                }
             }
             settings = preferences.get()
             refresh()
