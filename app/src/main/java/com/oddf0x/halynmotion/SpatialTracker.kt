@@ -30,8 +30,12 @@ data class StarPose(
     val warpProgress: Float = 1f,
     val travelLy: Double = 0.0,
     val skyAligned: Boolean = false,
-    val destinationName: String = ""
+    val destinationName: String = "",
+    val generatedWorlds: List<GeneratedWorld> = emptyList()
 )
+
+/** Imagined planet in anchored world coordinates, clearly not NASA-catalogued. */
+data class GeneratedWorld(val center: SpacePoint, val name: String, val tint: Int, val ringed: Boolean)
 
 /**
  * Slow, floating astronaut navigation built from linear acceleration +
@@ -88,6 +92,8 @@ class SpatialTracker(context: Context) : SensorEventListener {
     private var warpStartNs = 0L
     private var warpDurationNs = 2_600_000_000L
     private var destinationName = ""
+    private val generatedWorlds = ArrayList<GeneratedWorld>(12)
+    private var generatedCounter = 0
 
     val hasTrackingSensors: Boolean get() = rotationSensor != null && motionSensor != null
     val hasCompassHeading: Boolean get() = absoluteNorthAvailable
@@ -138,6 +144,8 @@ class SpatialTracker(context: Context) : SensorEventListener {
         completedWarpAu = SpacePoint(0.0, 0.0, 0.0)
         warpStartNs = 0L
         destinationName = ""
+        generatedWorlds.clear()
+        generatedCounter = 0
         for (i in 0..8) lookOffset[i] = identity[i]
         lastMotionNs = 0L
         // Calibrate forward again using the most recently accepted device pose.
@@ -157,11 +165,29 @@ class SpatialTracker(context: Context) : SensorEventListener {
      * The start position is the currently interpolated pose.
      */
     fun warpToward(normalizedX: Float, normalizedY: Float, aspect: Float) {
-        val pose = pose()
-        val ray = SpaceNavigation.ray(pose, normalizedX, normalizedY, aspect)
+        val currentPose = pose()
+        val ray = SpaceNavigation.ray(currentPose, normalizedX, normalizedY, aspect)
         val current = currentWarpOffset(visualClockNs)
-        beginTravel(current + ray * AstronomyCatalog.AU_PER_LY, "Deep space", 3_200_000_000L)
+        val distance = AstronomyCatalog.AU_PER_LY
+        val goal = currentPose.originAu + ray * distance
+        beginTravel(current + ray * distance, "Deep space", 3_200_000_000L)
         steerToward(ray)
+
+        // Arriving in an otherwise empty catalog sector gives the viewer
+        // a deterministic, explicitly fictional planet to explore.
+        generatedCounter += 1
+        if (generatedWorlds.size >= 12) generatedWorlds.removeAt(0)
+        val palette = intArrayOf(
+            0xFF85B6CF.toInt(), 0xFFC99BE3.toInt(), 0xFFC5A47A.toInt(),
+            0xFF8BBFA8.toInt(), 0xFFC7A4A2.toInt(), 0xFFA9A9D4.toInt()
+        )
+        val seed = generatedCounter * 7919 + (goal.x / 25.0).toInt()
+        generatedWorlds.add(GeneratedWorld(
+            goal + ray * .0065,
+            "Uncharted " + generatedCounter.toString().padStart(3, '0'),
+            palette[(seed and 0x7FFFFFFF) % palette.size],
+            (seed and 1) == 0
+        ))
     }
 
     fun warpForward() = warpToward(.5f, .5f, .46f)
@@ -287,7 +313,8 @@ class SpatialTracker(context: Context) : SensorEventListener {
             warpProgress = progress,
             travelLy = warp.length() / AstronomyCatalog.AU_PER_LY,
             skyAligned = useLocalSky,
-            destinationName = destinationName
+            destinationName = destinationName,
+            generatedWorlds = generatedWorlds.toList()
         )
     }
 
