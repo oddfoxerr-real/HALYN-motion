@@ -115,6 +115,15 @@ class MotionPreferences(context: Context) {
         val next = preferences.getInt("star_warp_token", 0) + 1
         preferences.edit().putInt("star_warp_token", next).apply()
     }
+    fun requestDestination(name: String) {
+        if (name.isBlank()) return
+        val next = preferences.getInt("star_destination_token", 0) + 1
+        preferences.edit()
+            .putString("star_destination_name", name)
+            .putInt("star_destination_token", next).apply()
+    }
+    fun destinationName(): String = preferences.getString("star_destination_name", "") ?: ""
+
     fun recenterStarWindow() {
         val token = preferences.getInt("star_recenter_token", 0)
         preferences.edit().putInt("star_recenter_token", token + 1).apply()
