@@ -80,9 +80,9 @@ object SpaceNavigation {
             }
         }
 
-        consider(Destination("Sun", SpacePoint(0.0, 0.0, 0.0), .16, Kind.SUN))
+        consider(Destination("Sun", SpacePoint(0.0, 0.0, 0.0), .032, Kind.SUN))
         SolarEphemeris.positions(nowMs).forEach { planet ->
-            consider(Destination(planet.name, planet.location, .035, Kind.PLANET))
+            consider(Destination(planet.name, planet.location, .006, Kind.PLANET))
         }
 
         // Only brighter and named real catalogue stars are direct touch
@@ -91,7 +91,7 @@ object SpaceNavigation {
         for (star in stars) {
             if (star.magnitude > 3.0f) break
             if (star.name.isBlank() || star.location.length() > 1e10) continue
-            consider(Destination(star.name, star.location, 3.0, Kind.CATALOG_STAR))
+            consider(Destination(star.name, star.location, .12, Kind.CATALOG_STAR))
         }
         return best
     }
@@ -99,11 +99,11 @@ object SpaceNavigation {
     fun destinationForName(
         name: String, stars: List<CatalogStar>, nowMs: Long = System.currentTimeMillis()
     ): Destination? {
-        if (name == "Sun") return Destination(name, SpacePoint(0.0, 0.0, 0.0), .16, Kind.SUN)
+        if (name == "Sun") return Destination(name, SpacePoint(0.0, 0.0, 0.0), .032, Kind.SUN)
         val planet = SolarEphemeris.positions(nowMs).firstOrNull { it.name == name }
-        if (planet != null) return Destination(name, planet.location, .035, Kind.PLANET)
+        if (planet != null) return Destination(name, planet.location, .006, Kind.PLANET)
         val star = stars.firstOrNull { it.name == name && it.location.length() < 1e10 }
-        return star?.let { Destination(name, it.location, 3.0, Kind.CATALOG_STAR) }
+        return star?.let { Destination(name, it.location, .12, Kind.CATALOG_STAR) }
     }
 }
 
