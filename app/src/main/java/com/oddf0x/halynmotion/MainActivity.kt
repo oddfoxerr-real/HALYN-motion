@@ -182,7 +182,7 @@ class MainActivity : Activity() {
         }
         activeSceneName = text("", 24f, ink, Typeface.BOLD)
         foot.addView(activeSceneName)
-        foot.addView(text("Touch to explore the movement", 12f, Color.rgb(205, 205, 215)).apply {
+        foot.addView(text("Live motion · Customise below", 12f, Color.rgb(205, 205, 215)).apply {
             setPadding(0, dp(4), 0, 0)
         })
         shell.addView(foot, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
@@ -506,7 +506,8 @@ class MainActivity : Activity() {
     private fun refreshClockPositions() {
         clockPositions.removeAllViews()
         val names = listOf("Upper", "Centre", "Lower")
-        val selected = prefs.get().clockPosition
+        val state = prefs.get()
+        val selected = if (state.clockCustomPlacement) -1 else state.clockPosition
         names.forEachIndexed { index, name ->
             val active = index == selected
             val button = text(name, 12f, if (active) backgroundColor else secondary,
