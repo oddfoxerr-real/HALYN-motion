@@ -181,6 +181,29 @@ class StarWindowRenderer(context: Context) {
             }
         }
 
+        // A real named star becomes a luminous disc as you approach its
+        // catalogue coordinate; farther stars remain accurate point lights.
+        if (!pose.skyAligned) {
+            val nearStar = stars.asSequence()
+                .filter { it.name.isNotEmpty() && it.location.length() < 1e10 }
+                .filter { (it.location - origin).length() < 1.5 }
+                .minByOrNull { (it.location - origin).length() }
+            if (nearStar != null) {
+                val projected = project(nearStar.location)
+                if (projected != null) {
+                    val size = (.0047 * canvas.height * .82 /
+                        projected.distance.coerceAtLeast(.0001)).toFloat()
+                        .coerceIn(5f, min(canvas.width, canvas.height) * .38f)
+                    val tint = if (nearStar.bv > 1.1f) Color.rgb(255, 188, 145)
+                        else if (nearStar.bv < .25f) Color.rgb(182, 208, 255)
+                        else Color.rgb(255, 238, 203)
+                    worldPainter.render(canvas, projected.x, projected.y,
+                        size, tint, nearStar.name, seconds,
+                        ringed = false, simulated = false, sun = true)
+                }
+            }
+        }
+
         // When approaching a named catalogue star, add coherent hypothetical
         // companion worlds. Positions are deterministic within that star's
         // frame, but the worlds are explicitly marked GENERATED: their orbits,
