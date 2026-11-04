@@ -27,7 +27,9 @@ data class StarPose(
     val up: FloatArray = floatArrayOf(0f, 1f, 0f),
     val outward: FloatArray = floatArrayOf(0f, 0f, 1f),
     val originAu: SpacePoint = SpacePoint(0.0, 0.0, 2.5),
-    val warpProgress: Float = 1f
+    val warpProgress: Float = 1f,
+    val travelLy: Double = 0.0,
+    val skyAligned: Boolean = false
 )
 
 /**
@@ -50,6 +52,7 @@ class SpatialTracker(context: Context) : SensorEventListener {
         ?: sensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR)
     private val motionSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
     private val windowManager = app.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+    private val absoluteNorthAvailable = rotationSensor?.type == Sensor.TYPE_ROTATION_VECTOR
 
     private val identity = floatArrayOf(1f,0f,0f, 0f,1f,0f, 0f,0f,1f)
     private val raw = identity.copyOf()
@@ -62,6 +65,11 @@ class SpatialTracker(context: Context) : SensorEventListener {
     private val position = FloatArray(3)
     private val smoothedPosition = FloatArray(3)
     private val filteredAcceleration = FloatArray(3)
+    private var useLocalSky = false
+    private var latitude = 0.0
+    private var longitude = 0.0
+    private var skyBucket = Long.MIN_VALUE
+    private var skyAxes: SkyCoordinates.LocalAxes? = null
     private var baselineReady = false
     private var active = false
     private var sensitivity = .55f
@@ -78,6 +86,19 @@ class SpatialTracker(context: Context) : SensorEventListener {
     private val warpDurationNs = 2_600_000_000L
 
     val hasTrackingSensors: Boolean get() = rotationSensor != null && motionSensor != null
+    val hasCompassHeading: Boolean get() = absoluteNorthAvailable
+
+    fun configureSky(state: MotionState) {
+        val want = state.skyAligned && absoluteNorthAvailable
+        if (want != useLocalSky || state.skyLatitude != latitude || state.skyLongitude != longitude) {
+            useLocalSky = want
+            latitude = state.skyLatitude
+            longitude = state.skyLongitude
+            skyBucket = Long.MIN_VALUE
+            // Never instant-snap the camera when the user changes modes.
+            // The existing render filter smoothly blends to the new axes.
+        }
+    }
 
     fun start(level: Float) {
         setSensitivity(level)
@@ -182,6 +203,10 @@ class SpatialTracker(context: Context) : SensorEventListener {
         }
 
         val warp = currentWarpOffset(visualClockNs)
+        val originBase = if (useLocalSky) {
+            SolarEphemeris.positions(System.currentTimeMillis())
+                .firstOrNull { it.name == "Earth" }?.location ?: SpacePoint(0.0, 0.0, 2.5)
+        } else SpacePoint(0.0, 0.0, 2.5)
         val progress = if (warpStartNs == 0L) 1f
             else ((visualClockNs - warpStartNs).toDouble() / warpDurationNs).coerceIn(0.0, 1.0).toFloat()
         return StarPose(
@@ -189,11 +214,13 @@ class SpatialTracker(context: Context) : SensorEventListener {
             up = floatArrayOf(smoothed[1], smoothed[4], smoothed[7]),
             outward = floatArrayOf(smoothed[2], smoothed[5], smoothed[8]),
             originAu = SpacePoint(
-                warp.x + smoothedPosition[0],
-                warp.y + smoothedPosition[1],
-                warp.z + 2.5 + smoothedPosition[2]
+                originBase.x + warp.x + smoothedPosition[0],
+                originBase.y + warp.y + smoothedPosition[1],
+                originBase.z + warp.z + smoothedPosition[2]
             ),
-            warpProgress = progress
+            warpProgress = progress,
+            travelLy = warp.length() / AstronomyCatalog.AU_PER_LY,
+            skyAligned = useLocalSky
         )
     }
 
@@ -245,19 +272,30 @@ class SpatialTracker(context: Context) : SensorEventListener {
                     baseline[6 + r] * screen[6 + c]
             }
         }
+        val now = System.currentTimeMillis()
+        val bucket = now / 60_000L
+        if (useLocalSky && (skyAxes == null || bucket != skyBucket)) {
+            skyAxes = SkyCoordinates.axes(latitude, longitude, now)
+            skyBucket = bucket
+        }
+        val desired = if (useLocalSky && skyAxes != null) {
+            SkyCoordinates.cameraMatrix(screen, skyAxes!!)
+        } else relative
         val delta = if (lastRotationNs > 0L) {
-            val dot = ((target[0] * relative[0] + target[3] * relative[3] + target[6] * relative[6]) +
-                (target[1] * relative[1] + target[4] * relative[4] + target[7] * relative[7]) +
-                (target[2] * relative[2] + target[5] * relative[5] + target[8] * relative[8]))
+            val dot = ((target[0] * desired[0] + target[3] * desired[3] + target[6] * desired[6]) +
+                (target[1] * desired[1] + target[4] * desired[4] + target[7] * desired[7]) +
+                (target[2] * desired[2] + target[5] * desired[5] + target[8] * desired[8]))
             acos(((dot - 1f) * .5f).coerceIn(-1f, 1f))
         } else 0f
         val intervalNs = event.timestamp - lastRotationNs
         // More than ~55 degrees inside <60ms is almost certainly a sensor
         // glitch. Keep the preceding pose and let the renderer interpolate.
-        if (intervalNs in 1L..60_000_000L && delta > .96f) return
+        // A deliberate switch to geographic alignment may be a large rotation.
+        // Accept that switch and interpolate it instead of treating it as noise.
+        if (!useLocalSky && intervalNs in 1L..60_000_000L && delta > .96f) return
 
         for (i in 0..8) previousTarget[i] = target[i]
-        for (i in 0..8) target[i] = relative[i]
+        for (i in 0..8) target[i] = desired[i]
         previousRotationNs = lastRotationNs
         lastRotationNs = event.timestamp
     }
