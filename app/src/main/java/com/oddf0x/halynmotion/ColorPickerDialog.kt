@@ -126,7 +126,7 @@ class ColorPickerDialog(
             setText(hex(selectedColor))
             setTextSize(16f)
             setTextColor(white)
-            selectAllOnFocus = true
+            setSelectAllOnFocus(true)
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             background = null
             setPadding(dp(15), 0, 0, 0)
