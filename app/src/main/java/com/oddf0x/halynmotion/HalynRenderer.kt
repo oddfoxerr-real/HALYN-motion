@@ -20,7 +20,13 @@ data class MotionState(
     val speed: Float = 1.0f,
     val fps: Int = 30,
     val touch: Boolean = true,
-    val parallax: Boolean = true
+    val parallax: Boolean = true,
+    val clockStyle: Int = 0,
+    val clockPosition: Int = 1,
+    val clock24h: Boolean = true,
+    val clockDate: Boolean = true,
+    val clockSeconds: Boolean = true,
+    val clockAccent: Boolean = false
 )
 
 class MotionPreferences(context: Context) {
@@ -35,7 +41,7 @@ class MotionPreferences(context: Context) {
             return if (result.isFinite()) result.coerceIn(min, max) else default
         }
         return MotionState(
-            preset = preferences.getInt("preset", 0).coerceIn(0, 5),
+            preset = preferences.getInt("preset", 0).coerceIn(0, 11),
             palette = preferences.getInt("palette", 0).coerceIn(0, 5),
             customColor = preferences.getInt("custom_color", Color.rgb(185, 174, 255)) or -0x1000000,
             intensity = float("intensity", 1f, .35f, 2.3f),
@@ -46,11 +52,17 @@ class MotionPreferences(context: Context) {
                 else -> 30
             },
             touch = preferences.getBoolean("touch", true),
-            parallax = preferences.getBoolean("parallax", true)
+            parallax = preferences.getBoolean("parallax", true),
+            clockStyle = preferences.getInt("clock_style", 0).coerceIn(0, 5),
+            clockPosition = preferences.getInt("clock_position", 1).coerceIn(0, 2),
+            clock24h = preferences.getBoolean("clock_24h", true),
+            clockDate = preferences.getBoolean("clock_date", true),
+            clockSeconds = preferences.getBoolean("clock_seconds", true),
+            clockAccent = preferences.getBoolean("clock_accent", false)
         )
     }
 
-    fun setPreset(value: Int) = preferences.edit().putInt("preset", value.coerceIn(0, 5)).apply()
+    fun setPreset(value: Int) = preferences.edit().putInt("preset", value.coerceIn(0, 11)).apply()
     fun setPalette(value: Int) = preferences.edit().putInt("palette", value.coerceIn(0, 5)).apply()
     fun setCustomColor(color: Int) = preferences.edit()
         .putInt("custom_color", color or -0x1000000)
@@ -61,6 +73,12 @@ class MotionPreferences(context: Context) {
     fun setFps(value: Int) = preferences.edit().putInt("fps", value).apply()
     fun setTouch(value: Boolean) = preferences.edit().putBoolean("touch", value).apply()
     fun setParallax(value: Boolean) = preferences.edit().putBoolean("parallax", value).apply()
+    fun setClockStyle(value: Int) = preferences.edit().putInt("clock_style", value.coerceIn(0, 5)).apply()
+    fun setClockPosition(value: Int) = preferences.edit().putInt("clock_position", value.coerceIn(0, 2)).apply()
+    fun setClock24h(value: Boolean) = preferences.edit().putBoolean("clock_24h", value).apply()
+    fun setClockDate(value: Boolean) = preferences.edit().putBoolean("clock_date", value).apply()
+    fun setClockSeconds(value: Boolean) = preferences.edit().putBoolean("clock_seconds", value).apply()
+    fun setClockAccent(value: Boolean) = preferences.edit().putBoolean("clock_accent", value).apply()
 }
 
 /**
@@ -118,7 +136,9 @@ class HalynRenderer {
     companion object {
         val PRESETS = listOf(
             "Ion Veil", "Liquid Chrome", "Nebula Drift",
-            "Electric Silk", "Solar Bloom", "Prism Tide"
+            "Electric Silk", "Solar Bloom", "Prism Tide",
+            "Silk Reactor", "Glass Orbit", "Magnetic Dust",
+            "Midnight Horizon", "Chromatic Flow", "Circuit Pulse"
         )
         val PALETTES = listOf(
             "Arctic", "Ultraviolet", "Ember", "Rose", "Verdant"
@@ -214,7 +234,7 @@ half4 main(float2 frag) {
         float rays = pow(max(0.0, petals), 7.0) * exp(-2.8 * r);
         v = core * 1.3 + rays * .75;
         glow = exp(-3.0 * r) * .33;
-    } else {
+    } else if (u_variant < 5.5) {
         // Prism Tide: layered interference and drifting chromatic bands.
         float flow = p.y * 12.0 + sin(p.x * 6.0 + t * .36) * 2.1
             + sin(p.x * 15.0 - t * .55) * .5;
@@ -222,6 +242,87 @@ half4 main(float2 frag) {
         v = pow(max(0.0, line), 12.0) * .87;
         glow = pow(abs(line), 3.0) * .36;
         v += .16 * (sin(p.x * 18.0 + p.y * 7.0 - t * .6) * .5 + .5);
+    } else if (u_variant < 6.5) {
+        // Silk Reactor: polished, folded optical fabric; multiple reflective folds.
+        float2 q = p;
+        q.x += .15 * sin(q.y * 9.0 + t * .7) + .07 * sin(q.y * 17.0 - t * .32);
+        float fold = sin(q.x * 27.0 + sin(q.y * 7.5 - t * .5) * 2.8);
+        float shimmer = pow(abs(fold), 20.0);
+        float secondaryFold = sin(q.x * 13.0 - q.y * 10.0 + t * .9);
+        float envelope = exp(-4.2 * abs(q.x + .1 * sin(q.y * 4.0 + t)));
+        v = (shimmer * 1.05 + .18 * pow(abs(secondaryFold), 11.0)) * envelope;
+        glow = envelope * (.25 + .3 * pow(abs(fold), 3.0));
+    } else if (u_variant < 7.5) {
+        // Glass Orbit: translucent gyroscopic glass rings with sharp edge highlights.
+        float2 q = p;
+        q.x += .045 * sin(t * .42);
+        float angle = atan(q.y, q.x);
+        float radius = length(q);
+        float ring1 = abs(radius - (.265 + .055 * sin(2.0 * angle - t * .45)));
+        float ring2 = abs(radius - (.345 + .040 * cos(3.0 * angle + t * .35)));
+        float rim1 = exp(-85.0 * ring1);
+        float rim2 = exp(-100.0 * ring2);
+        float specular = pow(max(0.0, cos(angle * 2.5 + t * .8)), 15.0);
+        v = (rim1 * 1.1 + rim2 * .66) * (.55 + .65 * specular);
+        glow = exp(-14.0 * ring1) * .21 + exp(-14.0 * ring2) * .20
+            + exp(-8.0 * radius) * .12;
+    } else if (u_variant < 8.5) {
+        // Magnetic Dust: sparse points orbiting curved invisible field-lines.
+        float2 q = p * 25.0;
+        q.x += 2.0 * sin(q.y * .11 + t * .38);
+        q.y += 1.5 * sin(q.x * .09 - t * .28);
+        float2 cell = floor(q);
+        float2 local = fract(q) - .5;
+        float seed = noise21(cell);
+        float2 offset = float2(noise21(cell + float2(9.0, 3.0)),
+            noise21(cell + float2(1.0, 21.0))) - .5;
+        float dotDistance = length(local - offset * .65);
+        float spark = (1.0 - smoothstep(.08, .19, dotDistance))
+            * smoothstep(.67, .99, seed);
+        float field = sin(12.0 * length(p) - t * .8 + sin(atan(p.y, p.x) * 3.0));
+        v = spark * (.4 + .6 * max(0.0, field));
+        glow = exp(-abs(field) * 8.0) * exp(-3.8 * length(p)) * .17;
+    } else if (u_variant < 9.5) {
+        // Midnight Horizon: luminous celestial body, distant moving cloud bands.
+        float horizon = .125 + .024 * sin(p.x * 7.5 + t * .12)
+            + .010 * sin(p.x * 19.0 - t * .18);
+        float atmosphere = exp(-18.0 * abs(p.y - horizon));
+        float2 moon = p - float2(.16 + .025 * sin(t * .12), -.165);
+        float moonDistance = length(moon);
+        float moonDisc = 1.0 - smoothstep(.085, .095, moonDistance);
+        float cloud = sin(p.x * 10.0 + p.y * 2.2 + t * .13)
+            * sin(p.y * 25.0 + t * .15);
+        float mist = exp(-13.0 * abs(p.y - horizon - .085))
+            * (.55 + .45 * cloud);
+        float star = noise21(floor(float2(p.x * 210.0, p.y * 320.0)));
+        float starfield = smoothstep(.996, 1.0, star)
+            * (1.0 - smoothstep(-.15, .1, p.y));
+        v = moonDisc * .75 + starfield * .7;
+        glow = atmosphere * .33 + exp(-11.0 * moonDistance) * .25
+            + max(0.0, mist) * .22;
+    } else if (u_variant < 10.5) {
+        // Chromatic Flow: slow coherent flowing contours, not a fluid solver.
+        float2 q = p * 3.8;
+        q.x += .65 * sin(q.y * 1.4 + t * .28)
+            + .3 * sin(q.y * 3.1 - t * .19);
+        q.y += .43 * cos(q.x * 1.8 - t * .25);
+        float contour = sin(q.x * 3.5 + q.y * 2.1 + .7 * sin(q.y * 3.3 + t));
+        float contrast = pow(max(0.0, contour), 6.0);
+        float bloom = sin(q.x * .7 - q.y * .9 + t * .14);
+        v = contrast * .72 + pow(max(0.0, bloom), 8.0) * .16;
+        glow = pow(max(0.0, contour), 2.0) * .36
+            * (1.0 - smoothstep(.25, .85, length(p)));
+    } else {
+        // Circuit Pulse: clean technical trace geometry, rhythmic crossings.
+        float2 q = p * 11.0;
+        q.x += .12 * sin(t * .5 + floor(q.y) * 3.0);
+        float2 g = abs(fract(q) - .5);
+        float trace = 1.0 - smoothstep(.015, .06, min(g.x, g.y));
+        float pulse = .4 + .6 * pow(max(0.0, sin(q.x * .38 + q.y * .41 - t)), 5.0);
+        float dot = exp(-18.0 * length(g));
+        float window = exp(-3.8 * length(p));
+        v = (trace * .31 + dot * .8) * pulse * window;
+        glow = trace * window * .075 + exp(-7.0 * length(p)) * .09;
     }
     v = max(0.0, v) * k;
     glow = max(0.0, glow) * k;
