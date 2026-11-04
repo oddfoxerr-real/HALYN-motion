@@ -22,6 +22,7 @@ class HalynWallpaperService : WallpaperService() {
         private val preferences = MotionPreferences(this@HalynWallpaperService)
         private val renderer = HalynRenderer()
         private val clockRenderer = ClockOverlayRenderer()
+        private val spatialTracker = SpatialTracker(this@HalynWallpaperService)
         private val handler = Handler(Looper.getMainLooper())
         private var settings = preferences.get()
         private var visible = false
@@ -62,6 +63,7 @@ class HalynWallpaperService : WallpaperService() {
                 refresh()
             } else {
                 handler.removeCallbacks(tick)
+                spatialTracker.stop()
             }
         }
 
@@ -85,6 +87,7 @@ class HalynWallpaperService : WallpaperService() {
         }
 
         override fun onSharedPreferenceChanged(prefs: SharedPreferences?, key: String?) {
+            if (key == "star_recenter_token") spatialTracker.recenter()
             settings = preferences.get()
             refresh()
         }
@@ -92,6 +95,7 @@ class HalynWallpaperService : WallpaperService() {
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
             surfaceReady = false
             handler.removeCallbacks(tick)
+            spatialTracker.stop()
             super.onSurfaceDestroyed(holder)
         }
 
@@ -99,12 +103,19 @@ class HalynWallpaperService : WallpaperService() {
             visible = false
             surfaceReady = false
             handler.removeCallbacks(tick)
+            spatialTracker.stop()
             preferences.raw.unregisterOnSharedPreferenceChangeListener(this)
             super.onDestroy()
         }
 
         private fun refresh() {
             handler.removeCallbacks(tick)
+            if (visible && surfaceReady && settings.preset == StarWindowRenderer.SCENE_INDEX) {
+                spatialTracker.start(settings.starSensitivity)
+                spatialTracker.setSensitivity(settings.starSensitivity)
+            } else {
+                spatialTracker.stop()
+            }
             if (visible && surfaceReady) handler.post(tick)
         }
 
@@ -117,7 +128,8 @@ class HalynWallpaperService : WallpaperService() {
                 renderer.draw(
                     canvas, settings,
                     (startedMs - startTimeMs) / 1000f,
-                    touchX, touchY, offsetX
+                    touchX, touchY, offsetX,
+                    if (settings.preset == StarWindowRenderer.SCENE_INDEX) spatialTracker.pose() else null
                 )
                 clockRenderer.draw(canvas, settings)
             } catch (_: IllegalArgumentException) {
