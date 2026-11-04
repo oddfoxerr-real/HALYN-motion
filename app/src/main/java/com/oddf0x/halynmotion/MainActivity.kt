@@ -364,17 +364,17 @@ class MainActivity : Activity() {
             background = rounded(cardColor, 22, borderColor)
             setPadding(dp(17), dp(18), dp(17), dp(16))
         }
-        panel.addView(text("MOVE THE PHONE, NOT THE UNIVERSE", 10f, secondary, Typeface.BOLD).apply {
+        panel.addView(text("WEIGHTLESS EXPLORATION", 10f, secondary, Typeface.BOLD).apply {
             letterSpacing = .10f
             setPadding(0, 0, 0, dp(8))
         })
         panel.addView(text(
-            "Rotation sets where you look. Linear acceleration adds bounded movement in that direction. No camera required.",
+            "Slow astronaut-like drift. Your phone becomes a window into a fixed astronomical starfield. No camera needed.",
             12f, secondary
         ).apply { setPadding(0, 0, 0, dp(16)) })
 
         addSlider(panel, "Movement response", prefs.get().starSensitivity,
-            .35f, 2.2f) { value ->
+            .15f, 1.4f) { value ->
             prefs.setStarSensitivity(value)
             previewTracker.setSensitivity(value)
         }
@@ -396,26 +396,41 @@ class MainActivity : Activity() {
             preview.invalidate()
         }
 
-        val recenter = text("Recenter spatial view    ⟲", 14f, ink, Typeface.BOLD).apply {
+        val recenter = text("Return to the Solar System    ⟲", 14f, ink, Typeface.BOLD).apply {
             gravity = Gravity.CENTER
             background = rounded(Color.rgb(42, 44, 53), 15)
             isClickable = true
             isFocusable = true
-            contentDescription = "Reset Star Window inertial movement to the centre"
+            contentDescription = "Return the Star Window camera to the Solar System starting point"
             setOnClickListener {
                 previewTracker.recenter()
                 prefs.recenterStarWindow()
                 preview.invalidate()
-                Toast.makeText(this@MainActivity, "Star Window recentered", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, "Returned to the Solar System", Toast.LENGTH_SHORT).show()
             }
         }
+        val warp = text("Warp one light-year    ↗", 14f, backgroundColor, Typeface.BOLD).apply {
+            gravity = Gravity.CENTER
+            background = rounded(ink, 15)
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Travel one light-year in the viewing direction"
+            setOnClickListener {
+                previewTracker.warpForward()
+                preview.invalidate()
+            }
+        }
+        panel.addView(warp, LinearLayout.LayoutParams(-1, dp(50)).apply {
+            topMargin = dp(16)
+        })
         panel.addView(recenter, LinearLayout.LayoutParams(-1, dp(50)).apply {
             topMargin = dp(18)
         })
 
         panel.addView(text(
-            "Movement is estimated from phone sensors and can drift. " +
-                "Recenter restores the virtual starting point; accurate room tracking needs camera-based AR.",
+            "Tap the wallpaper to warp 1 light-year in the direction you're facing. " +
+                "Planet positions follow NASA/JPL orbital elements; 9,096 real catalog stars " +
+                "supply the sky. Accelerometer movement is approximate and may drift.",
             11f, subtle
         ).apply { setPadding(0, dp(16), 0, 0) })
         starControls.addView(panel)
@@ -785,7 +800,7 @@ class MainActivity : Activity() {
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).roundToInt()
 
     private inner class SceneTilePreview(private val sceneIndex: Int) : View(this@MainActivity) {
-        private val renderer = HalynRenderer()
+        private val renderer = HalynRenderer(this@MainActivity)
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
@@ -802,6 +817,9 @@ class MainActivity : Activity() {
         private val startTime = SystemClock.uptimeMillis()
         private var touchX = .5f
         private var touchY = .5f
+        private var pointerDownMs = 0L
+        private var pointerDownX = 0f
+        private var pointerDownY = 0f
         var running: Boolean = false
             set(value) {
                 field = value
@@ -823,16 +841,33 @@ class MainActivity : Activity() {
 
         override fun onTouchEvent(event: MotionEvent): Boolean {
             when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
+                MotionEvent.ACTION_DOWN -> {
+                    pointerDownMs = SystemClock.uptimeMillis()
+                    pointerDownX = event.x
+                    pointerDownY = event.y
                     touchX = (event.x / width.coerceAtLeast(1)).coerceIn(0f, 1f)
                     touchY = (event.y / height.coerceAtLeast(1)).coerceIn(0f, 1f)
                     invalidate()
                     return true
                 }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    performClick()
+                MotionEvent.ACTION_MOVE -> {
+                    touchX = (event.x / width.coerceAtLeast(1)).coerceIn(0f, 1f)
+                    touchY = (event.y / height.coerceAtLeast(1)).coerceIn(0f, 1f)
+                    invalidate()
                     return true
                 }
+                MotionEvent.ACTION_UP -> {
+                    if (prefs.get().preset == StarWindowRenderer.SCENE_INDEX &&
+                        SystemClock.uptimeMillis() - pointerDownMs <= 330L &&
+                        kotlin.math.abs(event.x - pointerDownX) < dp(24) &&
+                        kotlin.math.abs(event.y - pointerDownY) < dp(24)) {
+                        previewTracker.warpForward()
+                    }
+                    performClick()
+                    invalidate()
+                    return true
+                }
+                MotionEvent.ACTION_CANCEL -> return true
             }
             return super.onTouchEvent(event)
         }
