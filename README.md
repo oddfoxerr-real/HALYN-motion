@@ -2,7 +2,23 @@
 
 Minimalist native Android live wallpaper studio featuring **13 animated GPU wallpaper scenes** and **5 real-time clock styles**.
 
-## What's new in v0.5
+## What's new in v0.6
+
+- **Warp fixed visually and functionally:** A travel tunnel with moving star streaks, a central portal ring, progress animation, one-light-year displacement in J2000 coordinates, distance HUD, and a visible arrival pulse. The app's Warp action now also signals the live wallpaper engine instead of affecting only its preview.
+- **New space atmospheres:** Survey (astronomy only), Nebula (animated luminous cloud field), Expedition (cinematic nebula, ringed artistic planet after traveling, brighter warp effects). Fictional worlds are **clearly marked as procedural**, not represented as NASA discoveries.
+- **Location-aware sky:** Opt-in foreground GPS/network location sync, approximate location supported, local-only cached coordinates, local sidereal time plus compass/magnetic declination for astronomical orientation. GPS is **not** used for indoor movement tracking or polled continually by the wallpaper.
+- **Existing content preserved:** All 13 wallpapers, all original wallpaper styles, all five clocks, original palettes, and the HSV colour picker.
+
+### How to use the new Star Window
+
+1. Choose **Star Window** in the New Collection, then **Expedition** under Visual Atmosphere.
+2. Tap **Warp one light-year** in the studio (always works when the app is open), or tap the live wallpaper when your launcher forwards wallpaper touches.
+3. You'll see an animated hyperspace tunnel, distance-from-origin label and warp-complete effect. **Return to the Solar System** resets the virtual camera.
+4. For the *real sky above your location*, choose **Sync sky location** and grant approximate or precise location. This uses the saved coordinates and Earth's rotation, not live GPS polling. Warping switches back into exploration mode.
+
+**Reality check:** This is an Android procedural *live wallpaper*, not a 3D game with terrain generation or walkable planets. The cinematic space atmosphere is original procedural art alongside the existing genuine Yale/Hipparcos star and approximate JPL planet coordinates.
+
+## Previous v0.5 changes
 
 - **Six preserved HALYN Originals:** Ion Veil, Liquid Chrome, Nebula Drift, Electric Silk, Solar Bloom and Prism Tide.
 - **Six additional scenes:** Silk Reactor, Glass Orbit, Magnetic Dust, Midnight Horizon, Chromatic Flow and Circuit Pulse.
@@ -22,7 +38,10 @@ Minimalist native Android live wallpaper studio featuring **13 animated GPU wall
 ## Architecture
 
 - `SpatialTracker.kt`: gravity-free acceleration transformed to world axes, damped integrated movement, orientation sensor, lifecycle and recenter. Inertial drift prevents exact room-scale navigation.
-- `StarWindowRenderer.kt`: fixed-world spherical starfield GPU shader with depth-dependent parallax.
+- `StarWindowRenderer.kt`: real-star Canvas renderer in 3D astronomical coordinates, with approximate planet positions and constellation paths.
+- `SpaceEffectsRenderer.kt`: optional nebula AGSL, artistic worlds, warp tunnel, progress and arrival overlays.
+- `SkyLocationController.kt`: user-initiated foreground GPS/network location capture, permission and local cache.
+- `SkyCoordinates.kt`: local sidereal time and geomagnetic true-north correction for aligning the sky.
 - `MainActivity.kt`: native minimalist wallpaper studio and Clock Atelier UI.
 - `ClockOverlayRenderer.kt`: 5 live-time clock face renderers on a hardware-accelerated Android Canvas.
 - `HalynRenderer.kt`: 12 procedural AGSL GPU wallpaper scenes and preferences.
@@ -39,5 +58,5 @@ The Star Window is an estimated inertial navigation effect: accelerometers canno
 - **Planetary position model:** NASA/JPL SSD [Approximate Positions of the Planets](https://ssd.jpl.nasa.gov/planets/approx_pos.html), Table 1, J2000 approximate orbital elements and rates valid 1800–2050. Earth uses the Earth–Moon barycenter approximation. These are *not* real-time Horizons high-precision vectors.
 - **Stars:** [Yale Bright Star Catalogue, 5th revised edition](http://tdc-www.harvard.edu/catalogs/bsc5.html), J2000 RA/Dec and visual magnitudes, ESA [Hipparcos parallaxes](https://cdsarc.cds.unistra.fr/viz-bin/cat/I/239) where reliable, and IAU proper names. Offline facts compiled by [isene/starmap](https://github.com/isene/starmap/blob/master/data/README.md); the original data are public domain. Dataset is **9,096 bright stars**, not every star in the Galaxy.
 - **Constellation lines:** [d3-celestial](https://github.com/ofrohn/d3-celestial), copyright 2015–2020 Olaf Frohn, licensed BSD-3-Clause; its copyright, permission and disclaimer are retained in `docs/CONSTELLATION-LICENSE.md`. These are sky-chart line segments, not physical structures in space.
-- Phone orientation is **calibrated relative to the initial screen direction**, not geolocated or astronomically aligned to your true local sky. No camera or location permission is used.
+- In **Explore** mode, phone orientation is calibrated relative to the initial screen direction. In **Location Sky** mode, a user-requested approximate/precise foreground location fix, sidereal time and compass sensor align view to the local sky (approximately). No camera or background-location permission is used; location is stored locally and can be disabled.
 - The Solar System and near stars occupy wildly different real-world scales. Correct mathematical coordinates are used, but Solar System body markers are deliberately magnified for visibility. Only the eight major planets and Sun are modelled; this is not a complete asteroid/moon catalogue.
