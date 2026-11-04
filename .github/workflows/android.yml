@@ -52,8 +52,8 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.4.0-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.4.0-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.5.0-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.5.0-preview.apk > SHA256SUMS.txt)
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -72,31 +72,40 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish Star Window preview
+      - name: Publish NASA Star Window + smooth astronaut navigation
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.4.0-preview.1
+          TAG: v0.5.0-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.4.0-preview.apk
-          unzip -t dist/HALYN-Motion-v0.4.0-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.5.0-preview.apk
+          unzip -t dist/HALYN-Motion-v0.5.0-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN Motion v0.4.0 Preview
+          # HALYN Motion v0.5.0 Preview
 
-          Star Window is a new camera-free spatial starfield wallpaper.
-          Linear acceleration provides bounded virtual position movement,
-          while the rotation-vector sensor anchors viewing orientation.
-          Three fixed world star shells create position-dependent parallax.
-          A dedicated scene panel includes sensitivity, star density,
-          constellation-line toggle and inertial recenter control.
-          All twelve previous wallpapers and five live clock styles remain.
-          IMPORTANT: Inertial movement is approximate and accumulates drift;
-          this is not accurate AR/6DoF room tracking.
+          Star Window now uses 9,096 real stars from the public-domain Yale
+          Bright Star Catalogue, Hipparcos distances where known, and real
+          constellation strokes (BSD-3-Clause attribution bundled). Planetary
+          positions follow NASA/JPL SSD approximate J2000 orbital elements
+          for the Sun and all eight major planets, calculated for the date.
+
+          Movement is slowed to weightless astronaut-style drift; hardware
+          acceleration impulses and orientation discontinuities are filtered.
+          Brief missing sensor samples are boundedly predicted, visual time
+          is capped during dropped frames, and rendering is aligned to display
+          vsync. Tap the preview or tap a supported wallpaper region to warp
+          ONE LIGHT-YEAR forward in 2.6 seconds, or use the in-app Warp button.
+          Return to the Solar System resets the camera position. Previous
+          twelve wallpapers, clock faces and colour picker remain.
+
+          NASA model is approximate, not a Horizons ephemeris. Motion is
+          inertial and drifts; actual room-scale position is not tracked.
+          Planet marker sizes are enlarged and not to physical scale.
 
           - Minimum Android 13.
           - No Unity, PC companion, ads or network permissions.
@@ -104,7 +113,7 @@ jobs:
             a stable release signing key.
           - Hardware performance on the Samsung Galaxy A56 is unverified.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.4.0-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.5.0-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.4 — Star Window Spatial Wallpaper" \
+            --title "HALYN Motion v0.5 — Astronaut Motion & NASA Solar System" \
             --notes-file notes.md --prerelease
