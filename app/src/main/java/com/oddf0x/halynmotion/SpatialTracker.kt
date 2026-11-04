@@ -62,6 +62,8 @@ class SpatialTracker(context: Context) : SensorEventListener {
     private val target = identity.copyOf()
     private val previousTarget = identity.copyOf()
     private val smoothed = identity.copyOf()
+    private val sensorBasis = identity.copyOf()
+    private val lookOffset = identity.copyOf()
     private val velocity = FloatArray(3)
     private val position = FloatArray(3)
     private val smoothedPosition = FloatArray(3)
@@ -97,6 +99,7 @@ class SpatialTracker(context: Context) : SensorEventListener {
             latitude = state.skyLatitude
             longitude = state.skyLongitude
             skyBucket = Long.MIN_VALUE
+            if (want) for (i in 0..8) lookOffset[i] = identity[i]
             // Never instant-snap the camera when the user changes modes.
             // The existing render filter smoothly blends to the new axes.
         }
@@ -135,6 +138,7 @@ class SpatialTracker(context: Context) : SensorEventListener {
         completedWarpAu = SpacePoint(0.0, 0.0, 0.0)
         warpStartNs = 0L
         destinationName = ""
+        for (i in 0..8) lookOffset[i] = identity[i]
         lastMotionNs = 0L
         // Calibrate forward again using the most recently accepted device pose.
         for (i in 0..8) baseline[i] = screen[i]
@@ -157,6 +161,7 @@ class SpatialTracker(context: Context) : SensorEventListener {
         val ray = SpaceNavigation.ray(pose, normalizedX, normalizedY, aspect)
         val current = currentWarpOffset(visualClockNs)
         beginTravel(current + ray * AstronomyCatalog.AU_PER_LY, "Deep space", 3_200_000_000L)
+        steerToward(ray)
     }
 
     fun warpForward() = warpToward(.5f, .5f, .46f)
@@ -174,6 +179,44 @@ class SpatialTracker(context: Context) : SensorEventListener {
         val offset = currentWarpOffset(visualClockNs)
         val baseWithInertia = currentPose.originAu - offset
         beginTravel(cameraStop - baseWithInertia, destination.name, 4_000_000_000L)
+        steerToward(direction)
+    }
+
+    private fun steerToward(direction: SpacePoint) {
+        // Rotate the viewing basis toward a picked destination without losing
+        // future gyroscope tracking. This is a coordinate-frame offset, not a
+        // permanent locked camera.
+        val d = SpaceNavigation.normalize(direction)
+        val upReference = if (kotlin.math.abs(d.y) > .94)
+            SpacePoint(0.0, 0.0, 1.0) else SpacePoint(0.0, 1.0, 0.0)
+        val right = SpaceNavigation.normalize(SpacePoint(
+            d.y * upReference.z - d.z * upReference.y,
+            d.z * upReference.x - d.x * upReference.z,
+            d.x * upReference.y - d.y * upReference.x
+        ))
+        val up = SpacePoint(
+            right.y * d.z - right.z * d.y,
+            right.z * d.x - right.x * d.z,
+            right.x * d.y - right.y * d.x
+        )
+        val wanted = floatArrayOf(
+            right.x.toFloat(), up.x.toFloat(), (-d.x).toFloat(),
+            right.y.toFloat(), up.y.toFloat(), (-d.y).toFloat(),
+            right.z.toFloat(), up.z.toFloat(), (-d.z).toFloat()
+        )
+        // lookOffset = wanted * transpose(sensorBasis)
+        for (r in 0..2) {
+            for (c in 0..2) {
+                lookOffset[r * 3 + c] = wanted[r * 3] * sensorBasis[c * 3] +
+                    wanted[r * 3 + 1] * sensorBasis[c * 3 + 1] +
+                    wanted[r * 3 + 2] * sensorBasis[c * 3 + 2]
+            }
+        }
+        for (i in 0..8) {
+            previousTarget[i] = target[i]
+            target[i] = wanted[i]
+        }
+        // Render-time smoothing turns gradually rather than snapping.
     }
 
     private fun beginTravel(end: SpacePoint, name: String, durationNs: Long) {
@@ -305,10 +348,19 @@ class SpatialTracker(context: Context) : SensorEventListener {
         val desired = if (useLocalSky && skyAxes != null) {
             SkyCoordinates.cameraMatrix(screen, skyAxes!!)
         } else relative
+        for (i in 0..8) sensorBasis[i] = desired[i]
+        val steered = FloatArray(9)
+        for (r in 0..2) {
+            for (c in 0..2) {
+                steered[r * 3 + c] = lookOffset[r * 3] * desired[c] +
+                    lookOffset[r * 3 + 1] * desired[3 + c] +
+                    lookOffset[r * 3 + 2] * desired[6 + c]
+            }
+        }
         val delta = if (lastRotationNs > 0L) {
-            val dot = ((target[0] * desired[0] + target[3] * desired[3] + target[6] * desired[6]) +
-                (target[1] * desired[1] + target[4] * desired[4] + target[7] * desired[7]) +
-                (target[2] * desired[2] + target[5] * desired[5] + target[8] * desired[8]))
+            val dot = ((target[0] * steered[0] + target[3] * steered[3] + target[6] * steered[6]) +
+                (target[1] * steered[1] + target[4] * steered[4] + target[7] * steered[7]) +
+                (target[2] * steered[2] + target[5] * steered[5] + target[8] * steered[8]))
             acos(((dot - 1f) * .5f).coerceIn(-1f, 1f))
         } else 0f
         val intervalNs = event.timestamp - lastRotationNs
@@ -319,7 +371,7 @@ class SpatialTracker(context: Context) : SensorEventListener {
         if (!useLocalSky && intervalNs in 1L..60_000_000L && delta > .96f) return
 
         for (i in 0..8) previousTarget[i] = target[i]
-        for (i in 0..8) target[i] = desired[i]
+        for (i in 0..8) target[i] = steered[i]
         previousRotationNs = lastRotationNs
         lastRotationNs = event.timestamp
     }
