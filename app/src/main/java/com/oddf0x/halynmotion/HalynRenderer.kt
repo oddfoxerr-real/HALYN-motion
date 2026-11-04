@@ -111,10 +111,20 @@ class MotionPreferences(context: Context) {
     fun clearSkyFix() = preferences.edit()
         .putBoolean("sky_aligned", false)
         .remove("sky_latitude").remove("sky_longitude").remove("sky_fix_time").apply()
-    fun requestWarp() {
+    fun requestWarp() = requestWarpToward(.5f, .5f, .46f)
+    fun requestWarpToward(nx: Float, ny: Float, aspect: Float) {
         val next = preferences.getInt("star_warp_token", 0) + 1
-        preferences.edit().putInt("star_warp_token", next).apply()
+        preferences.edit()
+            .putFloat("star_warp_x", nx.coerceIn(0f, 1f))
+            .putFloat("star_warp_y", ny.coerceIn(0f, 1f))
+            .putFloat("star_warp_aspect", aspect.coerceIn(.2f, 2.0f))
+            .putInt("star_warp_token", next).apply()
     }
+    fun warpCoordinates(): FloatArray = floatArrayOf(
+        preferences.getFloat("star_warp_x", .5f),
+        preferences.getFloat("star_warp_y", .5f),
+        preferences.getFloat("star_warp_aspect", .46f)
+    )
     fun requestDestination(name: String) {
         if (name.isBlank()) return
         val next = preferences.getInt("star_destination_token", 0) + 1
