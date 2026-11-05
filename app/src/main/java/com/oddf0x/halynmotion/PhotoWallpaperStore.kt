@@ -25,7 +25,7 @@ class PhotoWallpaperStore(private val context: Context) {
     fun available(): Boolean = imageFile.isFile && imageFile.length() > 0L
 
     /** Decode from SAF into a bounded temporary file, downsample, validate, then replace. */
-    fun import(uri: Uri): Boolean {
+    fun install(uri: Uri): Boolean {
         val mime = context.contentResolver.getType(uri) ?: return false
         if (!mime.startsWith("image/")) return false
         val raw = File(context.cacheDir, "halyn_image_input.tmp")
