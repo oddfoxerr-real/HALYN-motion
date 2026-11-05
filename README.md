@@ -1,6 +1,23 @@
 # HALYN Motion
 
-Minimalist native Android live wallpaper studio featuring **21 live wallpaper scenes** and **5 real-time clock styles**, including four layered mountain landscapes.
+Minimalist native Android live wallpaper studio featuring **51 original live wallpaper scenes plus a personal image option** and **5 real-time clock styles**, including four layered mountain landscapes.
+
+## v0.8.0 — Subject-led poster collection
+
+HALYN's collection now includes **51 built-in wallpapers**, with 30 new, original subject-based scenes rather than more anonymous geometry.
+
+- **Botanical posters:** Blue Rose, Red Anemone, Sunflower Hour, Lunar Lotus and Sakura Drift.
+- **Road & speed:** Sunset GT, Midnight Rider, Coastal Drive, Neon Circuit and Desert Runner.
+- **Quiet worlds:** Alone by the Sea, Foggy Pines, Peach Horizon, Deep Blue and Ember Forest.
+- **Illustrated creatures:** Night Cat, Little Fox, Moon Owl, Cozy Panda and Shadow Rabbit.
+- **City after dark:** Quiet Street, Streetlamp Rain, Skyline Blue, Lantern Alley and Rooftop Glow.
+- **Places & ruins:** Mountain Cabin, Island Gate, Desert Arch, Last Lighthouse and Temple Sunrise.
+
+The poster artwork uses lightweight Canvas illustration, subject-specific environments and gentle motion. Each foreground is drawn **after** the live clock, allowing the clock to partly sit behind a rose, car, creature or structure. The existing five clock styles, font selector, gyro controls, and on-home-screen positioning mode continue to work.
+
+**My Image** is one additional gallery option: tap **Choose an image**, pick a photo or artwork using Android's system file picker, and HALYN imports it into private on-device storage. Import supports up to 24 MB and produces a downsampled WebP for lightweight wallpaper use. The image does not leave your phone, is not stored in the GitHub repository and is not shared with any server. Gyro pans the image only inside its safe crop margins so no black borders appear. Your selectable clock is rendered over the image.
+
+The poster scenes deliberately **do not reproduce branded characters** from example galleries. To use character art you own or are authorized to use, choose **My Image**.
 
 ## v0.7.1 — Gyro & mountain stability
 

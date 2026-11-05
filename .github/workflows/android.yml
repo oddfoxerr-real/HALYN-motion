@@ -52,11 +52,11 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='10'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='11'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.7.1-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.7.1-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.8.0-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.8.0-preview.apk > SHA256SUMS.txt)
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -75,45 +75,46 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.7.1 Gyro and Mountain Stability
+      - name: Publish HALYN v0.8.0 Poster Collection
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.7.1-preview.1
+          TAG: v0.8.0-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.7.1-preview.apk
-          unzip -t dist/HALYN-Motion-v0.7.1-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.8.0-preview.apk
+          unzip -t dist/HALYN-Motion-v0.8.0-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN Motion v0.7.1 Preview
+          # HALYN Motion v0.8.0 Preview
 
-          Fixes for the v0.7 mountain and abstract wallpapers:
+          Adds thirty entirely new subject-led wallpapers to HALYN,
+          organized into six curated categories:
+          Botanical Posters (flowers), Road & Speed (cars/motorcycles),
+          Quiet Worlds (horizons), Illustrated Creatures (original
+          animal art), City After Dark (street scenes), and
+          Places & Ruins (cabins, temples and lighthouses).
 
-          - Advanced gyro for the 20 non-Star Window scenes using Android
-            fused rotation-vector sensors, neutral calibration on activation,
-            filtered movement, deadzone, safe displacement limits and
-            user-selected Off / Soft / Dynamic / Space modes.
-          - Both studio preview and live wallpaper now use the same
-            orientation-relative motion model; Star Window retains its
-            existing spatial navigation and independent touch preference.
-          - Mountain foregrounds, background ridges, celestial bodies and
-            fog each have distinct depth response, with geometry oversized
-            beyond the screen to prevent bright edge seams while tilting.
-          - Mountain gallery thumbnails now draw their front silhouette.
-          - Correct mountain colour, strength and animation flow controls.
-          - Cache expensive background gradients rather than allocating
-            them every frame, reducing jitter and garbage collection.
-          - Retain transparent mountain/clock occlusion, custom fonts,
-            home-screen clock grid editor, original 21 wallpapers and
-            the astronomy catalog.
+          Each design has distinct built-in composition, palette and
+          subtle GPU-free animated elements. Foreground subjects can
+          partly occlude HALYN's own configurable clock. All original
+          21 wallpapers and advanced gyro modes remain available.
 
-          Debug APK build verification checks package name, versionCode,
-          valid APK ZIP and the live wallpaper service. Actual sensor
-          smoothness and Samsung launcher behavior require on-phone testing.
+          MY IMAGE: Use Android's system document picker to import
+          your own image privately into HALYN. Imported images are
+          downsampled and converted to local WebP, with a 24 MB
+          input limit. The image is never uploaded or embedded in
+          the source repository. The clock remains independently
+          editable and the image supports bounded gyro crop.
+
+          Gallery categories are now organized for easier browsing.
+          New posters are original illustrations, not licensed
+          character portraits and not copies of supplied screenshots.
+          Runtime art quality, device-specific performance and
+          launcher behavior require on-phone testing.
 
           - Minimum Android 13.
           - No Unity, PC companion, ads or network calls.
@@ -123,7 +124,7 @@ jobs:
           - Unsupported vendor AGSL rendering falls back to a readable gradient.
           - Hardware performance on the Samsung Galaxy A56 is unverified.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.7.1-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.8.0-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.7.1 — Gyro and Mountain Stability" \
+            --title "HALYN Motion v0.8.0 — Poster Collection" \
             --notes-file notes.md --prerelease

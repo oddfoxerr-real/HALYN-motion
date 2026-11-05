@@ -43,7 +43,8 @@ data class MotionState(
     val clockFontRevision: Int = 0,
     val clockCustomPlacement: Boolean = false,
     val clockX: Float = .5f,
-    val clockY: Float = .68f
+    val clockY: Float = .68f,
+    val photoRevision: Int = 0
 )
 
 class MotionPreferences(context: Context) {
@@ -58,7 +59,7 @@ class MotionPreferences(context: Context) {
             return if (result.isFinite()) result.coerceIn(min, max) else default
         }
         return MotionState(
-            preset = preferences.getInt("preset", 0).coerceIn(0, 20),
+            preset = preferences.getInt("preset", 0).coerceIn(0, PhotoWallpaperStore.SCENE_INDEX),
             palette = preferences.getInt("palette", 0).coerceIn(0, 5),
             customColor = preferences.getInt("custom_color", Color.rgb(185, 174, 255)) or -0x1000000,
             intensity = float("intensity", 1f, .35f, 2.3f),
@@ -92,11 +93,15 @@ class MotionPreferences(context: Context) {
             clockFontRevision = preferences.getInt("clock_font_revision", 0),
             clockCustomPlacement = preferences.getBoolean("clock_custom_placement", false),
             clockX = float("clock_x", .5f, .08f, .92f),
-            clockY = float("clock_y", .68f, .14f, .88f)
+            clockY = float("clock_y", .68f, .14f, .88f),
+            photoRevision = preferences.getInt("photo_revision", 0)
         )
     }
 
-    fun setPreset(value: Int) = preferences.edit().putInt("preset", value.coerceIn(0, 20)).apply()
+    fun setPreset(value: Int) = preferences.edit().putInt("preset", value.coerceIn(0, PhotoWallpaperStore.SCENE_INDEX)).apply()
+    fun photoImported() = preferences.edit()
+        .putInt("photo_revision", preferences.getInt("photo_revision", 0) + 1)
+        .putInt("preset", PhotoWallpaperStore.SCENE_INDEX).apply()
     fun setPalette(value: Int) = preferences.edit().putInt("palette", value.coerceIn(0, 5)).apply()
     fun setCustomColor(color: Int) = preferences.edit()
         .putInt("custom_color", color or -0x1000000)
@@ -182,6 +187,8 @@ class MotionPreferences(context: Context) {
 class HalynRenderer(private val context: Context) {
     private val starRenderer by lazy { StarWindowRenderer(context) }
     private val mountainRenderer = MountainSceneRenderer()
+    private val posterRenderer = PosterSceneRenderer()
+    private val photoRenderer = PhotoWallpaperStore(context.applicationContext)
     private var shaderFailed = false
     // Mountain and Star Window previews never need AGSL. Creating a shader
     // for every gallery tile previously caused avoidable startup/GPU work.
@@ -213,6 +220,14 @@ class HalynRenderer(private val context: Context) {
         }
         if (MountainSceneRenderer.isMountain(state.preset)) {
             mountainRenderer.drawBackground(canvas, state, elapsedSeconds, mountainPose(state, gyro, offsetX))
+            return
+        }
+        if (PosterSceneRenderer.isPoster(state.preset)) {
+            posterRenderer.drawBackground(canvas, state.preset, elapsedSeconds, gyro)
+            return
+        }
+        if (state.preset == PhotoWallpaperStore.SCENE_INDEX) {
+            photoRenderer.draw(canvas, gyro)
             return
         }
         val width = canvas.width.coerceAtLeast(1).toFloat()
@@ -257,6 +272,8 @@ class HalynRenderer(private val context: Context) {
     ) {
         if (MountainSceneRenderer.isMountain(state.preset)) {
             mountainRenderer.drawForeground(canvas, state, mountainPose(state, gyro, offsetX))
+        } else if (PosterSceneRenderer.isPoster(state.preset)) {
+            posterRenderer.drawForeground(canvas, state.preset, android.os.SystemClock.uptimeMillis() / 1000f, gyro)
         }
     }
 
@@ -274,7 +291,7 @@ class HalynRenderer(private val context: Context) {
             "Star Window",
             "Orbital Halo", "Cosmic Rain", "Plasma Loom", "Eclipse Glass",
             "Twilight Peaks", "Moonlit Ridge", "Alpine Mist", "Ember Valley"
-        )
+        ) + PosterSceneRenderer.SCENES.map { it.title } + listOf("My Image")
         val PALETTES = listOf(
             "Arctic", "Ultraviolet", "Ember", "Rose", "Verdant"
         )
