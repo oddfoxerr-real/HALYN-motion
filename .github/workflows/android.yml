@@ -52,11 +52,11 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='12'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='13'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.9.0-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.9.0-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.9.1-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.9.1-preview.apk > SHA256SUMS.txt)
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -75,49 +75,44 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.9.0 Online 4K Gallery
+      - name: Publish HALYN v0.9.1 Online 4K Gallery
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.9.0-preview.1
+          TAG: v0.9.1-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.9.0-preview.apk
-          unzip -t dist/HALYN-Motion-v0.9.0-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.9.1-preview.apk
+          unzip -t dist/HALYN-Motion-v0.9.1-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN Motion v0.9.0 Preview
+          # HALYN Motion v0.9.1 Preview
 
-          New gallery direction requested by HALYN's owner:
-          stop generating wallpaper designs and use REAL ONLINE 4K IMAGES.
+          HALYN now browses REAL ONLINE 4K+ wallpapers from Wikimedia
+          Commons instead of offering new procedurally generated artwork.
 
-          - Live Wikimedia Commons search with Nature, Cars, Flowers,
-            Space, City, Art and Mountains browsing plus custom queries.
-          - Filters image results to minimum original 3840 x 2160
-            equivalent (long side >= 3840 and short side >= 2160).
-          - Only selects files reporting a reusable free-content
-            license (CC0, public domain, CC BY or CC BY-SA).
-          - Shows original author, file page, license and resolution
-            before downloading. Source link remains visible afterwards.
-          - Downloads original pixels from Wikimedia on request only,
-            stores up to 4096 pixels as a private offline WebP with
-            bounded-memory decoding; no earlier 2K reduction.
-          - Original generated wallpaper gallery is no longer visible
-            to select. Existing active procedural scenes are retained
-            only to avoid breaking previous selections until replaced.
-          - Keeps HALYN clock fonts/positioning and gyro parallax.
-          - Local image import remains available offline.
+          - Fresh installs open the online photo slot by default, without
+            showing an unwanted built-in procedural animation.
+          - Existing selections are preserved until replaced.
+          - Browse Nature, Cars, Flowers, Space, City, Art, Mountains or
+            search for a custom topic; load additional Commons results.
+          - Real images only: 3840x2160-equivalent originals with declared
+            CC0, public domain, CC BY or CC BY-SA licenses.
+          - Original source page, license and photographer/artist are
+            visible before download and remain linked afterwards.
+          - Only downloads the image selected by the user over HTTPS.
+          - Offline image retains up to 4096 pixels after local WebP
+            conversion, using capped input transfer and decode size.
+          - Existing HALYN 5-style clock editor, home-screen grid,
+            custom font and gyro remain functional for photo mode.
+          - Local image import works without the internet.
 
-          No user screenshots, chat content, scraped fan art,
-          unlicensed images or external wallpapers are bundled.
-          Internet permission enables explicit image search/download.
-          A photo is not fetched when an offline wallpaper renders.
-
-          - The real Commons network, filter effectiveness and
-            source compliance must also be checked on a device.
+          Copyright-restricted galleries and AI-generated assets are
+          not bundled. Wikimedia API connection, photo downloads and
+          device-specific performance require an actual phone test.
 
           - Minimum Android 13.
           - No Unity, PC companion or ads; network used for opt-in online gallery.
@@ -127,7 +122,7 @@ jobs:
           - Unsupported vendor AGSL rendering falls back to a readable gradient.
           - Hardware performance on the Samsung Galaxy A56 is unverified.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.9.0-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.9.1-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.9.0 — Online 4K Gallery" \
+            --title "HALYN Motion v0.9.1 — Online 4K Gallery" \
             --notes-file notes.md --prerelease
