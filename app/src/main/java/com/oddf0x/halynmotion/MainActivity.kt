@@ -62,6 +62,8 @@ class MainActivity : Activity() {
     private lateinit var clockPlacementToggle: Switch
     private var awaitingClockOverlayPermission = false
     private lateinit var mountainScenes: LinearLayout
+    private val posterRails = mutableListOf<LinearLayout>()
+    private lateinit var myImageScenes: LinearLayout
     private lateinit var gyroModes: LinearLayout
     private lateinit var gyroPanel: LinearLayout
     private lateinit var mountainDepthPanel: LinearLayout
@@ -200,7 +202,7 @@ class MainActivity : Activity() {
     }
 
     private fun buildScenes(root: LinearLayout) {
-        root.addView(section("The collection", "21 live wallpaper styles, individually selectable."))
+        root.addView(section("The collection", "51 original wallpapers, plus your own image."))
         root.addView(text("HALYN ORIGINALS", 11f, subtle, Typeface.BOLD).apply {
             letterSpacing = .14f
             setPadding(0, 0, 0, dp(7))
@@ -244,6 +246,60 @@ class MainActivity : Activity() {
             clipToPadding = false
             addView(mountainScenes)
         }, LinearLayout.LayoutParams(-1, dp(159)))
+
+        val posterCategories = listOf(
+            "BOTANICAL POSTERS", "ROAD & SPEED", "QUIET WORLDS",
+            "ILLUSTRATED CREATURES", "CITY AFTER DARK", "PLACES & RUINS"
+        )
+        posterCategories.forEach { heading ->
+            root.addView(text(heading, 11f, subtle, Typeface.BOLD).apply {
+                letterSpacing = .14f
+                setPadding(0, dp(16), 0, dp(7))
+            })
+            val items = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            posterRails.add(items)
+            root.addView(HorizontalScrollView(this).apply {
+                isHorizontalScrollBarEnabled = false
+                clipToPadding = false
+                addView(items)
+            }, LinearLayout.LayoutParams(-1, dp(159)))
+        }
+
+        root.addView(text("YOUR WALLPAPER", 11f, subtle, Typeface.BOLD).apply {
+            letterSpacing = .14f
+            setPadding(0, dp(17), 0, dp(8))
+        })
+        val photoRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        myImageScenes = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        photoRow.addView(myImageScenes)
+        photoRow.addView(text("Choose an image  ↗", 13f, ink, Typeface.BOLD).apply {
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Import an image from your phone for a clock wallpaper"
+            setPadding(dp(16), dp(12), dp(6), dp(12))
+            setOnClickListener { chooseWallpaperPhoto() }
+        })
+        root.addView(photoRow)
+    }
+
+    private fun chooseWallpaperPhoto() {
+        val pick = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "image/*"
+        }
+        try {
+            startActivityForResult(pick, REQUEST_WALLPAPER_IMAGE)
+        } catch (_: android.content.ActivityNotFoundException) {
+            Toast.makeText(this, "No image picker available", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun buildColours(root: LinearLayout) {
@@ -468,6 +524,19 @@ class MainActivity : Activity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_WALLPAPER_IMAGE && resultCode == RESULT_OK && data?.data != null) {
+            if (PhotoWallpaperStore(this).import(data.data!!)) {
+                prefs.photoImported()
+                refreshScene()
+                syncStarTracking()
+                syncMotionTracking()
+                preview.invalidate()
+                Toast.makeText(this, "Image saved on this device", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Could not import image (24 MB limit)", Toast.LENGTH_LONG).show()
+            }
+            return
+        }
         if (requestCode == REQUEST_CLOCK_FONT && resultCode == RESULT_OK && data?.data != null) {
             if (ClockFontStore.install(this, data.data!!)) {
                 prefs.importedClockFont()
@@ -961,6 +1030,8 @@ class MainActivity : Activity() {
         scenes.removeAllViews()
         newScenes.removeAllViews()
         mountainScenes.removeAllViews()
+        posterRails.forEach { it.removeAllViews() }
+        myImageScenes.removeAllViews()
         val selected = prefs.get().preset
         HalynRenderer.PRESETS.forEachIndexed { index, name ->
             val active = selected == index
@@ -972,6 +1043,10 @@ class MainActivity : Activity() {
                 isFocusable = true
                 contentDescription = "Wallpaper ${index + 1} of ${HalynRenderer.PRESETS.size}, ${name}, ${if (active) "selected" else "not selected"}"
                 setOnClickListener {
+                    if (index == PhotoWallpaperStore.SCENE_INDEX && !PhotoWallpaperStore(this@MainActivity).available()) {
+                        chooseWallpaperPhoto()
+                        return@setOnClickListener
+                    }
                     prefs.setPreset(index)
                     refreshScene()
                     syncStarTracking()
@@ -1009,7 +1084,10 @@ class MainActivity : Activity() {
             val target = when {
                 index < 6 -> scenes
                 index < MountainSceneRenderer.FIRST -> newScenes
-                else -> mountainScenes
+                index <= MountainSceneRenderer.LAST -> mountainScenes
+                index in PosterSceneRenderer.FIRST..PosterSceneRenderer.LAST ->
+                    posterRails[(index - PosterSceneRenderer.FIRST) / 5]
+                else -> myImageScenes
             }
             target.addView(item, LinearLayout.LayoutParams(dp(120), dp(154)).apply {
                 marginEnd = dp(10)
@@ -1223,6 +1301,7 @@ class MainActivity : Activity() {
 
     companion object {
         private const val REQUEST_CLOCK_FONT = 6208
+        private const val REQUEST_WALLPAPER_IMAGE = 6209
     }
 
     override fun onDestroy() {
