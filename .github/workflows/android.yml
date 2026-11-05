@@ -52,11 +52,11 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='9'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='10'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.7.0-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.7.0-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.7.1-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.7.1-preview.apk > SHA256SUMS.txt)
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -75,47 +75,45 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.7.0 Mountain Clock Studio
+      - name: Publish HALYN v0.7.1 Gyro and Mountain Stability
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.7.0-preview.1
+          TAG: v0.7.1-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.7.0-preview.apk
-          unzip -t dist/HALYN-Motion-v0.7.0-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.7.1-preview.apk
+          unzip -t dist/HALYN-Motion-v0.7.1-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN Motion v0.7.0 Preview
+          # HALYN Motion v0.7.1 Preview
 
-          The original 13 wallpapers remain intact. Four additional
-          procedural originals — Orbital Halo, Cosmic Rain, Plasma Loom
-          and Eclipse Glass — bring the collection to 17 abstract/space
-          scenes. Twilight Peaks, Moonlit Ridge, Alpine Mist and Ember
-          Valley complete a 21-scene library of animated wallpapers.
+          Fixes for the v0.7 mountain and abstract wallpapers:
 
-          Mountain foreground silhouettes draw above the clock, allowing
-          every clock face to pass behind the terrain naturally. The clock
-          supports six built-in font choices plus imported .ttf/.otf files
-          (validated, stored locally and limited to 3 MB).
+          - Advanced gyro for the 20 non-Star Window scenes using Android
+            fused rotation-vector sensors, neutral calibration on activation,
+            filtered movement, deadzone, safe displacement limits and
+            user-selected Off / Soft / Dynamic / Space modes.
+          - Both studio preview and live wallpaper now use the same
+            orientation-relative motion model; Star Window retains its
+            existing spatial navigation and independent touch preference.
+          - Mountain foregrounds, background ridges, celestial bodies and
+            fog each have distinct depth response, with geometry oversized
+            beyond the screen to prevent bright edge seams while tilting.
+          - Mountain gallery thumbnails now draw their front silhouette.
+          - Correct mountain colour, strength and animation flow controls.
+          - Cache expensive background gradients rather than allocating
+            them every frame, reducing jitter and garbage collection.
+          - Retain transparent mountain/clock occlusion, custom fonts,
+            home-screen clock grid editor, original 21 wallpapers and
+            the astronomy catalog.
 
-          Clock placement mode opens the actual home screen and provides
-          a temporary draggable 5%-snap grid with a top-corner X to save
-          and exit. This is an explicit user-initiated Android overlay
-          permission, and a temporary foreground notification provides
-          an additional exit action. The grid and overlay disappear when
-          editing ends; the normalized clock position is saved locally.
-
-          Existing Star Window navigation and the independent opt-in
-          Tap to travel toggle are preserved. All 5 clock faces, original
-          scenes, custom palettes and astronomy data remain available.
-
-          NOTE: The home-screen drag overlay requires the user's explicit
-          Draw over other apps permission. Launcher behaviour, edge-to-edge
-          alignment, sensors and thermal performance require device tests.
+          Debug APK build verification checks package name, versionCode,
+          valid APK ZIP and the live wallpaper service. Actual sensor
+          smoothness and Samsung launcher behavior require on-phone testing.
 
           - Minimum Android 13.
           - No Unity, PC companion, ads or network calls.
@@ -125,7 +123,7 @@ jobs:
           - Unsupported vendor AGSL rendering falls back to a readable gradient.
           - Hardware performance on the Samsung Galaxy A56 is unverified.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.7.0-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.7.1-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.7 — Mountain Clock Studio" \
+            --title "HALYN Motion v0.7.1 — Gyro and Mountain Stability" \
             --notes-file notes.md --prerelease

@@ -22,6 +22,9 @@ data class MotionState(
     val touch: Boolean = true,
     val starTapTravel: Boolean = false,
     val parallax: Boolean = true,
+    val gyroMode: Int = 1,
+    val gyroStrength: Float = 1f,
+    val mountainDepth: Float = 1f,
     val clockStyle: Int = 0,
     val clockPosition: Int = 1,
     val clock24h: Boolean = true,
@@ -68,6 +71,9 @@ class MotionPreferences(context: Context) {
             touch = preferences.getBoolean("touch", true),
             starTapTravel = preferences.getBoolean("star_tap_travel", false),
             parallax = preferences.getBoolean("parallax", true),
+            gyroMode = preferences.getInt("gyro_mode", 1).coerceIn(0, 3),
+            gyroStrength = float("gyro_strength", 1f, .5f, 1.8f),
+            mountainDepth = float("mountain_depth", 1f, .5f, 1.6f),
             clockStyle = preferences.getInt("clock_style", 0).coerceIn(0, 5),
             clockPosition = preferences.getInt("clock_position", 1).coerceIn(0, 2),
             clock24h = preferences.getBoolean("clock_24h", true),
@@ -102,6 +108,9 @@ class MotionPreferences(context: Context) {
     fun setTouch(value: Boolean) = preferences.edit().putBoolean("touch", value).apply()
     fun setStarTapTravel(value: Boolean) = preferences.edit().putBoolean("star_tap_travel", value).apply()
     fun setParallax(value: Boolean) = preferences.edit().putBoolean("parallax", value).apply()
+    fun setGyroMode(value: Int) = preferences.edit().putInt("gyro_mode", value.coerceIn(0, 3)).apply()
+    fun setGyroStrength(value: Float) = preferences.edit().putFloat("gyro_strength", value.coerceIn(.5f, 1.8f)).apply()
+    fun setMountainDepth(value: Float) = preferences.edit().putFloat("mountain_depth", value.coerceIn(.5f, 1.6f)).apply()
     fun setClockStyle(value: Int) = preferences.edit().putInt("clock_style", value.coerceIn(0, 5)).apply()
     fun setClockPosition(value: Int) = preferences.edit()
         .putInt("clock_position", value.coerceIn(0, 2))
@@ -174,14 +183,18 @@ class HalynRenderer(private val context: Context) {
     private val starRenderer by lazy { StarWindowRenderer(context) }
     private val mountainRenderer = MountainSceneRenderer()
     private var shaderFailed = false
-    private val shader: RuntimeShader? = try {
-        if (Build.VERSION.SDK_INT >= 33) RuntimeShader(AGSL) else null
-    } catch (_: IllegalArgumentException) {
-        null
+    // Mountain and Star Window previews never need AGSL. Creating a shader
+    // for every gallery tile previously caused avoidable startup/GPU work.
+    private val shader: RuntimeShader? by lazy {
+        try {
+            if (Build.VERSION.SDK_INT >= 33) RuntimeShader(AGSL) else null
+        } catch (_: RuntimeException) {
+            null
+        }
     }
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
         isDither = true
-        if (this@HalynRenderer.shader != null) this.shader = this@HalynRenderer.shader else color = Color.rgb(9, 12, 22)
+        color = Color.rgb(9, 12, 22)
     }
 
     fun draw(
@@ -191,14 +204,15 @@ class HalynRenderer(private val context: Context) {
         touchX: Float = .5f,
         touchY: Float = .5f,
         offsetX: Float = .5f,
-        starPose: StarPose? = null
+        starPose: StarPose? = null,
+        gyro: ParallaxPose = ParallaxPose()
     ) {
         if (state.preset == StarWindowRenderer.SCENE_INDEX) {
             starRenderer.draw(canvas, state, elapsedSeconds, starPose ?: StarPose())
             return
         }
         if (MountainSceneRenderer.isMountain(state.preset)) {
-            mountainRenderer.drawBackground(canvas, state, elapsedSeconds)
+            mountainRenderer.drawBackground(canvas, state, elapsedSeconds, mountainPose(state, gyro, offsetX))
             return
         }
         val width = canvas.width.coerceAtLeast(1).toFloat()
@@ -224,6 +238,8 @@ class HalynRenderer(private val context: Context) {
                 if (state.touch) touchY.coerceIn(0f, 1f) else .5f
             )
             current.setFloatUniform("u_offset", if (state.parallax) offsetX else .5f)
+            current.setFloatUniform("u_gyro", gyro.x, gyro.y)
+                paint.shader = current
                 canvas.drawRect(0f, 0f, width, height, paint)
                 return
             } catch (_: RuntimeException) {
@@ -235,10 +251,18 @@ class HalynRenderer(private val context: Context) {
         canvas.drawRect(0f, 0f, width, height, paint)
     }
 
-    fun drawForeground(canvas: Canvas, state: MotionState) {
+    fun drawForeground(
+        canvas: Canvas, state: MotionState,
+        gyro: ParallaxPose = ParallaxPose(), offsetX: Float = .5f
+    ) {
         if (MountainSceneRenderer.isMountain(state.preset)) {
-            mountainRenderer.drawForeground(canvas, state)
+            mountainRenderer.drawForeground(canvas, state, mountainPose(state, gyro, offsetX))
         }
+    }
+
+    private fun mountainPose(state: MotionState, gyro: ParallaxPose, offsetX: Float): ParallaxPose {
+        val swipe = if (state.parallax) (offsetX - .5f) * .4f else 0f
+        return ParallaxPose((gyro.x + swipe).coerceIn(-1f, 1f), gyro.y)
     }
 
     companion object {
@@ -272,6 +296,7 @@ uniform float3 u_customColor;
 uniform float u_intensity;
 uniform float u_speed;
 uniform float u_offset;
+uniform float2 u_gyro;
 
 float noise21(float2 p) {
     return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);
@@ -281,6 +306,8 @@ half4 main(float2 frag) {
     float aspect = u_resolution.x / u_resolution.y;
     float2 p = float2((uv.x - 0.5) * aspect, uv.y - 0.5);
     p.x -= (u_offset - 0.5) * 0.10;
+    float radialDepth = smoothstep(0.0, .65, length(p));
+    p -= u_gyro * float2(.021 + .037 * radialDepth, .012 + .025 * radialDepth);
     float2 touch = float2((u_touch.x - 0.5) * aspect, u_touch.y - 0.5);
     float nearTouch = exp(-13.0 * length(p - touch));
     float t = u_time * (0.35 + u_speed * 0.9);

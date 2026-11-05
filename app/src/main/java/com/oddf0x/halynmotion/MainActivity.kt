@@ -43,6 +43,7 @@ import kotlin.math.roundToInt
 class MainActivity : Activity() {
     private val prefs by lazy { MotionPreferences(this) }
     private val previewTracker by lazy { SpatialTracker(this) }
+    private val previewGyro by lazy { GyroParallax(this) }
     private val skyLocation by lazy {
         SkyLocationController(this, prefs,
             onStatus = { message -> if (::skyStatus.isInitialized) skyStatus.text = message },
@@ -61,6 +62,9 @@ class MainActivity : Activity() {
     private lateinit var clockPlacementToggle: Switch
     private var awaitingClockOverlayPermission = false
     private lateinit var mountainScenes: LinearLayout
+    private lateinit var gyroModes: LinearLayout
+    private lateinit var gyroPanel: LinearLayout
+    private lateinit var mountainDepthPanel: LinearLayout
     private lateinit var clockOptionsPanel: LinearLayout
     private lateinit var starControls: LinearLayout
     private lateinit var densityChoices: LinearLayout
@@ -120,6 +124,7 @@ class MainActivity : Activity() {
         refreshClockFonts()
         refreshStarDensity()
         refreshStarEffects()
+        refreshGyroModes()
         refreshSkyUi()
         syncStarTracking()
     }
@@ -802,6 +807,16 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun syncMotionTracking() {
+        val state = prefs.get()
+        if (::preview.isInitialized && preview.running &&
+            state.preset != StarWindowRenderer.SCENE_INDEX && state.gyroMode != 0) {
+            previewGyro.start()
+        } else {
+            previewGyro.stop()
+        }
+    }
+
     private fun buildMotion(root: LinearLayout) {
         root.addView(section("Motion", "Quiet, or full of life."))
         val panel = LinearLayout(this).apply {
@@ -818,6 +833,67 @@ class MainActivity : Activity() {
             min = .25f, max = 2.0f, prefs::setSpeed
         )
         root.addView(panel)
+
+        gyroPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = rounded(cardColor, 22, borderColor)
+            setPadding(dp(17), dp(15), dp(17), dp(13))
+        }
+        gyroPanel.addView(text("GYRO DEPTH", 10f, subtle, Typeface.BOLD).apply {
+            letterSpacing = .14f
+            setPadding(0, 0, 0, dp(12))
+        })
+        gyroModes = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        gyroPanel.addView(gyroModes, LinearLayout.LayoutParams(-1, dp(44)))
+        gyroPanel.addView(text(
+            "Calibrates when the wallpaper becomes visible. Smooth, bounded movement; no drifting.",
+            12f, secondary
+        ).apply { setPadding(0, dp(13), 0, dp(3)) })
+        addSlider(gyroPanel, "Gyro intensity", prefs.get().gyroStrength,
+            min = .5f, max = 1.8f, prefs::setGyroStrength)
+
+        mountainDepthPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        addSlider(mountainDepthPanel, "Mountain depth", prefs.get().mountainDepth,
+            min = .5f, max = 1.6f, prefs::setMountainDepth)
+        gyroPanel.addView(mountainDepthPanel)
+        root.addView(gyroPanel, LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = dp(12)
+        })
+    }
+
+    private fun refreshGyroModes() {
+        if (!::gyroModes.isInitialized) return
+        gyroModes.removeAllViews()
+        val names = listOf("Off", "Soft", "Dynamic", "Space")
+        val current = prefs.get().gyroMode
+        names.forEachIndexed { index, label ->
+            val selected = index == current
+            val chip = text(label, 12f,
+                if (selected) backgroundColor else secondary,
+                if (selected) Typeface.BOLD else Typeface.NORMAL).apply {
+                gravity = Gravity.CENTER
+                background = rounded(
+                    if (selected) ink else Color.rgb(37, 38, 45), 12
+                )
+                isFocusable = true
+                isClickable = true
+                contentDescription = "Gyro $label, ${if (selected) "selected" else "not selected"}"
+                setOnClickListener {
+                    prefs.setGyroMode(index)
+                    refreshGyroModes()
+                    syncMotionTracking()
+                    preview.invalidate()
+                }
+            }
+            gyroModes.addView(chip, LinearLayout.LayoutParams(0, dp(44), 1f).apply {
+                marginEnd = dp(if (index < 3) 5 else 0)
+            })
+        }
     }
 
     private fun buildBehavior(root: LinearLayout) {
@@ -827,11 +903,11 @@ class MainActivity : Activity() {
             background = rounded(cardColor, 22, borderColor)
             setPadding(dp(17), dp(6), dp(17), dp(14))
         }
-        addToggle(panel, "Touch interaction", "Gesture response for the other 12 scenes", prefs.get().touch) {
+        addToggle(panel, "Touch interaction", "Gesture response for non-space scenes", prefs.get().touch) {
             prefs.setTouch(it)
         }
         panel.addView(View(this).apply { setBackgroundColor(borderColor) }, LinearLayout.LayoutParams(-1, dp(1)))
-        addToggle(panel, "Parallax", "Follow home screen movement", prefs.get().parallax) {
+        addToggle(panel, "Home-screen swipe", "Horizontal parallax when changing launcher pages", prefs.get().parallax) {
             prefs.setParallax(it)
         }
 
@@ -899,6 +975,11 @@ class MainActivity : Activity() {
                     prefs.setPreset(index)
                     refreshScene()
                     syncStarTracking()
+                    syncMotionTracking()
+                    if (::gyroPanel.isInitialized) {
+                        gyroPanel.visibility = if (index == StarWindowRenderer.SCENE_INDEX) View.GONE else View.VISIBLE
+                        mountainDepthPanel.visibility = if (MountainSceneRenderer.isMountain(index)) View.VISIBLE else View.GONE
+                    }
                     preview.invalidate()
                 }
             }
@@ -937,6 +1018,10 @@ class MainActivity : Activity() {
         activeSceneName.text = HalynRenderer.PRESETS[selected]
         if (::starControls.isInitialized) starControls.visibility =
             if (selected == StarWindowRenderer.SCENE_INDEX) View.VISIBLE else View.GONE
+        if (::gyroPanel.isInitialized) {
+            gyroPanel.visibility = if (selected == StarWindowRenderer.SCENE_INDEX) View.GONE else View.VISIBLE
+            mountainDepthPanel.visibility = if (MountainSceneRenderer.isMountain(selected)) View.VISIBLE else View.GONE
+        }
     }
 
     private fun refreshPalette() {
@@ -1109,6 +1194,7 @@ class MainActivity : Activity() {
         super.onResume()
         if (::preview.isInitialized) preview.running = true
         syncStarTracking()
+        syncMotionTracking()
         if (awaitingClockOverlayPermission) {
             if (Settings.canDrawOverlays(this)) launchClockPlacement()
             else {
@@ -1123,6 +1209,7 @@ class MainActivity : Activity() {
     override fun onPause() {
         if (::preview.isInitialized) preview.running = false
         previewTracker.stop()
+        previewGyro.stop()
         skyLocation.cancel()
         super.onPause()
     }
@@ -1171,6 +1258,8 @@ class MainActivity : Activity() {
             // Thumbnails are intentionally static to avoid rendering twelve extra
             // continuously animated views while browsing the gallery.
             renderer.draw(canvas, state, 7f + sceneIndex * 1.7f)
+            // Mountain cards previously omitted their foreground entirely.
+            renderer.drawForeground(canvas, state)
         }
     }
 
@@ -1192,14 +1281,20 @@ class MainActivity : Activity() {
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
             val state = prefs.get()
+            val tilt = if (state.preset == StarWindowRenderer.SCENE_INDEX) {
+                ParallaxPose()
+            } else {
+                previewGyro.pose(state)
+            }
             renderer.draw(
                 canvas, state,
                 (SystemClock.uptimeMillis() - startTime) / 1000f,
                 touchX, touchY,
-                starPose = if (state.preset == StarWindowRenderer.SCENE_INDEX) previewTracker.pose() else null
+                starPose = if (state.preset == StarWindowRenderer.SCENE_INDEX) previewTracker.pose() else null,
+                gyro = tilt
             )
             clockRenderer.draw(canvas, state)
-            renderer.drawForeground(canvas, state)
+            renderer.drawForeground(canvas, state, tilt)
             if (running) postInvalidateDelayed(1000L / state.fps)
         }
 

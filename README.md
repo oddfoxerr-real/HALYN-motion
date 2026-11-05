@@ -2,6 +2,18 @@
 
 Minimalist native Android live wallpaper studio featuring **21 live wallpaper scenes** and **5 real-time clock styles**, including four layered mountain landscapes.
 
+## v0.7.1 — Gyro & mountain stability
+
+- **Motion that responds to your phone:** Non-Star Window scenes now use a dedicated fused rotation-vector sensor pipeline with per-activation neutral calibration, an anti-jitter deadzone, smooth damped response, hard travel limits and sensor shutdown when hidden. This is distinct from Star Window's existing space tracking.
+- **Four gyro modes:** Off, Soft, Dynamic and Space in **Motion → Gyro depth**, with an **intensity** slider. The mountain series adds a separate **Mountain depth** slider for near/far layer separation. Sensor-based movement works in the app preview and live wallpaper; launcher swipe movement remains an independent toggle.
+- **Mountain rendering fixed:** Sky, stars, light source, distant ridge, middle ridge, mist and nearest ridge move at deliberately different depths. Extending the mountain polygons beyond the screen prevents empty vertical strips at the edges during tilt.
+- **Clock masking preserved:** The same gyro pose is used before and after the clock is drawn, so the foreground cannot shear relative to its background.
+- **Gallery and colour controls:** Mountain thumbnails now include the foreground ridge. Colour selection, Strength and Flow now produce a controlled visual change on the mountain scenes.
+- **Less jank:** Scene-sized gradients and mountain geometry are cached instead of recreated on every frame, cutting avoidable allocations.
+- **No change to Star Window's navigation, sky alignment or opt-in Tap to travel.**
+
+**Verification:** Android CI validates APK compilation and package metadata. Actual gyro feel, GPU behaviour and overlay alignment still need testing on a Samsung device.
+
 ## What's new in v0.7 — Mountain Clock Studio
 
 - **21 scenes:** Keeps all 13 original wallpapers and adds *Orbital Halo*, *Cosmic Rain*, *Plasma Loom* and *Eclipse Glass* (procedural artistic visuals), plus *Twilight Peaks*, *Moonlit Ridge*, *Alpine Mist* and *Ember Valley* (minimal mountain landscapes).
