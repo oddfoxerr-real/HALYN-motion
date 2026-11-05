@@ -110,13 +110,22 @@ class MountainSceneRenderer {
         canvas.drawRect(0f, 0f, w, h, paint)
         paint.shader = null
 
+        // Existing colour controls previously had no effect on mountains.
+        // Use a light atmosphere tint while preserving the scene palette.
+        val accent = if (state.palette == 5) state.customColor else
+            HalynRenderer.PALETTE_COLORS[state.palette.coerceIn(0, 4)]
+        paint.color = accent
+        paint.alpha = if (state.palette == 5) 27 else 13
+        canvas.drawRect(0f, 0f, w, h, paint)
+        paint.alpha = 255
+
         // Stars + orb shift less than the foreground. The sky remains full bleed.
         if (scene == 0 || scene == 1) {
             for (i in 0 until 52) {
                 val x = ((i * 137 + 53) % 1000) / 1000f * w + pose.x * w * .006f * depth
                 val y = ((i * 211 + 31) % 570) / 1000f * h + pose.y * h * .004f * depth
-                val shimmer = .63f + .37f * sin(seconds * .12f + i * 1.73f)
-                paint.color = Color.argb((40f + shimmer * 96f).toInt().coerceIn(0, 255),
+                val shimmer = .63f + .37f * sin(seconds * state.speed * .12f + i * 1.73f)
+                paint.color = Color.argb(((40f + shimmer * 96f) * state.intensity).toInt().coerceIn(0, 255),
                     235, 244, 255)
                 canvas.drawCircle(x, y, if (i % 11 == 0) 1.5f else .7f, paint)
             }
@@ -130,10 +139,11 @@ class MountainSceneRenderer {
         canvas.save()
         canvas.translate(orbX, orbY)
         paint.shader = glowGradient
+        paint.alpha = (180f * state.intensity).toInt().coerceIn(85, 255)
         canvas.drawCircle(0f, 0f, orbRadius * 3.2f, paint)
         paint.shader = null
         paint.color = t.celestial
-        paint.alpha = if (scene == 2) 204 else 235
+        paint.alpha = ((if (scene == 2) 204 else 235) * state.intensity).toInt().coerceIn(96, 255)
         canvas.drawCircle(0f, 0f, orbRadius, paint)
         paint.alpha = 255
         canvas.restore()
@@ -144,7 +154,7 @@ class MountainSceneRenderer {
             pose.x * w * .027f * depth, pose.y * h * .013f * depth)
 
         paint.shader = mistGradient
-        val drift = .008f * sin(seconds * .09f)
+        val drift = .008f * sin(seconds * state.speed * .09f)
         canvas.save()
         canvas.translate(pose.x * w * .016f * depth,
             (pose.y * .012f * depth + drift) * h)
