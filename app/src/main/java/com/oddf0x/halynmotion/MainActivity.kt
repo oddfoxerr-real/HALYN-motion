@@ -54,6 +54,8 @@ class MainActivity : Activity() {
             })
     }
     private lateinit var preview: LivePreview
+    private lateinit var onlineGallery: CommonsGalleryView
+    private lateinit var onlineCredit: TextView
     private lateinit var scenes: LinearLayout
     private lateinit var newScenes: LinearLayout
     private lateinit var clockStyles: LinearLayout
@@ -109,9 +111,11 @@ class MainActivity : Activity() {
         buildHeader(column)
         buildPreview(column)
         buildScenes(column)
-        buildColours(column)
+        // Preserve legacy preferences for users with an older active scene,
+        // but do not offer generated artwork in the new online-only gallery.
+        buildColours(LinearLayout(this))
         buildClock(column)
-        buildStarWindow(column)
+        buildStarWindow(LinearLayout(this))
         buildMotion(column)
         buildBehavior(column)
         buildFooter(column)
@@ -129,6 +133,7 @@ class MainActivity : Activity() {
         refreshGyroModes()
         refreshSkyUi()
         syncStarTracking()
+        onlineGallery.loadInitial()
     }
 
     private fun buildHeader(root: LinearLayout) {
@@ -144,11 +149,11 @@ class MainActivity : Activity() {
         })
         root.addView(top)
 
-        root.addView(text("Made to move.", 34f, ink, Typeface.BOLD).apply {
+        root.addView(text("Real 4K wallpapers.", 32f, ink, Typeface.BOLD).apply {
             setPadding(0, dp(20), 0, 0)
             letterSpacing = -.035f
         })
-        root.addView(text("An expressive canvas for your screen.", 14f, secondary).apply {
+        root.addView(text("Curated online. Your clock. Your style.", 14f, secondary).apply {
             setPadding(0, dp(5), 0, dp(24))
         })
     }
@@ -189,7 +194,7 @@ class MainActivity : Activity() {
         }
         activeSceneName = text("", 24f, ink, Typeface.BOLD)
         foot.addView(activeSceneName)
-        foot.addView(text("Live motion · Customise below", 12f, Color.rgb(205, 205, 215)).apply {
+        foot.addView(text("Real online photo · Clock & gyro below", 12f, Color.rgb(205, 205, 215)).apply {
             setPadding(0, dp(4), 0, 0)
         })
         shell.addView(foot, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
@@ -202,92 +207,51 @@ class MainActivity : Activity() {
     }
 
     private fun buildScenes(root: LinearLayout) {
-        root.addView(section("The collection", "51 original wallpapers, plus your own image."))
-        root.addView(text("HALYN ORIGINALS", 11f, subtle, Typeface.BOLD).apply {
-            letterSpacing = .14f
-            setPadding(0, 0, 0, dp(7))
-        })
-        scenes = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+        onlineGallery = CommonsGalleryView(this) { image ->
+            prefs.raw.edit()
+                .putString("online_title", image.name)
+                .putString("online_artist", image.artist)
+                .putString("online_license", image.license)
+                .putString("online_source", image.sourcePage)
+                .putString("online_license_url", image.licenseUrl)
+                .putString("online_resolution", image.dimensionLabel)
+                .apply()
+            prefs.photoImported()
+            refreshScene()
+            syncStarTracking()
+            syncMotionTracking()
+            preview.invalidate()
         }
-        val rail = HorizontalScrollView(this).apply {
-            isHorizontalScrollBarEnabled = false
-            clipToPadding = false
-            addView(scenes)
-        }
-        root.addView(rail, LinearLayout.LayoutParams(-1, dp(159)))
+        root.addView(onlineGallery, LinearLayout.LayoutParams(-1, -2))
 
-        root.addView(text("NEW COLLECTION", 11f, subtle, Typeface.BOLD).apply {
-            letterSpacing = .14f
-            setPadding(0, dp(16), 0, dp(7))
-        })
-        newScenes = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
+        root.addView(section("From your phone", "Use a photo or image you already have."))
+        root.addView(text("Choose a local image  ↗", 14f, ink, Typeface.BOLD).apply {
+            background = rounded(cardColor, 16, borderColor)
             gravity = Gravity.CENTER_VERTICAL
-        }
-        val newRail = HorizontalScrollView(this).apply {
-            isHorizontalScrollBarEnabled = false
-            clipToPadding = false
-            addView(newScenes)
-        }
-        root.addView(newRail, LinearLayout.LayoutParams(-1, dp(159)))
-
-        root.addView(text("MOUNTAIN SERIES", 11f, subtle, Typeface.BOLD).apply {
-            letterSpacing = .14f
-            setPadding(0, dp(16), 0, dp(7))
-        })
-        mountainScenes = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        root.addView(HorizontalScrollView(this).apply {
-            isHorizontalScrollBarEnabled = false
-            clipToPadding = false
-            addView(mountainScenes)
-        }, LinearLayout.LayoutParams(-1, dp(159)))
-
-        val posterCategories = listOf(
-            "BOTANICAL POSTERS", "ROAD & SPEED", "QUIET WORLDS",
-            "ILLUSTRATED CREATURES", "CITY AFTER DARK", "PLACES & RUINS"
-        )
-        posterCategories.forEach { heading ->
-            root.addView(text(heading, 11f, subtle, Typeface.BOLD).apply {
-                letterSpacing = .14f
-                setPadding(0, dp(16), 0, dp(7))
-            })
-            val items = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-            }
-            posterRails.add(items)
-            root.addView(HorizontalScrollView(this).apply {
-                isHorizontalScrollBarEnabled = false
-                clipToPadding = false
-                addView(items)
-            }, LinearLayout.LayoutParams(-1, dp(159)))
-        }
-
-        root.addView(text("YOUR WALLPAPER", 11f, subtle, Typeface.BOLD).apply {
-            letterSpacing = .14f
-            setPadding(0, dp(17), 0, dp(8))
-        })
-        val photoRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        myImageScenes = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
-        photoRow.addView(myImageScenes)
-        photoRow.addView(text("Choose an image  ↗", 13f, ink, Typeface.BOLD).apply {
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            minHeight = dp(54)
             isClickable = true
             isFocusable = true
-            contentDescription = "Import an image from your phone for a clock wallpaper"
-            setPadding(dp(16), dp(12), dp(6), dp(12))
+            contentDescription = "Choose an existing picture from your phone"
             setOnClickListener { chooseWallpaperPhoto() }
         })
-        root.addView(photoRow)
+        onlineCredit = text("", 12f, secondary).apply {
+            setPadding(dp(2), dp(13), dp(2), dp(7))
+            isClickable = true
+            isFocusable = true
+            contentDescription = "View source and creator attribution of the active wallpaper"
+            setOnClickListener {
+                val source = prefs.raw.getString("online_source", null)
+                if (!source.isNullOrBlank()) {
+                    try {
+                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(source)))
+                    } catch (_: Exception) {
+                        Toast.makeText(this@MainActivity, "Source link unavailable", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+        root.addView(onlineCredit)
     }
 
     private fun chooseWallpaperPhoto() {
@@ -525,16 +489,28 @@ class MainActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_WALLPAPER_IMAGE && resultCode == RESULT_OK && data?.data != null) {
-            if (PhotoWallpaperStore(this).install(data.data!!)) {
-                prefs.photoImported()
-                refreshScene()
-                syncStarTracking()
-                syncMotionTracking()
-                preview.invalidate()
-                Toast.makeText(this, "Image saved on this device", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "Could not import image (24 MB limit)", Toast.LENGTH_LONG).show()
-            }
+            val uri = data.data!!
+            Thread {
+                val installed = PhotoWallpaperStore(applicationContext).install(uri)
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    if (installed) {
+                        prefs.raw.edit()
+                            .remove("online_source").remove("online_artist")
+                            .remove("online_license").remove("online_license_url")
+                            .remove("online_resolution")
+                            .putString("online_title", "My image").apply()
+                        prefs.photoImported()
+                        refreshScene()
+                        syncStarTracking()
+                        syncMotionTracking()
+                        preview.invalidate()
+                        Toast.makeText(this, "Image saved offline at full quality", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this, "Image import failed (48 MB limit)", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }.start()
             return
         }
         if (requestCode == REQUEST_CLOCK_FONT && resultCode == RESULT_OK && data?.data != null) {
@@ -901,7 +877,8 @@ class MainActivity : Activity() {
             panel, "Flow", prefs.get().speed,
             min = .25f, max = 2.0f, prefs::setSpeed
         )
-        root.addView(panel)
+        // Keep old renderer settings for existing installs, but don't show
+        // ineffective colour/flow controls for genuine downloaded photos.
 
         gyroPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -972,9 +949,9 @@ class MainActivity : Activity() {
             background = rounded(cardColor, 22, borderColor)
             setPadding(dp(17), dp(6), dp(17), dp(14))
         }
-        addToggle(panel, "Touch interaction", "Gesture response for non-space scenes", prefs.get().touch) {
-            prefs.setTouch(it)
-        }
+        // Source photographs are passive wallpapers; no tap-to-warp gesture
+        // is enabled for photo mode, even if a previous procedural preset
+        // stored touch interaction = true.
         panel.addView(View(this).apply { setBackgroundColor(borderColor) }, LinearLayout.LayoutParams(-1, dp(1)))
         addToggle(panel, "Home-screen swipe", "Horizontal parallax when changing launcher pages", prefs.get().parallax) {
             prefs.setParallax(it)
@@ -998,7 +975,7 @@ class MainActivity : Activity() {
     }
 
     private fun buildFooter(root: LinearLayout) {
-        root.addView(text("Designed to feel at home on your screen.", 12f, subtle).apply {
+        root.addView(text("Photographs from their original creators · Use with attribution.", 12f, subtle).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(28), 0, 0)
         })
@@ -1027,78 +1004,29 @@ class MainActivity : Activity() {
     }
 
     private fun refreshScene() {
-        scenes.removeAllViews()
-        newScenes.removeAllViews()
-        mountainScenes.removeAllViews()
-        posterRails.forEach { it.removeAllViews() }
-        myImageScenes.removeAllViews()
         val selected = prefs.get().preset
-        HalynRenderer.PRESETS.forEachIndexed { index, name ->
-            val active = selected == index
-            val item = FrameLayout(this).apply {
-                background = rounded(if (active) ink else borderColor, 19)
-                setPadding(dp(if (active) 2 else 1), dp(if (active) 2 else 1),
-                    dp(if (active) 2 else 1), dp(if (active) 2 else 1))
-                isClickable = true
-                isFocusable = true
-                contentDescription = "Wallpaper ${index + 1} of ${HalynRenderer.PRESETS.size}, ${name}, ${if (active) "selected" else "not selected"}"
-                setOnClickListener {
-                    if (index == PhotoWallpaperStore.SCENE_INDEX && !PhotoWallpaperStore(this@MainActivity).available()) {
-                        chooseWallpaperPhoto()
-                        return@setOnClickListener
-                    }
-                    prefs.setPreset(index)
-                    refreshScene()
-                    syncStarTracking()
-                    syncMotionTracking()
-                    if (::gyroPanel.isInitialized) {
-                        gyroPanel.visibility = if (index == StarWindowRenderer.SCENE_INDEX) View.GONE else View.VISIBLE
-                        mountainDepthPanel.visibility = if (MountainSceneRenderer.isMountain(index)) View.VISIBLE else View.GONE
-                    }
-                    preview.invalidate()
-                }
-            }
-            val art = FrameLayout(this).apply {
-                background = rounded(Color.rgb(10, 12, 21), 17)
-                clipToOutline = true
-            }
-            art.addView(SceneTilePreview(index), FrameLayout.LayoutParams(-1, -1))
-            val fade = GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(Color.TRANSPARENT, Color.argb(230, 6, 7, 11))
-            )
-            val caption = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                background = fade
-                setPadding(dp(9), dp(16), dp(9), dp(9))
-                addView(text(String.format(Locale.US, "%02d", index + 1), 9f,
-                    Color.rgb(202, 201, 211), Typeface.BOLD))
-                addView(text(name, 12f, ink, Typeface.BOLD).apply {
-                    setSingleLine(true)
-                    ellipsize = android.text.TextUtils.TruncateAt.END
-                    setPadding(0, dp(4), 0, 0)
-                })
-            }
-            art.addView(caption, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
-            item.addView(art, FrameLayout.LayoutParams(-1, -1))
-            val target = when {
-                index < 6 -> scenes
-                index < MountainSceneRenderer.FIRST -> newScenes
-                index <= MountainSceneRenderer.LAST -> mountainScenes
-                index in PosterSceneRenderer.FIRST..PosterSceneRenderer.LAST ->
-                    posterRails[(index - PosterSceneRenderer.FIRST) / 5]
-                else -> myImageScenes
-            }
-            target.addView(item, LinearLayout.LayoutParams(dp(120), dp(154)).apply {
-                marginEnd = dp(10)
-            })
+        val source = prefs.raw.getString("online_source", null)
+        val ownPhoto = PhotoWallpaperStore(this).available()
+        activeSceneName.text = when {
+            selected == PhotoWallpaperStore.SCENE_INDEX && ownPhoto ->
+                prefs.raw.getString("online_title", "My wallpaper") ?: "My wallpaper"
+            selected == PhotoWallpaperStore.SCENE_INDEX -> "Choose a 4K wallpaper"
+            else -> "Previous wallpaper"
         }
-        activeSceneName.text = HalynRenderer.PRESETS[selected]
-        if (::starControls.isInitialized) starControls.visibility =
-            if (selected == StarWindowRenderer.SCENE_INDEX) View.VISIBLE else View.GONE
+        if (::onlineCredit.isInitialized) {
+            onlineCredit.visibility =
+                if (selected == PhotoWallpaperStore.SCENE_INDEX && !source.isNullOrBlank())
+                    View.VISIBLE else View.GONE
+            onlineCredit.text = "Source & credits  ↗\n" +
+                (prefs.raw.getString("online_artist", "") ?: "") + " · " +
+                (prefs.raw.getString("online_license", "") ?: "") + "\n" +
+                (prefs.raw.getString("online_resolution", "") ?: "")
+        }
+        if (::starControls.isInitialized) starControls.visibility = View.GONE
         if (::gyroPanel.isInitialized) {
-            gyroPanel.visibility = if (selected == StarWindowRenderer.SCENE_INDEX) View.GONE else View.VISIBLE
-            mountainDepthPanel.visibility = if (MountainSceneRenderer.isMountain(selected)) View.VISIBLE else View.GONE
+            gyroPanel.visibility =
+                if (selected == StarWindowRenderer.SCENE_INDEX) View.GONE else View.VISIBLE
+            mountainDepthPanel.visibility = View.GONE
         }
     }
 
@@ -1305,6 +1233,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        if (::onlineGallery.isInitialized) onlineGallery.close()
         skyLocation.cancel()
         super.onDestroy()
     }

@@ -2,74 +2,95 @@ package com.oddf0x.halynmotion
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.ImageDecoder
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
 import android.net.Uri
 import java.io.File
 import java.io.FileOutputStream
+import java.io.InputStream
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** User-provided images remain on-device. No media library scans or cloud uploads. */
+/**
+ * Holds the selected 4K wallpaper on device for offline use.
+ * Decodes to max 4096 px on the longest edge; does not reduce 4K to 2K.
+ * Original source/creator metadata lives separately in MotionPreferences.
+ */
 class PhotoWallpaperStore(private val context: Context) {
     private val imageFile get() = File(context.filesDir, "halyn_my_wallpaper.webp")
     private var cached: Bitmap? = null
     private var cachedModified = -1L
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG)
 
-    fun available(): Boolean = imageFile.isFile && imageFile.length() > 0L
+    fun available(): Boolean = imageFile.isFile && imageFile.length() > 0
 
-    /** Decode from SAF into a bounded temporary file, downsample, validate, then replace. */
     fun install(uri: Uri): Boolean {
         val mime = context.contentResolver.getType(uri) ?: return false
         if (!mime.startsWith("image/")) return false
-        val raw = File(context.cacheDir, "halyn_image_input.tmp")
-        val output = File(context.filesDir, "halyn_image_new.webp")
         return try {
-            val input = context.contentResolver.openInputStream(uri) ?: return false
-            input.use { source ->
-                FileOutputStream(raw).use { destination ->
-                    val buffer = ByteArray(32 * 1024)
-                    var length = 0L
-                    while (true) {
-                        val read = source.read(buffer)
-                        if (read < 0) break
-                        length += read
-                        if (length > 24L * 1024 * 1024) return false
-                        destination.write(buffer, 0, read)
-                    }
+            context.contentResolver.openInputStream(uri)?.use {
+                installStream(it, 48L * 1024L * 1024L)
+            } ?: false
+        } catch (_: Exception) { false }
+    }
+
+    /**
+     * The caller must run this OFF the UI thread.
+     * Never overwrite a working wallpaper until a fully decoded replacement
+     * has been encoded to a temporary local file.
+     */
+    fun installStream(input: InputStream, limitBytes: Long = 48L * 1024L * 1024L): Boolean {
+        val raw = File(context.cacheDir, "halyn_wallpaper_download.tmp")
+        val next = File(context.filesDir, "halyn_wallpaper_next.webp")
+        return try {
+            FileOutputStream(raw).use { out ->
+                val buffer = ByteArray(32 * 1024)
+                var count = 0L
+                while (true) {
+                    val n = input.read(buffer)
+                    if (n < 0) break
+                    count += n
+                    if (count > limitBytes) return false
+                    out.write(buffer, 0, n)
                 }
+                out.fd.sync()
             }
-            if (raw.length() < 1024L) return false
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeFile(raw.absolutePath, bounds)
-            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return false
-            val options = BitmapFactory.Options().apply {
-                var sample = 1
-                while (max(bounds.outWidth, bounds.outHeight) / sample > 2200) sample *= 2
-                inSampleSize = sample
-                inPreferredConfig = Bitmap.Config.ARGB_8888
+            if (raw.length() < 1024) return false
+
+            val bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(raw)) {
+                decoder, info, _ ->
+                val longest = max(info.size.width, info.size.height)
+                if (info.size.width < 32 || info.size.height < 32 ||
+                    longest > 30000) throw IllegalArgumentException("Invalid image dimensions")
+                val factor = min(1f, 4096f / longest.toFloat())
+                val width = (info.size.width * factor).roundToInt().coerceAtLeast(1)
+                val height = (info.size.height * factor).roundToInt().coerceAtLeast(1)
+                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                decoder.setTargetSize(width, height)
             }
-            val decoded = BitmapFactory.decodeFile(raw.absolutePath, options) ?: return false
             try {
-                FileOutputStream(output).use { stream ->
-                    if (!decoded.compress(Bitmap.CompressFormat.WEBP_LOSSY, 91, stream)) return false
-                    stream.fd.sync()
+                FileOutputStream(next).use { out ->
+                    if (!bitmap.compress(Bitmap.CompressFormat.WEBP_LOSSY, 92, out)) {
+                        return false
+                    }
+                    out.fd.sync()
                 }
             } finally {
-                decoded.recycle()
+                bitmap.recycle()
             }
-            if (output.length() < 1000L) return false
-            val previous = imageFile
-            // Move a completely decoded, validated image into place only after
-            // all work succeeds. The old image stays if import fails.
-            output.copyTo(previous, overwrite = true)
-            output.delete()
+            if (next.length() < 1024) return false
+            val target = imageFile
+            if (!next.renameTo(target)) {
+                // Rare filesystem fallback; previous file is left untouched
+                // on normal successful atomic rename.
+                next.copyTo(target, overwrite = true)
+                next.delete()
+            }
             cached?.recycle()
             cached = null
             cachedModified = -1L
@@ -78,7 +99,7 @@ class PhotoWallpaperStore(private val context: Context) {
             false
         } finally {
             raw.delete()
-            output.delete()
+            next.delete()
         }
     }
 
@@ -90,9 +111,9 @@ class PhotoWallpaperStore(private val context: Context) {
         }
         cached?.recycle()
         cached = try {
-            BitmapFactory.decodeFile(file.absolutePath, BitmapFactory.Options().apply {
-                inPreferredConfig = Bitmap.Config.ARGB_8888
-            })
+            ImageDecoder.decodeBitmap(ImageDecoder.createSource(file)) { decoder, _, _ ->
+                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+            }
         } catch (_: Exception) { null }
         cachedModified = file.lastModified()
         return cached
@@ -103,13 +124,12 @@ class PhotoWallpaperStore(private val context: Context) {
         val h = canvas.height.toFloat().coerceAtLeast(1f)
         val photo = image()
         if (photo == null) {
-            canvas.drawColor(Color.rgb(26, 35, 54))
+            canvas.drawColor(Color.rgb(12, 16, 26))
             return
         }
         val bw = photo.width.toFloat()
         val bh = photo.height.toFloat()
-        // Fit center-crop with 8% overscan. Movement only within the available
-        // crop margin so gyro can never reveal black edges.
+        // Fit centre crop + 8% overscan; clamp gyro to crop margins.
         val scale = max(w / bw, h / bh) * 1.08f
         val srcW = min(bw, w / scale)
         val srcH = min(bh, h / scale)
@@ -117,12 +137,14 @@ class PhotoWallpaperStore(private val context: Context) {
         val slackY = (bh - srcH) * .5f
         val x = (bw - srcW) * .5f + gyro.x * slackX * .9f
         val y = (bh - srcH) * .5f + gyro.y * slackY * .9f
-        val left = x.coerceIn(0f,(bw-srcW).coerceAtLeast(0f))
-        val top = y.coerceIn(0f,(bh-srcH).coerceAtLeast(0f))
-        val source = Rect(left.roundToInt(),top.roundToInt(),
-            (left+srcW).roundToInt().coerceAtMost(photo.width),
-            (top+srcH).roundToInt().coerceAtMost(photo.height))
-        canvas.drawBitmap(photo, source, RectF(0f,0f,w,h), paint)
+        val left = x.coerceIn(0f, (bw - srcW).coerceAtLeast(0f))
+        val top = y.coerceIn(0f, (bh - srcH).coerceAtLeast(0f))
+        val crop = Rect(
+            left.roundToInt(), top.roundToInt(),
+            (left + srcW).roundToInt().coerceAtMost(photo.width),
+            (top + srcH).roundToInt().coerceAtMost(photo.height)
+        )
+        canvas.drawBitmap(photo, crop, RectF(0f, 0f, w, h), paint)
     }
 
     companion object {
