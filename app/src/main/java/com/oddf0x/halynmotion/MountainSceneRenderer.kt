@@ -7,16 +7,15 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RadialGradient
 import android.graphics.Shader
-import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
 
 /**
- * Four intentionally restrained layered landscapes. Distant ridges are drawn
- * behind the clock and the nearest silhouette is drawn AFTER the clock.
+ * Layered minimalist landscapes sharing one normalized camera pose.
  *
- * This is real Canvas occlusion rather than an opaque clock sticker. The clock
- * can be dragged through the ridge and naturally disappears behind terrain.
+ * Canvas order is: sky -> celestial/stars -> far mountain -> middle mountain
+ * -> mist -> clock (drawn by caller) -> foreground mountain.
+ * Every polygon is oversized past the viewport to prevent edge seams on tilt.
  */
 class MountainSceneRenderer {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.DITHER_FLAG)
@@ -27,7 +26,6 @@ class MountainSceneRenderer {
         val distant: Int, val middle: Int, val front: Int,
         val celestial: Int, val mist: Int
     )
-
     private val themes = arrayOf(
         Theme(0xFF081426.toInt(), 0xFF3A456A.toInt(), 0xFFBA8891.toInt(),
             0xFF5C6383.toInt(), 0xFF333D5A.toInt(), 0xFF121D32.toInt(),
@@ -43,106 +41,158 @@ class MountainSceneRenderer {
             0xFFFFD2A0.toInt(), 0xFFEDB1AA.toInt())
     )
 
-    private fun theme(state: MotionState) = themes[(state.preset - FIRST).coerceIn(0, 3)]
+    // Geometry is created once, not on every 60 Hz frame.
+    private val far = arrayOf(
+        floatArrayOf(0f,.73f,.17f,.59f,.31f,.71f,.49f,.56f,.65f,.68f,.84f,.59f,1f,.70f),
+        floatArrayOf(0f,.73f,.17f,.59f,.31f,.71f,.49f,.56f,.65f,.68f,.84f,.59f,1f,.70f),
+        floatArrayOf(0f,.77f,.17f,.64f,.34f,.74f,.53f,.61f,.76f,.77f,1f,.66f),
+        floatArrayOf(0f,.73f,.17f,.59f,.31f,.71f,.49f,.56f,.65f,.68f,.84f,.59f,1f,.70f)
+    )
+    private val middle = arrayOf(
+        floatArrayOf(0f,.86f,.19f,.74f,.35f,.82f,.54f,.68f,.72f,.83f,.88f,.71f,1f,.82f),
+        floatArrayOf(0f,.86f,.19f,.74f,.35f,.82f,.54f,.68f,.72f,.83f,.88f,.71f,1f,.82f),
+        floatArrayOf(0f,.86f,.19f,.74f,.35f,.82f,.54f,.68f,.72f,.83f,.88f,.71f,1f,.82f),
+        floatArrayOf(0f,.87f,.19f,.72f,.35f,.80f,.53f,.68f,.70f,.81f,.86f,.67f,1f,.78f)
+    )
+    private val foreground = arrayOf(
+        floatArrayOf(0f,.85f,.12f,.79f,.24f,.66f,.35f,.77f,.48f,.70f,.62f,.82f,.76f,.64f,.89f,.78f,1f,.71f),
+        floatArrayOf(0f,.84f,.14f,.72f,.26f,.79f,.39f,.66f,.55f,.82f,.72f,.73f,.85f,.61f,1f,.77f),
+        floatArrayOf(0f,.83f,.11f,.77f,.23f,.69f,.34f,.76f,.45f,.74f,.59f,.63f,.73f,.81f,.86f,.69f,1f,.77f),
+        floatArrayOf(0f,.86f,.12f,.78f,.26f,.70f,.4f,.80f,.54f,.67f,.70f,.79f,.82f,.66f,1f,.79f)
+    )
 
-    fun drawBackground(canvas: Canvas, state: MotionState, seconds: Float) {
-        val w = canvas.width.toFloat().coerceAtLeast(1f)
-        val h = canvas.height.toFloat().coerceAtLeast(1f)
-        val scene = (state.preset - FIRST).coerceIn(0, 3)
-        val t = theme(state)
-        paint.shader = LinearGradient(0f, 0f, 0f, h,
+    private var cachedScene = -1
+    private var cachedWidth = -1f
+    private var cachedHeight = -1f
+    private var skyGradient: Shader? = null
+    private var glowGradient: Shader? = null
+    private var mistGradient: Shader? = null
+
+    private fun ensureShaders(scene: Int, w: Float, h: Float) {
+        if (cachedScene == scene && cachedWidth == w && cachedHeight == h) return
+        cachedScene = scene
+        cachedWidth = w
+        cachedHeight = h
+        val t = themes[scene]
+        skyGradient = LinearGradient(0f, 0f, 0f, h,
             intArrayOf(t.skyTop, t.skyMid, t.skyBottom),
             floatArrayOf(0f, .49f, 1f), Shader.TileMode.CLAMP)
+        val orbRadius = min(w, h) * if (scene == 1) .091f else .11f
+        val c = t.celestial
+        glowGradient = RadialGradient(0f, 0f, orbRadius * 3.2f,
+            intArrayOf(
+                Color.argb(58, Color.red(c), Color.green(c), Color.blue(c)),
+                Color.argb(16, Color.red(c), Color.green(c), Color.blue(c)),
+                Color.TRANSPARENT
+            ),
+            floatArrayOf(0f, .48f, 1f), Shader.TileMode.CLAMP)
+        mistGradient = LinearGradient(0f, h * .60f, 0f, h * .91f,
+            intArrayOf(Color.TRANSPARENT,
+                Color.argb(32, Color.red(t.mist), Color.green(t.mist), Color.blue(t.mist)),
+                Color.TRANSPARENT),
+            floatArrayOf(0f, .45f, 1f), Shader.TileMode.CLAMP)
+    }
+
+    fun drawBackground(
+        canvas: Canvas, state: MotionState, seconds: Float,
+        pose: ParallaxPose = ParallaxPose()
+    ) {
+        val w = canvas.width.coerceAtLeast(1).toFloat()
+        val h = canvas.height.coerceAtLeast(1).toFloat()
+        val scene = (state.preset - FIRST).coerceIn(0, 3)
+        ensureShaders(scene, w, h)
+        val t = themes[scene]
+        val depth = state.mountainDepth
+
+        paint.style = Paint.Style.FILL
+        paint.alpha = 255
+        paint.shader = skyGradient
         canvas.drawRect(0f, 0f, w, h, paint)
         paint.shader = null
 
-        if (scene == 1 || scene == 0) {
-            paint.style = Paint.Style.FILL
+        // Stars + orb shift less than the foreground. The sky remains full bleed.
+        if (scene == 0 || scene == 1) {
             for (i in 0 until 52) {
-                val x = ((i * 137 + 53) % 1000) / 1000f * w
-                val y = ((i * 211 + 31) % 570) / 1000f * h
+                val x = ((i * 137 + 53) % 1000) / 1000f * w + pose.x * w * .006f * depth
+                val y = ((i * 211 + 31) % 570) / 1000f * h + pose.y * h * .004f * depth
                 val shimmer = .63f + .37f * sin(seconds * .12f + i * 1.73f)
-                paint.color = Color.argb((36 + shimmer * 100).toInt().coerceIn(0, 255),
+                paint.color = Color.argb((40f + shimmer * 96f).toInt().coerceIn(0, 255),
                     235, 244, 255)
                 canvas.drawCircle(x, y, if (i % 11 == 0) 1.5f else .7f, paint)
             }
         }
 
-        val orbX = w * when (scene) { 0 -> .72f; 1 -> .74f; 2 -> .29f; else -> .76f }
-        val orbY = h * when (scene) { 0 -> .33f; 1 -> .26f; 2 -> .31f; else -> .37f }
-        val orbRadius = min(w, h) * when (scene) { 1 -> .091f; else -> .11f }
-        val glowColor = t.celestial
-        paint.shader = RadialGradient(orbX, orbY, orbRadius * 3.2f,
-            intArrayOf(Color.argb(56, Color.red(glowColor), Color.green(glowColor), Color.blue(glowColor)),
-                Color.argb(18, Color.red(glowColor), Color.green(glowColor), Color.blue(glowColor)),
-                Color.TRANSPARENT),
-            floatArrayOf(0f, .50f, 1f), Shader.TileMode.CLAMP)
-        canvas.drawCircle(orbX, orbY, orbRadius * 3.2f, paint)
+        val orbX = w * when (scene) { 0 -> .72f; 1 -> .74f; 2 -> .29f; else -> .76f } +
+            pose.x * w * .012f * depth
+        val orbY = h * when (scene) { 0 -> .33f; 1 -> .26f; 2 -> .31f; else -> .37f } +
+            pose.y * h * .009f * depth
+        val orbRadius = min(w, h) * if (scene == 1) .091f else .11f
+        canvas.save()
+        canvas.translate(orbX, orbY)
+        paint.shader = glowGradient
+        canvas.drawCircle(0f, 0f, orbRadius * 3.2f, paint)
         paint.shader = null
-        paint.color = glowColor
+        paint.color = t.celestial
         paint.alpha = if (scene == 2) 204 else 235
-        canvas.drawCircle(orbX, orbY, orbRadius, paint)
+        canvas.drawCircle(0f, 0f, orbRadius, paint)
         paint.alpha = 255
+        canvas.restore()
 
-        // Distant landscape, always behind clock typography.
-        ridge(canvas, w, h, t.distant,
-            if (scene == 2) floatArrayOf(.0f,.77f,.17f,.64f,.34f,.74f,.53f,.61f,.76f,.77f,1f,.66f)
-            else floatArrayOf(.0f,.73f,.17f,.59f,.31f,.71f,.49f,.56f,.65f,.68f,.84f,.59f,1f,.70f))
-        ridge(canvas, w, h, t.middle,
-            if (scene == 3) floatArrayOf(.0f,.87f,.19f,.72f,.35f,.80f,.53f,.68f,.7f,.81f,.86f,.67f,1f,.78f)
-            else floatArrayOf(.0f,.86f,.19f,.74f,.35f,.82f,.54f,.68f,.72f,.83f,.88f,.71f,1f,.82f))
+        ridge(canvas, w, h, t.distant, far[scene],
+            pose.x * w * .012f * depth, pose.y * h * .006f * depth)
+        ridge(canvas, w, h, t.middle, middle[scene],
+            pose.x * w * .027f * depth, pose.y * h * .013f * depth)
 
-        val mistY = h * (.72f + .012f * sin(seconds * .11f))
-        paint.shader = LinearGradient(0f, mistY - h * .12f, 0f, mistY + h * .17f,
-            intArrayOf(Color.TRANSPARENT,
-                Color.argb(28, Color.red(t.mist), Color.green(t.mist), Color.blue(t.mist)),
-                Color.TRANSPARENT), null, Shader.TileMode.CLAMP)
-        canvas.drawRect(0f, mistY - h * .12f, w, mistY + h * .17f, paint)
+        paint.shader = mistGradient
+        val drift = .008f * sin(seconds * .09f)
+        canvas.save()
+        canvas.translate(pose.x * w * .016f * depth,
+            (pose.y * .012f * depth + drift) * h)
+        canvas.drawRect(-w * .16f, h * .60f, w * 1.16f, h * .91f, paint)
+        canvas.restore()
         paint.shader = null
     }
 
-    fun drawForeground(canvas: Canvas, state: MotionState) {
-        val w = canvas.width.toFloat().coerceAtLeast(1f)
-        val h = canvas.height.toFloat().coerceAtLeast(1f)
+    fun drawForeground(
+        canvas: Canvas, state: MotionState,
+        pose: ParallaxPose = ParallaxPose()
+    ) {
+        val w = canvas.width.coerceAtLeast(1).toFloat()
+        val h = canvas.height.coerceAtLeast(1).toFloat()
         val scene = (state.preset - FIRST).coerceIn(0, 3)
-        val t = theme(state)
-        // Draw this AFTER the clock: mountain peaks occlude clock glyphs.
-        val peaks = when (scene) {
-            0 -> floatArrayOf(.0f,.85f,.12f,.79f,.24f,.66f,.35f,.77f,.48f,.70f,.62f,.82f,.76f,.64f,.89f,.78f,1f,.71f)
-            1 -> floatArrayOf(.0f,.84f,.14f,.72f,.26f,.79f,.39f,.66f,.55f,.82f,.72f,.73f,.85f,.61f,1f,.77f)
-            2 -> floatArrayOf(.0f,.83f,.11f,.77f,.23f,.69f,.34f,.76f,.45f,.74f,.59f,.63f,.73f,.81f,.86f,.69f,1f,.77f)
-            else -> floatArrayOf(.0f,.86f,.12f,.78f,.26f,.70f,.4f,.80f,.54f,.67f,.7f,.79f,.82f,.66f,1f,.79f)
-        }
-        ridge(canvas, w, h, t.front, peaks)
-
-        // Sparse geometric slope facets keep the silhouette polished, not noisy.
-        paint.color = Color.argb(20, 244, 246, 255)
-        path.reset()
-        path.moveTo(w * .24f, h * peaks[5])
-        path.lineTo(w * .30f, h * .83f)
-        path.lineTo(w * .36f, h)
-        path.lineTo(w * .27f, h)
-        path.close()
-        canvas.drawPath(path, paint)
-        path.reset()
+        paint.shader = null
+        paint.alpha = 255
+        ridge(canvas, w, h, themes[scene].front, foreground[scene],
+            pose.x * w * .052f * state.mountainDepth,
+            pose.y * h * .026f * state.mountainDepth)
+        // No hand-painted facets above the silhouette: these used to cut
+        // across the ridge and made the clock overlap look broken.
     }
 
-    private fun ridge(canvas: Canvas, w: Float, h: Float, color: Int, pairs: FloatArray) {
+    private fun ridge(
+        canvas: Canvas, w: Float, h: Float,
+        color: Int, pairs: FloatArray, dx: Float, dy: Float
+    ) {
+        // Extend both ends past the viewport. Translating a closed polygon
+        // that ends at x=w previously revealed sky-coloured edge seams.
+        val pad = w * .18f
+        val firstY = pairs[1] * h + dy
+        val lastY = pairs[pairs.lastIndex] * h + dy
         path.reset()
-        path.moveTo(pairs[0] * w, pairs[1] * h)
-        var i = 2
-        while (i + 1 < pairs.size) {
-            path.lineTo(pairs[i] * w, pairs[i + 1] * h)
+        path.moveTo(-pad, firstY)
+        var i = 0
+        while (i < pairs.size - 1) {
+            path.lineTo(pairs[i] * w + dx, pairs[i + 1] * h + dy)
             i += 2
         }
-        path.lineTo(w, h)
-        path.lineTo(0f, h)
+        path.lineTo(w + pad, lastY)
+        path.lineTo(w + pad, h + pad)
+        path.lineTo(-pad, h + pad)
         path.close()
+        paint.shader = null
         paint.color = color
-        paint.style = Paint.Style.FILL
         paint.alpha = 255
         canvas.drawPath(path, paint)
-        path.reset()
     }
 
     companion object {
