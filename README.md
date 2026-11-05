@@ -1,6 +1,6 @@
 # HALYN Motion
 
-Minimalist native Android live wallpaper studio featuring **51 original live wallpaper scenes plus a personal image option** and **5 real-time clock styles**, including four layered mountain landscapes.
+Native Android live wallpaper studio for **online, licensed 4K+ photography and artwork**, with offline storage, gyro parallax, and **5 customizable real-time clock styles**. Older procedural wallpaper selections are retained only for backward compatibility.
 
 ## v0.9.0 — Online 4K wallpapers, no new generated artwork
 
