@@ -183,14 +183,18 @@ class HalynRenderer(private val context: Context) {
     private val starRenderer by lazy { StarWindowRenderer(context) }
     private val mountainRenderer = MountainSceneRenderer()
     private var shaderFailed = false
-    private val shader: RuntimeShader? = try {
-        if (Build.VERSION.SDK_INT >= 33) RuntimeShader(AGSL) else null
-    } catch (_: IllegalArgumentException) {
-        null
+    // Mountain and Star Window previews never need AGSL. Creating a shader
+    // for every gallery tile previously caused avoidable startup/GPU work.
+    private val shader: RuntimeShader? by lazy {
+        try {
+            if (Build.VERSION.SDK_INT >= 33) RuntimeShader(AGSL) else null
+        } catch (_: RuntimeException) {
+            null
+        }
     }
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
         isDither = true
-        if (this@HalynRenderer.shader != null) this.shader = this@HalynRenderer.shader else color = Color.rgb(9, 12, 22)
+        color = Color.rgb(9, 12, 22)
     }
 
     fun draw(
@@ -235,6 +239,7 @@ class HalynRenderer(private val context: Context) {
             )
             current.setFloatUniform("u_offset", if (state.parallax) offsetX else .5f)
             current.setFloatUniform("u_gyro", gyro.x, gyro.y)
+                paint.shader = current
                 canvas.drawRect(0f, 0f, width, height, paint)
                 return
             } catch (_: RuntimeException) {
