@@ -59,7 +59,8 @@ class MotionPreferences(context: Context) {
             return if (result.isFinite()) result.coerceIn(min, max) else default
         }
         return MotionState(
-            preset = preferences.getInt("preset", 0).coerceIn(0, PhotoWallpaperStore.SCENE_INDEX),
+            preset = preferences.getInt("preset", PhotoWallpaperStore.SCENE_INDEX)
+                .coerceIn(0, PhotoWallpaperStore.SCENE_INDEX),
             palette = preferences.getInt("palette", 0).coerceIn(0, 5),
             customColor = preferences.getInt("custom_color", Color.rgb(185, 174, 255)) or -0x1000000,
             intensity = float("intensity", 1f, .35f, 2.3f),
