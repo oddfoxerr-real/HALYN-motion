@@ -320,8 +320,8 @@ class PosterSceneRenderer {
         } else {
             moon(c,240f,328f,if(s.variant==4) 80f else 43f,s.accent)
         }
-        mountain(c,406f,s.variant==4?0xFF3B5962.toInt():0xFF738CAC.toInt(),10f)
-        mountain(c,459f,s.variant==4?0xFF234E4D.toInt():0xFF46728C.toInt(),-5f)
+        mountain(c,406f,if (s.variant == 4) 0xFF3B5962.toInt() else 0xFF738CAC.toInt(),10f)
+        mountain(c,459f,if (s.variant == 4) 0xFF234E4D.toInt() else 0xFF46728C.toInt(),-5f)
         if(s.variant==0||s.variant==2||s.variant==3) {
             rect(c,0f,474f,360f,640f,0xFF204A74.toInt())
             for(i in 0 until 15) {
