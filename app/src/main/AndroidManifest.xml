@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-feature android:name="android.software.live_wallpaper" android:required="false"/>
     <uses-feature android:name="android.hardware.location" android:required="false"/>
+    <!-- Only used when browsing or downloading user-selected online 4K images. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <!-- Optional and requested only when entering home-screen clock edit mode. -->
