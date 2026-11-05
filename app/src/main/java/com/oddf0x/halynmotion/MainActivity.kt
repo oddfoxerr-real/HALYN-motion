@@ -525,7 +525,7 @@ class MainActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_WALLPAPER_IMAGE && resultCode == RESULT_OK && data?.data != null) {
-            if (PhotoWallpaperStore(this).import(data.data!!)) {
+            if (PhotoWallpaperStore(this).install(data.data!!)) {
                 prefs.photoImported()
                 refreshScene()
                 syncStarTracking()
