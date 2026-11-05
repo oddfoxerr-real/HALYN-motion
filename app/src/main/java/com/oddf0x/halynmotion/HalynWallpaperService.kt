@@ -21,6 +21,7 @@ class HalynWallpaperService : WallpaperService() {
         private val renderer = HalynRenderer(this@HalynWallpaperService)
         private val clockRenderer = ClockOverlayRenderer(this@HalynWallpaperService)
         private val spatialTracker = SpatialTracker(this@HalynWallpaperService)
+        private val gyroParallax = GyroParallax(this@HalynWallpaperService)
         private val choreographer = Choreographer.getInstance()
         private var framePosted = false
         private var lastFrameNs = 0L
@@ -78,6 +79,7 @@ class HalynWallpaperService : WallpaperService() {
             super.onSurfaceChanged(holder, format, width, height)
             surfaceWidth = width.coerceAtLeast(1)
             surfaceHeight = height.coerceAtLeast(1)
+            gyroParallax.recenter()
             surfaceReady = true
             refresh()
         }
@@ -91,6 +93,7 @@ class HalynWallpaperService : WallpaperService() {
             } else {
                 stopFrames()
                 spatialTracker.stop()
+                gyroParallax.stop()
             }
         }
 
@@ -180,6 +183,7 @@ class HalynWallpaperService : WallpaperService() {
             surfaceReady = false
             stopFrames()
             spatialTracker.stop()
+            gyroParallax.stop()
             super.onSurfaceDestroyed(holder)
         }
 
@@ -188,6 +192,7 @@ class HalynWallpaperService : WallpaperService() {
             surfaceReady = false
             stopFrames()
             spatialTracker.stop()
+            gyroParallax.stop()
             preferences.raw.unregisterOnSharedPreferenceChangeListener(this)
             super.onDestroy()
         }
@@ -204,8 +209,14 @@ class HalynWallpaperService : WallpaperService() {
                 spatialTracker.configureSky(settings)
                 spatialTracker.start(settings.starSensitivity)
                 spatialTracker.setSensitivity(settings.starSensitivity)
+                gyroParallax.stop()
             } else {
                 spatialTracker.stop()
+                if (visible && surfaceReady && settings.gyroMode != 0) {
+                    gyroParallax.start()
+                } else {
+                    gyroParallax.stop()
+                }
             }
             if (visible && surfaceReady) scheduleFrame()
         }
@@ -216,15 +227,22 @@ class HalynWallpaperService : WallpaperService() {
             var canvas: Canvas? = null
             try {
                 canvas = surfaceHolder.lockHardwareCanvas()
+                val tilt = if (settings.preset == StarWindowRenderer.SCENE_INDEX) {
+                    ParallaxPose()
+                } else {
+                    gyroParallax.pose(settings)
+                }
                 renderer.draw(
                     canvas, settings,
                     (startedMs - startTimeMs) / 1000f,
                     touchX, touchY, offsetX,
-                    if (settings.preset == StarWindowRenderer.SCENE_INDEX) spatialTracker.pose() else null
+                    if (settings.preset == StarWindowRenderer.SCENE_INDEX) spatialTracker.pose() else null,
+                    gyro = tilt
                 )
                 clockRenderer.draw(canvas, settings)
-                // Mountain foreground deliberately occludes the clock.
-                renderer.drawForeground(canvas, settings)
+                // Reuse the exact same gyro pose for background/foreground;
+                // otherwise a moving ridge can visibly shear around the clock.
+                renderer.drawForeground(canvas, settings, tilt, offsetX)
             } catch (_: IllegalArgumentException) {
                 // The system may be replacing the wallpaper surface.
             } catch (_: IllegalStateException) {
