@@ -877,7 +877,8 @@ class MainActivity : Activity() {
             panel, "Flow", prefs.get().speed,
             min = .25f, max = 2.0f, prefs::setSpeed
         )
-        root.addView(panel)
+        // Keep old renderer settings for existing installs, but don't show
+        // ineffective colour/flow controls for genuine downloaded photos.
 
         gyroPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -948,9 +949,9 @@ class MainActivity : Activity() {
             background = rounded(cardColor, 22, borderColor)
             setPadding(dp(17), dp(6), dp(17), dp(14))
         }
-        addToggle(panel, "Touch interaction", "Gesture response for non-space scenes", prefs.get().touch) {
-            prefs.setTouch(it)
-        }
+        // Source photographs are passive wallpapers; no tap-to-warp gesture
+        // is enabled for photo mode, even if a previous procedural preset
+        // stored touch interaction = true.
         panel.addView(View(this).apply { setBackgroundColor(borderColor) }, LinearLayout.LayoutParams(-1, dp(1)))
         addToggle(panel, "Home-screen swipe", "Horizontal parallax when changing launcher pages", prefs.get().parallax) {
             prefs.setParallax(it)
@@ -974,7 +975,7 @@ class MainActivity : Activity() {
     }
 
     private fun buildFooter(root: LinearLayout) {
-        root.addView(text("Designed to feel at home on your screen.", 12f, subtle).apply {
+        root.addView(text("Photographs from their original creators · Use with attribution.", 12f, subtle).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(28), 0, 0)
         })
