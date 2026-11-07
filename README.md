@@ -1,16 +1,12 @@
 # HALYN Motion
 
-## v0.13.0 — Real graphics API selection (A56)
+## v0.14.0 — Simplified renderer
 
-HALYN includes three explicit rendering modes in **Preferences → Graphics engine**:
+HALYN now uses **Android hardware-accelerated Canvas/AGSL** for every wallpaper. Vulkan and OpenGL ES engine selectors have been removed, along with their separate native implementations and build dependencies. Previously saved engine choices are ignored automatically.
 
-- **System:** Existing Android Canvas/AGSL path. Compatible with all old wallpapers, the 4K gallery, custom clocks, and the on-device editor.
-- **OpenGL ES 3:** An EGL surface and GLSL ES 3.0 fragment-shader renderer for the new ray-marched Glass Horizon, Liquid Mirror, and Prism Monolith styles.
-- **Vulkan 1.3:** A separate NDK-backed Vulkan swapchain/graphics pipeline using compiled SPIR-V and dynamic rendering. Selectable only when GPU support is detected. It uses the Android wallpaper Surface without adding a second screen overlay.
+All 28 original animated wallpapers, eight SHADES materials, and three reflective styles (Glass Horizon, Liquid Mirror, Prism Monolith) remain selectable. The reflective wallpapers now use existing SHADES material lighting with clocks, gyro, colours and motion. 4K online images and local photo imports remain unchanged.
 
-Direct OpenGL/Vulkan applies to the three **Ray-marched scenes** when the clock overlay is **off**. Other wallpapers (and clock-enabled ray-marched scenes) use the original System backend to preserve existing effects and clock drawing; this fallback is indicated in the settings. GPU initialization/presentation failure also falls back to System. The editor tiles deliberately use a lower-cost Canvas approximation, so apply the wallpaper to see actual native shaders.
-
-These scenes perform limited fragment-shader ray marching and a secondary reflection sample, **not hardware NVIDIA RTX or real-time Vulkan hardware RT acceleration**. The Xclipse 540 in the A56 supports Vulkan and OpenGL ES but does not expose hardware ray-tracing acceleration. Full-resolution ray marching can consume significant GPU power; use Efficient or Balanced shader detail on phones. No root, third-party driver or network connection is needed for native rendering. Android CI checks compilation and bundled SPIR-V, while actual shader appearance, clock fallback, and thermal performance require Samsung device testing.
+The smaller, simpler app no longer packages Vulkan binaries or requires driver selection. Hardware ray tracing is not part of the renderer. GitHub Android compilation checks do not replace on-device visual testing.
 
 ## v0.12.0 — SHADES dimensional material engine
 

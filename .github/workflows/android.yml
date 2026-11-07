@@ -34,7 +34,7 @@ jobs:
 
       - name: Android SDK 35
         shell: bash
-        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
 
       - name: Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
@@ -52,20 +52,11 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='18'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='19'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.13.0-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.13.0-preview.apk > SHA256SUMS.txt)
-
-      - name: Verify bundled Vulkan shader modules and native backend
-        shell: bash
-        run: |
-          set -euo pipefail
-          apk=app/build/outputs/apk/debug/app-debug.apk
-          unzip -Z1 "$apk" | grep -q 'lib/arm64-v8a/libhalyn-vulkan.so'
-          unzip -Z1 "$apk" | grep -q 'assets/shaders/raytrace.vert.spv'
-          unzip -Z1 "$apk" | grep -q 'assets/shaders/raytrace.frag.spv'
+          cp "$apk" dist/HALYN-Motion-v0.14.0-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.14.0-preview.apk > SHA256SUMS.txt)
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -84,40 +75,33 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.13.0 Selectable GPU Engines
+      - name: Publish HALYN v0.14.0 Simplified Renderer
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.13.0-preview.1
+          TAG: v0.14.0-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.13.0-preview.apk
-          unzip -t dist/HALYN-Motion-v0.13.0-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.14.0-preview.apk
+          unzip -t dist/HALYN-Motion-v0.14.0-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN Motion v0.13.0 — Selectable GPU Engines
+          # HALYN v0.14.0 — Simplified Rendering
 
-          - Real OpenGL ES 3.0 EGL backend for three ray-marched 3D scenes.
-          - Real Vulkan 1.3 native swapchain and SPIR-V graphics pipeline.
-          - Renderer selector: System Canvas, OpenGL ES and Vulkan.
-          - Ray-marched geometry, computed normals, one secondary reflection
-            ray, lighting and palette-controlled metallic/glass materials.
-          - Vulkan requires dynamic rendering and swapchain support; disabled
-            in settings if unsupported.
-          - Explicit fallback to Canvas on native initialization/present error.
-          - Existing 36 abstract wallpapers and photo gallery continue on
-            System Canvas: engine choice does not silently break older styles.
-          - Clocks remain supported on System Canvas; GPU-only scenes fall
-            back to Canvas when the clock overlay is enabled.
-          - Hardware raytracing cores are NOT required or claimed; Xclipse 540
-            uses shaders to approximate reflective ray effects.
-          - Debug-signed preview. Verify native GPU output on Galaxy A56;
-            Kotlin/NDK compilation is not a runtime device test.
+          - Removed Vulkan and OpenGL ES choices and the graphics API selector.
+          - Deleted native EGL and Vulkan implementations, graphics shaders,
+            NDK build requirements and Vulkan APK verification.
+          - All wallpapers now use the hardware-accelerated Canvas/AGSL renderer.
+          - Preserved 28 original effects, 8 SHADES material wallpapers,
+            and 3 reflective presets at their existing IDs.
+          - Live clock, gyro, wallpaper gallery and uploaded photos retained.
+          - Previously saved backend choices are harmlessly ignored.
+          - Debug-signed preview. Verify display on Galaxy A56 hardware.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.13.0-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.14.0-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.13.0 — GPU Engine Selection" \
+            --title "HALYN Motion v0.14.0 — Simplified Rendering" \
             --notes-file notes.md --prerelease

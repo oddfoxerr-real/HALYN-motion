@@ -2,7 +2,6 @@ package com.oddf0x.halynmotion
 
 import android.content.SharedPreferences
 import android.graphics.Canvas
-import android.util.Log
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -22,50 +21,6 @@ class HalynWallpaperService : WallpaperService() {
     inner class MotionEngine : Engine(), SharedPreferences.OnSharedPreferenceChangeListener {
         private val preferences = MotionPreferences(this@HalynWallpaperService)
         private val renderer = HalynRenderer(this@HalynWallpaperService)
-        private val openGl = RaymarchOpenGl()
-        private var vulkanHandle = 0L
-        private var activeBackend = 0
-        private var backendFailure = -1
-
-        private fun desiredBackend(): Int =
-            if (RaymarchScenes.supports(settings.preset) && settings.clockStyle == 0)
-                settings.renderBackend else 0
-
-        private fun releaseGpu() {
-            // Surface must be disconnected before Canvas can become producer.
-            if (activeBackend == 1) openGl.close()
-            if (vulkanHandle != 0L) VulkanBridge.destroy(vulkanHandle)
-            vulkanHandle = 0L
-            activeBackend = 0
-        }
-
-        private fun configureBackend() {
-            val want = desiredBackend()
-            if (want == activeBackend) return
-            releaseGpu()
-            if (!visible || !surfaceReady || want == 0) return
-            val failureKey = want * 100 + settings.preset
-            if (backendFailure == failureKey) return
-            val ready = when (want) {
-                1 -> openGl.start(surfaceHolder.surface)
-                2 -> {
-                    vulkanHandle = VulkanBridge.create(
-                        surfaceHolder.surface, this@HalynWallpaperService.assets
-                    )
-                    vulkanHandle != 0L
-                }
-                else -> false
-            }
-            if (ready) {
-                activeBackend = want
-            } else {
-                openGl.close()
-                if (vulkanHandle != 0L) VulkanBridge.destroy(vulkanHandle)
-                vulkanHandle = 0L
-                backendFailure = failureKey
-                Log.w("HALYN_GPU", "Direct engine $want unavailable: falling back to Canvas")
-            }
-        }
         private val clockRenderer = ClockOverlayRenderer(this@HalynWallpaperService)
         private val spatialTracker = SpatialTracker(this@HalynWallpaperService)
         private val gyroParallax = GyroParallax(this@HalynWallpaperService)
@@ -196,7 +151,6 @@ class HalynWallpaperService : WallpaperService() {
             super.onSurfaceCreated(holder)
             surfaceReady = true
             renderer.resetHardwareState()
-            backendFailure = -1
             refresh()
         }
 
@@ -205,8 +159,6 @@ class HalynWallpaperService : WallpaperService() {
             surfaceWidth = width.coerceAtLeast(1)
             surfaceHeight = height.coerceAtLeast(1)
             gyroParallax.recenter()
-            releaseGpu()
-            backendFailure = -1
             surfaceReady = true
             refresh()
         }
@@ -219,7 +171,6 @@ class HalynWallpaperService : WallpaperService() {
                 refresh()
             } else {
                 stopFrames()
-                releaseGpu()
                 spatialTracker.stop()
                 gyroParallax.stop()
             }
@@ -309,8 +260,7 @@ class HalynWallpaperService : WallpaperService() {
                 settings.skyAligned != previous.skyAligned ||
                 key == "sky_latitude" || key == "sky_longitude" ||
                 key == "sky_fix_time"
-            if (trackerChanged || key == "render_backend" || key == "clock_style") {
-                backendFailure = -1
+            if (trackerChanged) {
                 refresh()
             } else {
                 if (acceptsTouch(settings) != acceptsTouch(previous)) {
@@ -325,7 +275,6 @@ class HalynWallpaperService : WallpaperService() {
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
             surfaceReady = false
             stopFrames()
-            releaseGpu()
             spatialTracker.stop()
             gyroParallax.stop()
             super.onSurfaceDestroyed(holder)
@@ -335,7 +284,6 @@ class HalynWallpaperService : WallpaperService() {
             visible = false
             surfaceReady = false
             stopFrames()
-            releaseGpu()
             spatialTracker.stop()
             gyroParallax.stop()
             preferences.raw.unregisterOnSharedPreferenceChangeListener(this)
@@ -363,32 +311,12 @@ class HalynWallpaperService : WallpaperService() {
                     gyroParallax.stop()
                 }
             }
-            if (visible && surfaceReady) {
-                configureBackend()
-                scheduleFrame()
-            }
+            if (visible && surfaceReady) scheduleFrame()
         }
 
         private fun renderFrame() {
             if (!visible || !surfaceReady) return
             val startedMs = SystemClock.uptimeMillis()
-            if (activeBackend != 0) {
-                val tilt = gyroParallax.pose(settings)
-                val px = tilt.x + if (settings.parallax) (offsetX - .5f) * .35f else 0f
-                val py = tilt.y
-                val elapsed = (startedMs - startTimeMs) / 1000f
-                val drawn = when (activeBackend) {
-                    1 -> openGl.render(elapsed, settings, px, py)
-                    2 -> VulkanBridge.draw(vulkanHandle,
-                        elapsed * (.35f + settings.speed * .65f), settings, px, py)
-                    else -> false
-                }
-                if (drawn) return
-                val failed = desiredBackend() * 100 + settings.preset
-                releaseGpu()
-                backendFailure = failed
-                Log.w("HALYN_GPU", "GPU presentation failed; returning to Canvas")
-            }
             var canvas: Canvas? = null
             try {
                 canvas = surfaceHolder.lockHardwareCanvas()
