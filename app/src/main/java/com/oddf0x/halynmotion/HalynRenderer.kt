@@ -19,6 +19,7 @@ data class MotionState(
     val intensity: Float = 1.0f,
     val speed: Float = 1.0f,
     val fps: Int = 30,
+    val shaderQuality: Int = 1,
     val touch: Boolean = true,
     val starTapTravel: Boolean = false,
     val parallax: Boolean = true,
@@ -69,6 +70,7 @@ class MotionPreferences(context: Context) {
                 45 -> 45
                 else -> 30
             },
+            shaderQuality = preferences.getInt("shader_quality", 1).coerceIn(0, 2),
             touch = preferences.getBoolean("touch", true),
             starTapTravel = preferences.getBoolean("star_tap_travel", false),
             parallax = preferences.getBoolean("parallax", true),
@@ -115,6 +117,7 @@ class MotionPreferences(context: Context) {
     fun setIntensity(value: Float) = preferences.edit().putFloat("intensity", value.coerceIn(.35f, 2.3f)).apply()
     fun setSpeed(value: Float) = preferences.edit().putFloat("speed", value.coerceIn(.25f, 2f)).apply()
     fun setFps(value: Int) = preferences.edit().putInt("fps", value).apply()
+    fun setShaderQuality(value: Int) = preferences.edit().putInt("shader_quality", value.coerceIn(0, 2)).apply()
     fun setTouch(value: Boolean) = preferences.edit().putBoolean("touch", value).apply()
     fun setStarTapTravel(value: Boolean) = preferences.edit().putBoolean("star_tap_travel", value).apply()
     fun setParallax(value: Boolean) = preferences.edit().putBoolean("parallax", value).apply()
@@ -202,6 +205,7 @@ class HalynRenderer(private val context: Context) {
     private var configuredColor = 0
     private var configuredIntensity = Float.NaN
     private var configuredSpeed = Float.NaN
+    private var configuredQuality = -1
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
         isDither = true
@@ -227,6 +231,7 @@ class HalynRenderer(private val context: Context) {
         configuredColor = 0
         configuredIntensity = Float.NaN
         configuredSpeed = Float.NaN
+        configuredQuality = -1
     }
 
     private fun currentShader(): RuntimeShader? {
@@ -336,6 +341,10 @@ class HalynRenderer(private val context: Context) {
                     current.setFloatUniform("u_speed", state.speed)
                     configuredSpeed = state.speed
                 }
+                if (configuredQuality != state.shaderQuality) {
+                    current.setFloatUniform("u_quality", state.shaderQuality.toFloat())
+                    configuredQuality = state.shaderQuality
+                }
                 current.setFloatUniform("u_time", elapsedSeconds)
                 current.setFloatUniform(
                     "u_touch",
@@ -406,11 +415,35 @@ uniform float u_palette;
 uniform float3 u_customColor;
 uniform float u_intensity;
 uniform float u_speed;
+uniform float u_quality;
 uniform float u_offset;
 uniform float2 u_gyro;
 
 float noise21(float2 p) {
     return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);
+}
+// Smoothed density, sampled only when Cinematic detail is selected.
+float valueNoise(float2 p) {
+    float2 i = floor(p);
+    float2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = mix(noise21(i), noise21(i + float2(1.0, 0.0)), f.x);
+    float b = mix(noise21(i + float2(0.0, 1.0)),
+                  noise21(i + float2(1.0, 1.0)), f.x);
+    return mix(a, b, f.y);
+}
+// Filmic shoulder: preserves glints without clipping them to pure white.
+float3 toneMap(float3 x) {
+    x = max(x, float3(0.0));
+    return clamp(
+        (x * (2.51 * x + float3(0.03))) /
+        (x * (2.43 * x + float3(0.59)) + float3(0.14)),
+        float3(0.0), float3(1.0));
+}
+// Interleaved gradient noise is stable between frames (no shimmering grain).
+float stableDither(float2 pixel) {
+    return fract(52.9829189 * fract(pixel.x * 0.06711056 +
+                pixel.y * 0.00583715)) - 0.5;
 }
 half4 main(float2 frag) {
     float2 uv = frag / u_resolution;
@@ -436,8 +469,8 @@ half4 main(float2 frag) {
     if (u_palette > 4.5) {
         accent = u_customColor;
     }
-    float3 companion = accent.zxy * 0.74 + accent * 0.26;
-    float3 col = float3(0.014, 0.018, 0.038);
+    float3 companion = mix(accent, accent.zxy, 0.46) * 0.72;
+    float3 highlight = mix(accent, float3(0.97, 0.985, 1.0), 0.59);
     float r = length(p);
     float v = 0.0;
     float glow = 0.0;
@@ -463,7 +496,11 @@ half4 main(float2 frag) {
         float2 q = p * 3.5;
         float n = sin(q.x * 2.3 + t * .3 + sin(q.y * 1.3))
             * cos(q.y * 2.8 - t * .23 + cos(q.x * 1.7));
-        v = pow(max(0.0, n * .5 + .5), 3.8) * .78;
+        if (u_quality > 1.5) {
+            float wisps = valueNoise(q * 1.2 + float2(t * .075, -t * .042));
+            n = n * .69 + (wisps * 2.0 - 1.0) * .31;
+        }
+        v = pow(max(0.0, n * .5 + .5), 3.2) * .91;
         float stars = noise21(floor(uv * float2(115.0, 220.0)));
         glow = smoothstep(.991, 1.0, stars) * (.28 + .72 * sin(t * .8 + stars * 70.0));
         glow += exp(-length(q - float2(sin(t * .2), cos(t * .14))) * .55) * .2;
@@ -634,7 +671,11 @@ half4 main(float2 frag) {
         q.y += .49 * cos(q.x * 1.25 + t * .26);
         float sw = sin(q.x * 2.4 + sin(q.y * 3.1 - t * .37))
             * cos(q.y * 2.1 + cos(q.x * 1.7 + t * .19));
-        v = pow(max(0.0, sw), 3.0) * .85;
+        if (u_quality > 1.5) {
+            float inkWarp = valueNoise(q * 1.37 - float2(t * .08, 0.0));
+            sw = sw * .76 + (inkWarp * 2.0 - 1.0) * .24;
+        }
+        v = pow(max(0.0, sw), 2.6) * .98;
         glow = pow(max(0.0, sw), 1.4) * .19 + exp(-3.7 * length(p)) * .09;
     } else if (u_variant < 55.5) {
         // Zenith Borealis: towering moving curtains, intentionally asymmetric.
@@ -718,15 +759,57 @@ half4 main(float2 frag) {
         v = 0.0;
         glow = 0.0;
     }
-    v = max(0.0, v) * k;
-    glow = max(0.0, glow) * k;
-    float depth = .07 * (1.0 - smoothstep(0.0, .8, r));
-    col += accent * (v * .8 + glow * .24 + depth);
-    col += companion * (v * v * .28 + glow * .18);
-    col += accent * nearTouch * .095 * k;
-    col += float3(.02, .025, .045) * (1.0 - smoothstep(.15, .9, r));
-    col = col / (1.0 + col * .45);
-    col = pow(max(col, float3(0.0)), float3(.9));
+    // Scene-dependent material response: reflections are not nebula light.
+    float metal = 0.0;
+    if ((u_variant > 0.5 && u_variant < 1.5) ||
+        (u_variant > 6.5 && u_variant < 7.5) ||
+        (u_variant > 52.5 && u_variant < 53.5) ||
+        (u_variant > 59.5 && u_variant < 61.5)) {
+        metal = 1.0;
+    }
+    float atmospheric = 0.0;
+    if ((u_variant > 1.5 && u_variant < 2.5) ||
+        (u_variant > 8.5 && u_variant < 9.5) ||
+        (u_variant > 58.5 && u_variant < 59.5)) {
+        atmospheric = 1.0;
+    }
+    // Tinted shadow, midground haze and a separate far-light source.
+    float horizon = 0.5 + 0.5 * sin(p.y * 2.2 + p.x * 1.25 + u_variant * .35);
+    float vignette = 1.0 - smoothstep(0.25, 0.92, r);
+    float fog = exp(-3.3 * length(p - float2(0.08, -0.12)));
+    float3 inkBlack = float3(0.0035, 0.006, 0.014);
+    float3 ambientTint = mix(companion, accent, .36) * (.065 + .045 * horizon);
+    float3 col = inkBlack + ambientTint * (.5 + .5 * vignette);
+
+    // Balanced: animated light gradients, without expensive noise samples.
+    if (u_quality > 0.5) {
+        float lightFlow = sin(p.x * 4.4 - t * .087 + u_variant * .3)
+            * cos(p.y * 3.9 + t * .061);
+        col += companion * (.017 + .011 * lightFlow) * vignette;
+        col += accent * (.023 + .032 * atmospheric) * fog;
+    }
+    // Cinematic: smooth moving turbulence, calculated only when enabled.
+    if (u_quality > 1.5) {
+        float f = valueNoise(p * 5.1 + float2(t * .054, u_variant * .16));
+        col += companion * (.040 * f * f) * (.35 + .65 * vignette);
+    }
+    float energy = max(0.0, v) * k;
+    float halo = max(0.0, glow) * k;
+    float broadLight = energy * (.56 - .10 * metal) +
+        halo * (.25 + .24 * atmospheric);
+    float3 emission = mix(companion, accent, clamp(energy * .56 + .35, 0.0, 1.0));
+    col += emission * broadLight;
+    col += companion * halo * (.17 + .18 * atmospheric);
+    // Metal and refractive glass receive a bright, focused specular lobe.
+    float specular = energy * energy / (1.0 + energy * energy);
+    col += highlight * specular * (.33 + .70 * metal);
+    col += accent * nearTouch * .07 * k;
+    col += companion * .034 * vignette;
+    col = toneMap(col * 1.22);
+    col = pow(col, float3(.92));
+    // Fixed sub-LSB grain reduces gradient banding without temporal shimmer.
+    col = clamp(col + float3(stableDither(floor(frag)) / 255.0),
+                float3(0.0), float3(1.0));
     return half4(half3(col), 1.0);
 }
 """.trimIndent()

@@ -75,6 +75,7 @@ class MainActivity : Activity() {
     private lateinit var skyToggle: TextView
     private lateinit var palettes: LinearLayout
     private lateinit var frameRates: LinearLayout
+    private lateinit var qualityModes: LinearLayout
     private lateinit var activeSceneName: TextView
     private lateinit var activeColourName: TextView
 
@@ -121,6 +122,7 @@ class MainActivity : Activity() {
         refreshScene()
         refreshPalette()
         refreshFps()
+        refreshShaderQuality()
         refreshClockStyles()
         refreshClockPositions()
         refreshClockFonts()
@@ -941,6 +943,19 @@ class MainActivity : Activity() {
             panel, "Flow", prefs.get().speed,
             min = .25f, max = 2.0f, prefs::setSpeed
         )
+        panel.addView(text("SHADER DETAIL", 10f, subtle, Typeface.BOLD).apply {
+            letterSpacing = .12f
+            setPadding(0, dp(15), 0, dp(9))
+        })
+        qualityModes = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        panel.addView(qualityModes, LinearLayout.LayoutParams(-1, dp(45)))
+        panel.addView(text(
+            "Efficient saves GPU work. Balanced adds light depth. Cinematic adds moving turbulence.",
+            11f, secondary
+        ).apply { setPadding(0, dp(9), 0, dp(4)) })
         root.addView(panel)
         // Show intensity and flow only where an AGSL shader actually uses them.
 
@@ -974,6 +989,33 @@ class MainActivity : Activity() {
         root.addView(gyroPanel, LinearLayout.LayoutParams(-1, -2).apply {
             topMargin = dp(12)
         })
+    }
+
+    private fun refreshShaderQuality() {
+        if (!::qualityModes.isInitialized) return
+        qualityModes.removeAllViews()
+        val selectedQuality = prefs.get().shaderQuality
+        listOf("Efficient", "Balanced", "Cinematic").forEachIndexed { index, name ->
+            val selected = index == selectedQuality
+            val chip = text(name, 11f,
+                if (selected) backgroundColor else secondary,
+                if (selected) Typeface.BOLD else Typeface.NORMAL
+            ).apply {
+                gravity = Gravity.CENTER
+                background = rounded(if (selected) ink else Color.rgb(37, 38, 45), 11)
+                isFocusable = true
+                isClickable = true
+                contentDescription = "$name shader quality, ${if (selected) "selected" else "not selected"}"
+                setOnClickListener {
+                    prefs.setShaderQuality(index)
+                    refreshShaderQuality()
+                    preview.invalidate()
+                }
+            }
+            qualityModes.addView(chip, LinearLayout.LayoutParams(0, dp(44), 1f).apply {
+                marginEnd = dp(if (index < 2) 6 else 0)
+            })
+        }
     }
 
     private fun refreshGyroModes() {
@@ -1332,7 +1374,7 @@ class MainActivity : Activity() {
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
-            val state = prefs.get().copy(preset = sceneIndex, clockStyle = 0)
+            val state = prefs.get().copy(preset = sceneIndex, clockStyle = 0, shaderQuality = 0)
             // Thumbnails are intentionally static to avoid rendering twelve extra
             // continuously animated views while browsing the gallery.
             renderer.draw(canvas, state, 7f + sceneIndex * 1.7f)

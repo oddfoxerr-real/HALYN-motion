@@ -1,5 +1,11 @@
 # HALYN Motion
 
+## v0.11.0 — Shader Studio
+
+The 28 original animated effects now use a redesigned AGSL material and colour compositor, not just revised frame scheduling. Highlights receive filmic tone mapping rather than hard clipping; reflective effects have brighter focused specular light, while atmospheric effects use softer scattering. Palette-tinted shadows, depth lighting, and stable sub-LSB dithering improve dimensionality and gradient quality. Nebula Drift and Neon Ink have optional smooth procedural density. The new **Motion → Shader Detail** control has Efficient, Balanced (default), and Cinematic rendering, with additional noise calculations only in Cinematic. Gallery thumbnails render in Efficient mode to keep scrolling responsive.
+
+Removed illustrated cars, cities, flowers and foxes stay removed. The live clock, gyro and online 4K gallery are unchanged. Shader compilation and visual performance require on-device checks; an AGSL failure triggers the existing fallback.
+
 ## v0.10.1 — Rendering engine optimization
 
 - **Less overdraw:** The AGSL scene paints directly to the wallpaper surface without the redundant full-screen clear that previously preceded it.
