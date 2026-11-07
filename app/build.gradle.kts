@@ -9,8 +9,8 @@ android {
         applicationId = "com.oddf0x.halynmotion"
         minSdk = 33
         targetSdk = 35
-        versionCode = 13
-        versionName = "0.9.1"
+        versionCode = 14
+        versionName = "0.10.0"
     }
     buildTypes {
         release {

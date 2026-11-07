@@ -59,8 +59,7 @@ class MotionPreferences(context: Context) {
             return if (result.isFinite()) result.coerceIn(min, max) else default
         }
         return MotionState(
-            preset = preferences.getInt("preset", PhotoWallpaperStore.SCENE_INDEX)
-                .coerceIn(0, PhotoWallpaperStore.SCENE_INDEX),
+            preset = sanitizePreset(preferences.getInt("preset", 0)),
             palette = preferences.getInt("palette", 0).coerceIn(0, 5),
             customColor = preferences.getInt("custom_color", Color.rgb(185, 174, 255)) or -0x1000000,
             intensity = float("intensity", 1f, .35f, 2.3f),
@@ -99,7 +98,12 @@ class MotionPreferences(context: Context) {
         )
     }
 
-    fun setPreset(value: Int) = preferences.edit().putInt("preset", value.coerceIn(0, PhotoWallpaperStore.SCENE_INDEX)).apply()
+    private fun sanitizePreset(value: Int): Int = when {
+        value in 0..20 || value == PhotoWallpaperStore.SCENE_INDEX || value in 52..63 -> value
+        else -> 0 // The retired illustrated poster IDs 21–50 must never render.
+    }
+
+    fun setPreset(value: Int) = preferences.edit().putInt("preset", sanitizePreset(value)).apply()
     fun photoImported() = preferences.edit()
         .putInt("photo_revision", preferences.getInt("photo_revision", 0) + 1)
         .putInt("preset", PhotoWallpaperStore.SCENE_INDEX).apply()
@@ -188,7 +192,6 @@ class MotionPreferences(context: Context) {
 class HalynRenderer(private val context: Context) {
     private val starRenderer by lazy { StarWindowRenderer(context) }
     private val mountainRenderer = MountainSceneRenderer()
-    private val posterRenderer = PosterSceneRenderer()
     private val photoRenderer = PhotoWallpaperStore(context.applicationContext)
     private var shaderFailed = false
     // Mountain and Star Window previews never need AGSL. Creating a shader
@@ -221,10 +224,6 @@ class HalynRenderer(private val context: Context) {
         }
         if (MountainSceneRenderer.isMountain(state.preset)) {
             mountainRenderer.drawBackground(canvas, state, elapsedSeconds, mountainPose(state, gyro, offsetX))
-            return
-        }
-        if (PosterSceneRenderer.isPoster(state.preset)) {
-            posterRenderer.drawBackground(canvas, state.preset, elapsedSeconds, gyro)
             return
         }
         if (state.preset == PhotoWallpaperStore.SCENE_INDEX) {
@@ -273,8 +272,6 @@ class HalynRenderer(private val context: Context) {
     ) {
         if (MountainSceneRenderer.isMountain(state.preset)) {
             mountainRenderer.drawForeground(canvas, state, mountainPose(state, gyro, offsetX))
-        } else if (PosterSceneRenderer.isPoster(state.preset)) {
-            posterRenderer.drawForeground(canvas, state.preset, android.os.SystemClock.uptimeMillis() / 1000f, gyro)
         }
     }
 
@@ -292,7 +289,11 @@ class HalynRenderer(private val context: Context) {
             "Star Window",
             "Orbital Halo", "Cosmic Rain", "Plasma Loom", "Eclipse Glass",
             "Twilight Peaks", "Moonlit Ridge", "Alpine Mist", "Ember Valley"
-        ) + PosterSceneRenderer.SCENES.map { it.title } + listOf("My Image")
+        ) + List(30) { "Retired illustration" } + listOf("My Image") + listOf(
+            "Velvet Flux", "Crystal Current", "Neon Ink", "Zenith Borealis",
+            "Quartz Ripple", "Lumen Dusk", "Flux Filament", "Celestial Mist",
+            "Liquid Copper", "Polar Halo", "Prism Flow", "Voltage Bloom"
+        )
         val PALETTES = listOf(
             "Arctic", "Ultraviolet", "Ember", "Rose", "Verdant"
         )
@@ -507,7 +508,7 @@ half4 main(float2 frag) {
         float focus = exp(-3.5 * length(p));
         v = (pow(abs(ribbon), 26.0) * .75 + pow(abs(cross), 35.0) * .4) * focus;
         glow = (pow(abs(ribbon), 5.0) + pow(abs(cross), 7.0)) * focus * .16;
-    } else {
+    } else if (u_variant < 17.5) {
         // Eclipse Glass: illuminated crescent with a soft diffractive corona.
         float2 q = p - float2(.02 * sin(t * .1), .015 * cos(t * .12));
         float disc = length(q);
@@ -519,6 +520,111 @@ half4 main(float2 frag) {
         float diffraction = pow(max(0.0, cos(atan(q.y,q.x) * 15.0 + t * .13)), 8.0);
         v = crescent * .91 + outer * (.66 + diffraction * .28);
         glow = exp(-10.0 * abs(disc - .19)) * .33 + exp(-4.0 * disc) * .13;
+    } else if (u_variant < 52.5) {
+        // Velvet Flux: flowing satin folds with soft chiaroscuro.
+        float2 q = p;
+        q.x += .19 * sin(q.y * 5.1 - t * .29);
+        float crease = sin(q.x * 19.0 + sin(q.y * 9.0 + t * .32) * 1.6);
+        float body = exp(-3.2 * abs(q.x));
+        v = pow(abs(crease), 18.0) * body * .95;
+        glow = pow(abs(crease), 3.0) * body * .26;
+    } else if (u_variant < 53.5) {
+        // Crystal Current: refracted wave fronts passing over a glass lens.
+        float2 q = p + .07 * float2(sin(p.y * 12.0 + t * .3), cos(p.x * 10.0 - t * .26));
+        float lens = length(q + float2(.03, .09));
+        float refraction = sin(32.0 * lens - 2.0 * t + 2.0 * sin(atan(q.y, q.x) * 5.0));
+        v = pow(max(0.0, refraction), 14.0) * exp(-1.7 * lens);
+        glow = exp(-38.0 * abs(lens - .26)) * .35 + exp(-4.0 * lens) * .14;
+    } else if (u_variant < 54.5) {
+        // Neon Ink: slow organic pigment billows, no clip-art shapes.
+        float2 q = p * 4.5;
+        q.x += .65 * sin(q.y * 1.5 - t * .29);
+        q.y += .49 * cos(q.x * 1.25 + t * .26);
+        float sw = sin(q.x * 2.4 + sin(q.y * 3.1 - t * .37))
+            * cos(q.y * 2.1 + cos(q.x * 1.7 + t * .19));
+        v = pow(max(0.0, sw), 3.0) * .85;
+        glow = pow(max(0.0, sw), 1.4) * .19 + exp(-3.7 * length(p)) * .09;
+    } else if (u_variant < 55.5) {
+        // Zenith Borealis: towering moving curtains, intentionally asymmetric.
+        float sway = sin(p.y * 4.0 + t * .14) * .18;
+        float curtain = sin((p.x + sway) * 15.0 + sin(p.y * 12.0 - t * .36) * .8);
+        float edge = pow(max(0.0, curtain), 15.0);
+        float veil = exp(-2.8 * abs(p.x + .06));
+        v = edge * veil * (.3 + .7 * (1.0 - smoothstep(-.5, .5, p.y)));
+        glow = pow(max(0.0, curtain), 2.0) * veil * .22;
+    } else if (u_variant < 56.5) {
+        // Quartz Ripple: overlapping interference rings without hard circles.
+        float2 a = p - float2(-.14 + .08 * sin(t * .13), -.12);
+        float2 b = p - float2(.21, .17 + .06 * cos(t * .16));
+        float wave = sin(length(a) * 26.0 - t * .81) + sin(length(b) * 31.0 + t * .56);
+        float envelope = exp(-2.8 * length(p));
+        v = pow(max(0.0, wave * .5), 7.0) * envelope * 1.1;
+        glow = pow(abs(wave * .5), 3.0) * envelope * .18;
+    } else if (u_variant < 57.5) {
+        // Lumen Dusk: a distant, breathing liquid horizon.
+        float horizon = .10 + .047 * sin(p.x * 6.0 - t * .14);
+        horizon += .016 * sin(p.x * 17.0 + t * .21);
+        float bend = p.y - horizon;
+        float water = sin(bend * 51.0 + p.x * 6.0 - t * .44);
+        float light = exp(-11.0 * abs(bend));
+        v = light * .8 + pow(max(0.0, water), 13.0) * exp(-18.0 * max(0.0, bend)) * .23;
+        glow = exp(-4.0 * abs(bend)) * .17;
+    } else if (u_variant < 58.5) {
+        // Flux Filament: several fine light paths that never intersect perfectly.
+        float center = sin(p.y * 5.3 + t * .4) * .15 + sin(p.y * 13.0 - t * .23) * .038;
+        float strandA = abs(p.x - center);
+        float strandB = abs(p.x + .16 + center * .5);
+        float strandC = abs(p.x - .18 - center * .8);
+        v = exp(-130.0 * strandA) + exp(-104.0 * strandB) * .63 + exp(-110.0 * strandC) * .48;
+        glow = exp(-17.0 * strandA) * .23 + exp(-13.0 * strandB) * .10;
+    } else if (u_variant < 59.5) {
+        // Celestial Mist: animated celestial clouds with rare glimmering dust.
+        float2 q = p * 3.1 + float2(t * .045, -t * .035);
+        float fog = sin(q.x * 2.2 + sin(q.y * 1.8 + t * .23))
+            * cos(q.y * 2.4 + cos(q.x * 2.1 - t * .17));
+        float depthFog = sin(q.x * .85 - q.y * 1.25 + t * .08);
+        float starNoise = noise21(floor(uv * float2(105.0, 213.0)));
+        v = pow(max(0.0, fog * .55 + depthFog * .22 + .23), 3.0);
+        glow = smoothstep(.995, 1.0, starNoise) * .7 + exp(-3.2 * length(p)) * .16;
+    } else if (u_variant < 60.5) {
+        // Liquid Copper: glossy molten ribbons with subdued metallic space.
+        float2 q = p;
+        q.x += .10 * sin(q.y * 9.0 - t * .52);
+        q.y += .065 * cos(q.x * 14.0 + t * .35);
+        float molten = sin(q.x * 25.0 + q.y * 9.0 + sin(q.y * 10.0 - t) * 2.0);
+        float shine = max(0.0, molten);
+        v = pow(shine, 25.0) * exp(-3.0 * abs(q.x)) * 1.1;
+        glow = pow(shine, 3.0) * exp(-2.3 * abs(q.x)) * .24;
+    } else if (u_variant < 61.5) {
+        // Polar Halo: a softly orbiting refractive ellipse.
+        float angle = atan(p.y, p.x);
+        float2 q = float2(p.x * 1.20, p.y * .84);
+        float distanceRing = length(q);
+        float polar = .26 + .032 * sin(angle * 6.0 + t * .27);
+        float ring = abs(distanceRing - polar);
+        float satellite = length(p - float2(.18 * cos(t * .32), .15 * sin(t * .32)));
+        v = exp(-125.0 * ring) + exp(-20.0 * satellite) * .4;
+        glow = exp(-13.0 * ring) * .24 + exp(-4.3 * length(p)) * .14;
+    } else if (u_variant < 62.5) {
+        // Prism Flow: waves of iridescent-looking layered interference.
+        float2 q = p;
+        q.x += .09 * sin(q.y * 15.0 + t * .19);
+        float primary = sin(q.y * 22.0 + sin(q.x * 8.0 - t * .26) * 2.2 - t * .41);
+        float secondary = sin(q.y * 15.0 - q.x * 12.0 + t * .36);
+        v = pow(max(0.0, primary), 13.0) * .69 + pow(max(0.0, secondary), 20.0) * .36;
+        glow = pow(abs(primary), 4.0) * .24 + exp(-4.0 * length(q)) * .10;
+    } else if (u_variant < 63.5) {
+        // Voltage Bloom: light branches spreading out from an energetic center.
+        float angle = atan(p.y, p.x);
+        float spoke = sin(angle * 11.0 + sin(r * 22.0 - t * .63) * 1.2);
+        float flash = pow(max(0.0, spoke), 28.0) * exp(-4.2 * r);
+        float pulse = .65 + .35 * sin(t * 1.6);
+        v = flash * pulse + exp(-19.0 * r) * .8;
+        glow = exp(-4.8 * r) * .28 + pow(max(0.0, spoke), 5.0) * exp(-4.5 * r) * .09;
+    } else {
+        // A retired or unknown scene index is rendered as a harmless dark field.
+        v = 0.0;
+        glow = 0.0;
     }
     v = max(0.0, v) * k;
     glow = max(0.0, glow) * k;

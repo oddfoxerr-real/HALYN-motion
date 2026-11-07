@@ -56,16 +56,14 @@ class MainActivity : Activity() {
     private lateinit var preview: LivePreview
     private lateinit var onlineGallery: CommonsGalleryView
     private lateinit var onlineCredit: TextView
-    private lateinit var scenes: LinearLayout
-    private lateinit var newScenes: LinearLayout
     private lateinit var clockStyles: LinearLayout
     private lateinit var clockPositions: LinearLayout
     private lateinit var clockFonts: LinearLayout
     private lateinit var clockPlacementToggle: Switch
     private var awaitingClockOverlayPermission = false
-    private lateinit var mountainScenes: LinearLayout
-    private val posterRails = mutableListOf<LinearLayout>()
-    private lateinit var myImageScenes: LinearLayout
+    private val originalCards = mutableListOf<Pair<Int, LinearLayout>>()
+    private val originalTileRenderer by lazy { HalynRenderer(this) }
+    private lateinit var effectPanel: LinearLayout
     private lateinit var gyroModes: LinearLayout
     private lateinit var gyroPanel: LinearLayout
     private lateinit var mountainDepthPanel: LinearLayout
@@ -111,11 +109,9 @@ class MainActivity : Activity() {
         buildHeader(column)
         buildPreview(column)
         buildScenes(column)
-        // Preserve legacy preferences for users with an older active scene,
-        // but do not offer generated artwork in the new online-only gallery.
-        buildColours(LinearLayout(this))
+        buildColours(column)
         buildClock(column)
-        buildStarWindow(LinearLayout(this))
+        buildStarWindow(column)
         buildMotion(column)
         buildBehavior(column)
         buildFooter(column)
@@ -149,11 +145,11 @@ class MainActivity : Activity() {
         })
         root.addView(top)
 
-        root.addView(text("Real 4K wallpapers.", 32f, ink, Typeface.BOLD).apply {
+        root.addView(text("Motion. Made original.", 32f, ink, Typeface.BOLD).apply {
             setPadding(0, dp(20), 0, 0)
             letterSpacing = -.035f
         })
-        root.addView(text("Curated online. Your clock. Your style.", 14f, secondary).apply {
+        root.addView(text("Original animated wallpapers, real 4K photography and your clock.", 14f, secondary).apply {
             setPadding(0, dp(5), 0, dp(24))
         })
     }
@@ -194,7 +190,7 @@ class MainActivity : Activity() {
         }
         activeSceneName = text("", 24f, ink, Typeface.BOLD)
         foot.addView(activeSceneName)
-        foot.addView(text("Real online photo · Clock & gyro below", 12f, Color.rgb(205, 205, 215)).apply {
+        foot.addView(text("Live originals · 4K photos · Clock & motion", 12f, Color.rgb(205, 205, 215)).apply {
             setPadding(0, dp(4), 0, 0)
         })
         shell.addView(foot, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
@@ -206,7 +202,74 @@ class MainActivity : Activity() {
         root.addView(shell, LinearLayout.LayoutParams(-1, dp(heightDp)))
     }
 
+    private fun buildOriginalRail(root: LinearLayout, title: String, indexes: List<Int>) {
+        root.addView(text(title, 13f, secondary, Typeface.BOLD).apply {
+            setPadding(0, dp(12), 0, dp(9))
+        })
+        val rail = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.TOP
+        }
+        indexes.forEach { index ->
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                background = rounded(cardColor, 17, borderColor)
+                clipToOutline = true
+                isClickable = true
+                isFocusable = true
+                contentDescription = "Select ${HalynRenderer.PRESETS[index]} animated wallpaper"
+                setOnClickListener {
+                    prefs.setPreset(index)
+                    refreshScene()
+                    syncStarTracking()
+                    syncMotionTracking()
+                    preview.invalidate()
+                }
+            }
+            val artwork = SceneTilePreview(index).apply {
+                isClickable = false
+                isFocusable = false
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }
+            card.addView(artwork, LinearLayout.LayoutParams(-1, dp(166)))
+            card.addView(text(HalynRenderer.PRESETS[index], 12f, ink, Typeface.BOLD).apply {
+                maxLines = 2
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(10), dp(7), dp(10), dp(9))
+            }, LinearLayout.LayoutParams(-1, dp(51)))
+            rail.addView(card, LinearLayout.LayoutParams(dp(149), dp(217)).apply {
+                marginEnd = dp(10)
+            })
+            originalCards.add(index to card)
+        }
+        root.addView(HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            clipToPadding = false
+            addView(rail)
+        }, LinearLayout.LayoutParams(-1, dp(226)))
+    }
+
+    private fun refreshOriginalCards() {
+        if (originalCards.isEmpty()) return
+        val selected = prefs.get().preset
+        originalCards.forEach { (index, card) ->
+            card.background = rounded(
+                if (index == selected) Color.rgb(35, 42, 54) else cardColor,
+                17,
+                if (index == selected) ink else borderColor
+            )
+            card.isSelected = index == selected
+        }
+    }
+
     private fun buildScenes(root: LinearLayout) {
+        root.addView(section("HALYN Originals", "Dynamic shaders, no illustrated posters or generated characters."))
+        buildOriginalRail(root, "The classics", (0..11).toList())
+        buildOriginalRail(root, "Original atmospheres", (13..16).toList())
+        buildOriginalRail(root, "New motion collection", (52..63).toList())
+        buildOriginalRail(root, "Star Window", listOf(StarWindowRenderer.SCENE_INDEX))
+
+        root.addView(section("Explore online · 4K+", "Real, licensed images from independent creators."))
         onlineGallery = CommonsGalleryView(this) { image ->
             prefs.raw.edit()
                 .putString("online_title", image.name)
@@ -869,6 +932,7 @@ class MainActivity : Activity() {
             background = rounded(cardColor, 22, borderColor)
             setPadding(dp(17), dp(15), dp(17), dp(11))
         }
+        effectPanel = panel
         addSlider(
             panel, "Strength", prefs.get().intensity,
             min = .35f, max = 2.3f, prefs::setIntensity
@@ -877,8 +941,8 @@ class MainActivity : Activity() {
             panel, "Flow", prefs.get().speed,
             min = .25f, max = 2.0f, prefs::setSpeed
         )
-        // Keep old renderer settings for existing installs, but don't show
-        // ineffective colour/flow controls for genuine downloaded photos.
+        root.addView(panel)
+        // Show intensity and flow only where an AGSL shader actually uses them.
 
         gyroPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -1011,7 +1075,7 @@ class MainActivity : Activity() {
             selected == PhotoWallpaperStore.SCENE_INDEX && ownPhoto ->
                 prefs.raw.getString("online_title", "My wallpaper") ?: "My wallpaper"
             selected == PhotoWallpaperStore.SCENE_INDEX -> "Choose a 4K wallpaper"
-            else -> "Previous wallpaper"
+            else -> HalynRenderer.PRESETS.getOrElse(selected) { "HALYN Original" }
         }
         if (::onlineCredit.isInitialized) {
             onlineCredit.visibility =
@@ -1022,7 +1086,13 @@ class MainActivity : Activity() {
                 (prefs.raw.getString("online_license", "") ?: "") + "\n" +
                 (prefs.raw.getString("online_resolution", "") ?: "")
         }
-        if (::starControls.isInitialized) starControls.visibility = View.GONE
+        refreshOriginalCards()
+        if (::effectPanel.isInitialized) {
+            effectPanel.visibility = if (selected in 0..11 || selected in 13..16 || selected in 52..63)
+                View.VISIBLE else View.GONE
+        }
+        if (::starControls.isInitialized) starControls.visibility =
+            if (selected == StarWindowRenderer.SCENE_INDEX) View.VISIBLE else View.GONE
         if (::gyroPanel.isInitialized) {
             gyroPanel.visibility =
                 if (selected == StarWindowRenderer.SCENE_INDEX) View.GONE else View.VISIBLE
@@ -1258,7 +1328,7 @@ class MainActivity : Activity() {
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).roundToInt()
 
     private inner class SceneTilePreview(private val sceneIndex: Int) : View(this@MainActivity) {
-        private val renderer = HalynRenderer(this@MainActivity)
+        private val renderer get() = originalTileRenderer
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)

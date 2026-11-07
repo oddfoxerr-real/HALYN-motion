@@ -52,11 +52,11 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='13'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='14'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.9.1-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.9.1-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.10.0-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.10.0-preview.apk > SHA256SUMS.txt)
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -75,54 +75,41 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.9.1 Online 4K Gallery
+      - name: Publish HALYN v0.10.0 Originals
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.9.1-preview.1
+          TAG: v0.10.0-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.9.1-preview.apk
-          unzip -t dist/HALYN-Motion-v0.9.1-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.10.0-preview.apk
+          unzip -t dist/HALYN-Motion-v0.10.0-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN Motion v0.9.1 Preview
+          # HALYN Motion v0.10.0 Preview — Originals
 
-          HALYN now browses REAL ONLINE 4K+ wallpapers from Wikimedia
-          Commons instead of offering new procedurally generated artwork.
+          - Restored HALYN Originals, including the original 16 abstract animated designs.
+          - Added 12 distinct shader styles: Velvet Flux, Crystal Current,
+            Neon Ink, Zenith Borealis, Quartz Ripple, Lumen Dusk,
+            Flux Filament, Celestial Mist, Liquid Copper, Polar Halo,
+            Prism Flow, and Voltage Bloom.
+          - Removed all thirty illustrated posters (cars, city scenes,
+            flowers, foxes, other animals, etc.) from the app renderer.
+          - Old saved illustration selections reset to Ion Veil rather
+            than loading retired generated characters.
+          - Reintroduced dynamic original-scene previews and selection.
+          - Restored the functional colour, strength and flow controls.
+          - Kept real licensed online 4K photos, offline imports, clock
+            styles, custom clock fonts, position grid, and gyro.
+          - Star Window remains available in its own row.
 
-          - Fresh installs open the online photo slot by default, without
-            showing an unwanted built-in procedural animation.
-          - Existing selections are preserved until replaced.
-          - Browse Nature, Cars, Flowers, Space, City, Art, Mountains or
-            search for a custom topic; load additional Commons results.
-          - Real images only: 3840x2160-equivalent originals with declared
-            CC0, public domain, CC BY or CC BY-SA licenses.
-          - Original source page, license and photographer/artist are
-            visible before download and remain linked afterwards.
-          - Only downloads the image selected by the user over HTTPS.
-          - Offline image retains up to 4096 pixels after local WebP
-            conversion, using capped input transfer and decode size.
-          - Existing HALYN 5-style clock editor, home-screen grid,
-            custom font and gyro remain functional for photo mode.
-          - Local image import works without the internet.
-
-          Copyright-restricted galleries and AI-generated assets are
-          not bundled. Wikimedia API connection, photo downloads and
-          device-specific performance require an actual phone test.
-
-          - Minimum Android 13.
-          - No Unity, PC companion or ads; network used for opt-in online gallery.
-          - Temporary overlay and foreground service only during placement.
-          - Debug-signed preview: later Play Store production updates require
-            a stable release signing key.
-          - Unsupported vendor AGSL rendering falls back to a readable gradient.
-          - Hardware performance on the Samsung Galaxy A56 is unverified.
+          Preview is debug-signed. Validate shader appearance, scrolling,
+          animations and wallpaper service on an Android 13+ device.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.9.1-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.10.0-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.9.1 — Online 4K Gallery" \
+            --title "HALYN Motion v0.10.0 — Originals" \
             --notes-file notes.md --prerelease

@@ -1,6 +1,14 @@
 # HALYN Motion
 
-Native Android live wallpaper studio for **online, licensed 4K+ photography and artwork**, with offline storage, gyro parallax, and **5 customizable real-time clock styles**. Older procedural wallpaper selections are retained only for backward compatibility.
+Native Android live wallpaper studio with **28 original animated shader wallpapers**, an optional real **licensed online 4K+ photo gallery**, gyro parallax and **5 customizable real-time clock styles**. The illustrated poster packs (cars, flowers, cityscapes, foxes and similar cartoons) are removed.
+
+## v0.10.0 — HALYN Originals return
+
+The studio now lets you select the **original 16 abstract shaders** and **12 new original dynamic shaders** directly in the wallpaper gallery. The new styles are Velvet Flux, Crystal Current, Neon Ink, Zenith Borealis, Quartz Ripple, Lumen Dusk, Flux Filament, Celestial Mist, Liquid Copper, Polar Halo, Prism Flow and Voltage Bloom. These are rendered live in Android AGSL, rather than downloaded photos or illustrations.
+
+All **30 retired generated poster scenes** and their renderer are removed. Previously selected poster scene IDs are safely mapped to the original Ion Veil effect. The photo gallery, local photo import, clock masks, custom fonts, grid positioning and gyro controls remain available. The Strength, Flow and Colour controls are visible again for shader scenes; the separate astronomy-focused Star Window is still selectable.
+
+**Previous release history** below documents earlier versions, not the current available poster collection.
 
 ## v0.9.0 — Online 4K wallpapers, no new generated artwork
 
