@@ -148,6 +148,6 @@ class PhotoWallpaperStore(private val context: Context) {
     }
 
     companion object {
-        const val SCENE_INDEX = PosterSceneRenderer.LAST + 1
+        const val SCENE_INDEX = 51 // Preserve saved online/offline photo wallpaper slots.
     }
 }
