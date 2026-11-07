@@ -52,11 +52,11 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='16'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='17'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.11.0-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.11.0-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.12.0-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.12.0-preview.apk > SHA256SUMS.txt)
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -75,35 +75,41 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.11.0 Shader Studio
+      - name: Publish HALYN v0.12.0 SHADES Engine
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.11.0-preview.1
+          TAG: v0.12.0-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.11.0-preview.apk
-          unzip -t dist/HALYN-Motion-v0.11.0-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.12.0-preview.apk
+          unzip -t dist/HALYN-Motion-v0.12.0-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN Motion v0.11.0 — Shader Studio
-          - New filmic AGSL compositor with tonal shoulder, material glints,
-            palette-tinted shadows and multi-depth atmospheric lighting.
-          - Distinct reflective and atmospheric treatment based on scene.
-          - Stable ordered gradient noise reduces colour banding.
-          - Cinematic mode adds smooth animated density to Nebula Drift,
-            Neon Ink and the global atmospheric field.
-          - Shader Detail selector: Efficient, Balanced (default), Cinematic.
-          - Gallery thumbnails stay efficient while browsing.
-          - Preserves all 28 abstract originals, online licensed 4K
-            photos, clocks, sensors, and clock placement.
-          Runtime AGSL compatibility and GPU temperature need phone testing.
-          The existing shader failure fallback remains enabled.
+          # HALYN v0.12.0 — SHADES Material Engine
+
+          - Dedicated independent GPU material renderer (AGSL RuntimeShader).
+          - Eight material scenes: Obsidian Current, Mercury Fold, Opaline
+            Depth, Aurora Satin, Crystal Facets, Abyssal Tide, Molten Veins,
+            and Prismatic Rift.
+          - Runtime height-field normals, dual directional lights, specular
+            lobes, Fresnel edge light, approximate soft self-shadowing,
+            ambient atmosphere and scene-specific emission.
+          - Surface Depth, Reflectivity, and Emission sliders.
+          - Three existing detail tiers apply to SHADES, including cinematic
+            procedural density. Original 28 abstract wallpapers untouched.
+          - Preserved licensed 4K gallery, wallpaper service, clock editor,
+            gyro parallax, touch interaction and fallback rendering.
+          - No camera capture, external assets or character illustrations.
+
+          This is a debug-signed preview. Gradle validates compilation;
+          AGSL compilation and GPU performance must be checked on the
+          Samsung Galaxy A56 and other actual Android 13+ hardware.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.11.0-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.12.0-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.11.0 — Shader Studio" \
+            --title "HALYN Motion v0.12.0 — SHADES Material Engine" \
             --notes-file notes.md --prerelease

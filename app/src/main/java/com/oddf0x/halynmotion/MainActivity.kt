@@ -64,6 +64,7 @@ class MainActivity : Activity() {
     private val originalCards = mutableListOf<Pair<Int, LinearLayout>>()
     private val originalTileRenderer by lazy { HalynRenderer(this) }
     private lateinit var effectPanel: LinearLayout
+    private lateinit var shadesPanel: LinearLayout
     private lateinit var gyroModes: LinearLayout
     private lateinit var gyroPanel: LinearLayout
     private lateinit var mountainDepthPanel: LinearLayout
@@ -269,6 +270,8 @@ class MainActivity : Activity() {
         buildOriginalRail(root, "The classics", (0..11).toList())
         buildOriginalRail(root, "Original atmospheres", (13..16).toList())
         buildOriginalRail(root, "New motion collection", (52..63).toList())
+        root.addView(section("SHADES · Material Engine", "Reflections, simulated surface depth and luminous materials."))
+        buildOriginalRail(root, "Dimensional materials", (ShadesRenderer.FIRST..ShadesRenderer.LAST).toList())
         buildOriginalRail(root, "Star Window", listOf(StarWindowRenderer.SCENE_INDEX))
 
         root.addView(section("Explore online · 4K+", "Real, licensed images from independent creators."))
@@ -957,6 +960,28 @@ class MainActivity : Activity() {
             11f, secondary
         ).apply { setPadding(0, dp(9), 0, dp(4)) })
         root.addView(panel)
+        shadesPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = rounded(cardColor, 22, borderColor)
+            setPadding(dp(17), dp(14), dp(17), dp(13))
+        }
+        shadesPanel.addView(text("SHADES MATERIAL CONTROLS", 10f, subtle, Typeface.BOLD).apply {
+            letterSpacing = .12f
+            setPadding(0, 0, 0, dp(12))
+        })
+        addSlider(shadesPanel, "Surface depth", prefs.get().shadesDepth,
+            min = .4f, max = 2f, prefs::setShadesDepth)
+        addSlider(shadesPanel, "Reflectivity", prefs.get().shadesGloss,
+            min = .1f, max = 2f, prefs::setShadesGloss)
+        addSlider(shadesPanel, "Emission", prefs.get().shadesGlow,
+            min = 0f, max = 2f, prefs::setShadesGlow)
+        shadesPanel.addView(text(
+            "Controls real-time height-field lighting, reflections and emissive edges.",
+            11f, secondary
+        ).apply { setPadding(0, dp(7), 0, dp(2)) })
+        root.addView(shadesPanel, LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = dp(12)
+        })
         // Show intensity and flow only where an AGSL shader actually uses them.
 
         gyroPanel = LinearLayout(this).apply {
@@ -1130,9 +1155,11 @@ class MainActivity : Activity() {
         }
         refreshOriginalCards()
         if (::effectPanel.isInitialized) {
-            effectPanel.visibility = if (selected in 0..11 || selected in 13..16 || selected in 52..63)
+            effectPanel.visibility = if (selected in 0..11 || selected in 13..16 || selected in 52..ShadesRenderer.LAST)
                 View.VISIBLE else View.GONE
         }
+        if (::shadesPanel.isInitialized) shadesPanel.visibility =
+            if (ShadesRenderer.isShades(selected)) View.VISIBLE else View.GONE
         if (::starControls.isInitialized) starControls.visibility =
             if (selected == StarWindowRenderer.SCENE_INDEX) View.VISIBLE else View.GONE
         if (::gyroPanel.isInitialized) {

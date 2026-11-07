@@ -1,5 +1,13 @@
 # HALYN Motion
 
+## v0.12.0 — SHADES dimensional material engine
+
+**Eight new procedural live wallpapers** are rendered by a distinct `ShadesRenderer.kt` engine. Instead of adding yet another glow formula to the older shader, SHADES reconstructs normals from animated surface-height functions, computes key/fill lighting and reflective lobes, uses Fresnel edge light, approximates self-shadow and ambient occlusion, then composites analytical emission and colour-graded atmosphere. Materials: **Obsidian Current, Mercury Fold, Opaline Depth, Aurora Satin, Crystal Facets, Abyssal Tide, Molten Veins, and Prismatic Rift.**
+
+Use **SHADES · Material Engine** to select a new material. Under Motion, customize **Surface depth**, **Reflectivity**, and **Emission**, plus existing shader detail (Efficient / Balanced / Cinematic), intensity, speed and gyro. Cinematic adds extra procedural turbulence and caustics. All render inside Android's `RuntimeShader` / live WallpaperService; no camera or screen recording. A cached gradient is used when a software canvas or unsupported GPU cannot execute AGSL.
+
+**Limitations:** The lighting is a deliberately stylized height-field approximation, not physical ray tracing, real environment reflections or a multipass global-illumination solver. Android CI validates Kotlin compilation and APK integrity; actual AGSL execution and thermal performance require phone testing. The prior 28 originals, 4K photo gallery, clocks and removed illustrated poster policy are preserved.
+
 ## v0.11.0 — Shader Studio
 
 The 28 original animated effects now use a redesigned AGSL material and colour compositor, not just revised frame scheduling. Highlights receive filmic tone mapping rather than hard clipping; reflective effects have brighter focused specular light, while atmospheric effects use softer scattering. Palette-tinted shadows, depth lighting, and stable sub-LSB dithering improve dimensionality and gradient quality. Nebula Drift and Neon Ink have optional smooth procedural density. The new **Motion → Shader Detail** control has Efficient, Balanced (default), and Cinematic rendering, with additional noise calculations only in Cinematic. Gallery thumbnails render in Efficient mode to keep scrolling responsive.
