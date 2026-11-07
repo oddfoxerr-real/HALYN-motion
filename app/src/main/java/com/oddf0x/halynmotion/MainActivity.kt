@@ -1373,7 +1373,18 @@ class MainActivity : Activity() {
             )
             clockRenderer.draw(canvas, state)
             renderer.drawForeground(canvas, state, tilt)
-            if (running) postInvalidateDelayed(1000L / state.fps)
+            if (running) {
+                // A motionless photo without a clock needs no redraw loop;
+                // with a clock, repaint only when the displayed second changes.
+                val photoStill = state.preset == PhotoWallpaperStore.SCENE_INDEX &&
+                    state.gyroMode == 0
+                if (!photoStill) {
+                    postInvalidateDelayed(1000L / state.fps)
+                } else if (state.clockStyle != 0) {
+                    val nextSecond = 1_000L - System.currentTimeMillis() % 1_000L
+                    postInvalidateDelayed(nextSecond.coerceAtLeast(16L) + 5L)
+                }
+            }
         }
 
         override fun onTouchEvent(event: MotionEvent): Boolean {

@@ -194,18 +194,87 @@ class HalynRenderer(private val context: Context) {
     private val mountainRenderer = MountainSceneRenderer()
     private val photoRenderer = PhotoWallpaperStore(context.applicationContext)
     private var shaderFailed = false
-    // Mountain and Star Window previews never need AGSL. Creating a shader
-    // for every gallery tile previously caused avoidable startup/GPU work.
-    private val shader: RuntimeShader? by lazy {
-        try {
-            if (Build.VERSION.SDK_INT >= 33) RuntimeShader(AGSL) else null
-        } catch (_: RuntimeException) {
-            null
-        }
-    }
+    private var shader: RuntimeShader? = null
+    private var configuredWidth = -1f
+    private var configuredHeight = -1f
+    private var configuredPreset = -1
+    private var configuredPalette = -1
+    private var configuredColor = 0
+    private var configuredIntensity = Float.NaN
+    private var configuredSpeed = Float.NaN
+
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
         isDither = true
         color = Color.rgb(9, 12, 22)
+    }
+    private val fallbackPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.DITHER_FLAG)
+    private var fallbackShader: android.graphics.LinearGradient? = null
+    private var fallbackHeight = -1f
+    private var fallbackAccent = 0
+    private var fallbackPreset = -1
+
+    /**
+     * Recreate AGSL resources after the wallpaper's hardware surface is lost.
+     * Compilation is lazy and failures fall back to a cached colour gradient.
+     */
+    fun resetHardwareState() {
+        shader = null
+        shaderFailed = false
+        configuredWidth = -1f
+        configuredHeight = -1f
+        configuredPreset = -1
+        configuredPalette = -1
+        configuredColor = 0
+        configuredIntensity = Float.NaN
+        configuredSpeed = Float.NaN
+    }
+
+    private fun currentShader(): RuntimeShader? {
+        if (shaderFailed || Build.VERSION.SDK_INT < 33) return null
+        shader?.let { return it }
+        return try {
+            RuntimeShader(AGSL).also {
+                shader = it
+                configuredPreset = -1
+                configuredWidth = -1f
+            }
+        } catch (_: RuntimeException) {
+            shaderFailed = true
+            null
+        }
+    }
+
+    private fun blendColor(base: Int, accent: Int, weight: Float): Int {
+        val a = 1f - weight
+        return Color.rgb(
+            (Color.red(base) * a + Color.red(accent) * weight).toInt().coerceIn(0, 255),
+            (Color.green(base) * a + Color.green(accent) * weight).toInt().coerceIn(0, 255),
+            (Color.blue(base) * a + Color.blue(accent) * weight).toInt().coerceIn(0, 255)
+        )
+    }
+
+    private fun drawFallback(canvas: Canvas, state: MotionState, width: Float, height: Float) {
+        val accent = if (state.palette == 5) state.customColor
+            else PALETTE_COLORS[state.palette.coerceIn(0, 4)]
+        if (fallbackShader == null || fallbackHeight != height ||
+            fallbackAccent != accent || fallbackPreset != state.preset) {
+            val shift = (state.preset % 4) * .035f
+            fallbackShader = android.graphics.LinearGradient(
+                0f, 0f, 0f, height,
+                intArrayOf(
+                    blendColor(Color.rgb(4, 8, 19), accent, .10f + shift),
+                    blendColor(Color.rgb(16, 19, 34), accent, .29f + shift),
+                    blendColor(Color.rgb(3, 7, 17), accent, .12f + shift)
+                ),
+                floatArrayOf(0f, .48f, 1f),
+                android.graphics.Shader.TileMode.CLAMP
+            )
+            fallbackHeight = height
+            fallbackAccent = accent
+            fallbackPreset = state.preset
+        }
+        fallbackPaint.shader = fallbackShader
+        canvas.drawRect(0f, 0f, width, height, fallbackPaint)
     }
 
     fun draw(
@@ -232,38 +301,61 @@ class HalynRenderer(private val context: Context) {
         }
         val width = canvas.width.coerceAtLeast(1).toFloat()
         val height = canvas.height.coerceAtLeast(1).toFloat()
-        canvas.drawColor(Color.rgb(5, 7, 13))
-        val current = shader
-        if (current != null && !shaderFailed && canvas.isHardwareAccelerated) {
+        // The shader writes every pixel: clearing the canvas first produced
+        // a second expensive full-screen GPU pass on every animated frame.
+        val current = if (canvas.isHardwareAccelerated) currentShader() else null
+        if (current != null) {
             try {
-            current.setFloatUniform("u_resolution", width, height)
-            current.setFloatUniform("u_time", elapsedSeconds)
-            current.setFloatUniform("u_variant", state.preset.toFloat())
-            current.setFloatUniform("u_palette", state.palette.toFloat())
-            current.setFloatUniform("u_customColor",
-                Color.red(state.customColor) / 255f,
-                Color.green(state.customColor) / 255f,
-                Color.blue(state.customColor) / 255f
-            )
-            current.setFloatUniform("u_intensity", state.intensity)
-            current.setFloatUniform("u_speed", state.speed)
-            current.setFloatUniform(
-                "u_touch",
-                if (state.touch) touchX.coerceIn(0f, 1f) else .5f,
-                if (state.touch) touchY.coerceIn(0f, 1f) else .5f
-            )
-            current.setFloatUniform("u_offset", if (state.parallax) offsetX else .5f)
-            current.setFloatUniform("u_gyro", gyro.x, gyro.y)
+                if (configuredWidth != width || configuredHeight != height) {
+                    current.setFloatUniform("u_resolution", width, height)
+                    configuredWidth = width
+                    configuredHeight = height
+                }
+                if (configuredPreset != state.preset) {
+                    current.setFloatUniform("u_variant", state.preset.toFloat())
+                    configuredPreset = state.preset
+                }
+                if (configuredPalette != state.palette) {
+                    current.setFloatUniform("u_palette", state.palette.toFloat())
+                    configuredPalette = state.palette
+                }
+                if (configuredColor != state.customColor) {
+                    current.setFloatUniform(
+                        "u_customColor",
+                        Color.red(state.customColor) / 255f,
+                        Color.green(state.customColor) / 255f,
+                        Color.blue(state.customColor) / 255f
+                    )
+                    configuredColor = state.customColor
+                }
+                if (configuredIntensity != state.intensity) {
+                    current.setFloatUniform("u_intensity", state.intensity)
+                    configuredIntensity = state.intensity
+                }
+                if (configuredSpeed != state.speed) {
+                    current.setFloatUniform("u_speed", state.speed)
+                    configuredSpeed = state.speed
+                }
+                current.setFloatUniform("u_time", elapsedSeconds)
+                current.setFloatUniform(
+                    "u_touch",
+                    if (state.touch) touchX.coerceIn(0f, 1f) else .5f,
+                    if (state.touch) touchY.coerceIn(0f, 1f) else .5f
+                )
+                current.setFloatUniform("u_offset", if (state.parallax) offsetX else .5f)
+                current.setFloatUniform("u_gyro", gyro.x, gyro.y)
                 paint.shader = current
                 canvas.drawRect(0f, 0f, width, height, paint)
                 return
             } catch (_: RuntimeException) {
                 shaderFailed = true
+                shader = null
                 paint.shader = null
-                paint.color = Color.rgb(9, 12, 22)
             }
         }
-        canvas.drawRect(0f, 0f, width, height, paint)
+        // A software preview or unsupported AGSL device must never show an
+        // opaque near-black failure frame.
+        drawFallback(canvas, state, width, height)
     }
 
     fun drawForeground(

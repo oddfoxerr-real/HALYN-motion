@@ -2,6 +2,8 @@ package com.oddf0x.halynmotion
 
 import android.content.SharedPreferences
 import android.graphics.Canvas
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.service.wallpaper.WallpaperService
 import android.view.MotionEvent
@@ -23,8 +25,13 @@ class HalynWallpaperService : WallpaperService() {
         private val spatialTracker = SpatialTracker(this@HalynWallpaperService)
         private val gyroParallax = GyroParallax(this@HalynWallpaperService)
         private val choreographer = Choreographer.getInstance()
+        private val mainHandler = Handler(Looper.getMainLooper())
         private var framePosted = false
+        private var tickPosted = false
         private var lastFrameNs = 0L
+        private var adaptiveFps = 30
+        private var slowFrames = 0
+        private var fastFrames = 0
         private var settings = preferences.get()
         private var visible = false
         private var surfaceReady = false
@@ -37,30 +44,101 @@ class HalynWallpaperService : WallpaperService() {
         private var touchDownY = 0f
         private var touchDownMs = 0L
         private var startTimeMs = SystemClock.uptimeMillis()
-        private val frameCallback = object : Choreographer.FrameCallback {
-            override fun doFrame(frameTimeNanos: Long) {
-                framePosted = false
-                if (!visible || !surfaceReady) return
-                val targetIntervalNs = 1_000_000_000L / settings.fps.coerceIn(15, 60)
-                if (lastFrameNs == 0L || frameTimeNanos - lastFrameNs >= targetIntervalNs - 1_000_000L) {
-                    lastFrameNs = frameTimeNanos
-                    renderFrame()
+
+        private fun isStillPhoto(): Boolean =
+            settings.preset == PhotoWallpaperStore.SCENE_INDEX && settings.gyroMode == 0
+
+        private fun effectiveFps(): Int =
+            minOf(settings.fps, adaptiveFps).coerceIn(24, 60)
+
+        private fun targetIntervalNs(): Long = 1_000_000_000L / effectiveFps()
+
+        private val staticClockTick = Runnable {
+            tickPosted = false
+            if (visible && surfaceReady && isStillPhoto()) scheduleFrame(immediate = true)
+        }
+
+        private fun scheduleStaticClockTick() {
+            if (tickPosted || !visible || !surfaceReady || !isStillPhoto() ||
+                settings.clockStyle == 0) return
+            // Wake at a clock-second boundary, not 30–60 times per second.
+            val untilNextSecond = 1_000L - System.currentTimeMillis() % 1_000L
+            tickPosted = true
+            mainHandler.postDelayed(staticClockTick, untilNextSecond.coerceAtLeast(16L) + 5L)
+        }
+
+        private val frameCallback = Choreographer.FrameCallback { frameTimeNanos ->
+            framePosted = false
+            if (!visible || !surfaceReady) return@FrameCallback
+            lastFrameNs = frameTimeNanos
+            val started = System.nanoTime()
+            renderFrame()
+            observeFrameCost(System.nanoTime() - started)
+            scheduleFrame()
+        }
+
+        private fun observeFrameCost(durationNs: Long) {
+            if (isStillPhoto()) return
+            val budgetNs = targetIntervalNs()
+            if (durationNs > budgetNs * 85L / 100L) {
+                slowFrames++
+                fastFrames = 0
+                if (slowFrames >= 20) {
+                    adaptiveFps = when {
+                        adaptiveFps > 45 -> 45
+                        adaptiveFps > 30 -> 30
+                        else -> 24
+                    }
+                    slowFrames = 0
                 }
-                scheduleFrame()
+            } else {
+                slowFrames = (slowFrames - 2).coerceAtLeast(0)
+                if (durationNs < budgetNs / 2L && adaptiveFps < settings.fps) {
+                    fastFrames++
+                    if (fastFrames >= 300) {
+                        adaptiveFps = when {
+                            adaptiveFps < 30 -> 30
+                            adaptiveFps < 45 -> 45
+                            else -> 60
+                        }.coerceAtMost(settings.fps)
+                        fastFrames = 0
+                    }
+                } else {
+                    fastFrames = 0
+                }
             }
         }
 
         private fun stopFrames() {
             choreographer.removeFrameCallback(frameCallback)
+            mainHandler.removeCallbacks(staticClockTick)
             framePosted = false
+            tickPosted = false
             lastFrameNs = 0L
+            slowFrames = 0
+            fastFrames = 0
+            adaptiveFps = settings.fps.coerceIn(24, 60)
         }
 
-        private fun scheduleFrame() {
-            if (visible && surfaceReady && !framePosted) {
-                framePosted = true
-                choreographer.postFrameCallback(frameCallback)
+        private fun scheduleFrame(immediate: Boolean = false) {
+            if (!visible || !surfaceReady) return
+            if (isStillPhoto() && !immediate && lastFrameNs != 0L) {
+                scheduleStaticClockTick()
+                return
             }
+            if (framePosted) {
+                if (!immediate) return
+                choreographer.removeFrameCallback(frameCallback)
+                framePosted = false
+            }
+            // Queue near the next requested presentation deadline instead of
+            // waking the main thread on every display vsync at lower FPS.
+            val delayMs = if (immediate || lastFrameNs == 0L) 0L else {
+                ((lastFrameNs + targetIntervalNs() - System.nanoTime() -
+                    4_000_000L) / 1_000_000L).coerceAtLeast(0L)
+            }
+            framePosted = true
+            choreographer.postFrameCallbackDelayed(frameCallback, delayMs)
         }
 
         override fun onCreate(surfaceHolder: SurfaceHolder) {
@@ -72,6 +150,7 @@ class HalynWallpaperService : WallpaperService() {
         override fun onSurfaceCreated(holder: SurfaceHolder) {
             super.onSurfaceCreated(holder)
             surfaceReady = true
+            renderer.resetHardwareState()
             refresh()
         }
 
@@ -103,6 +182,7 @@ class HalynWallpaperService : WallpaperService() {
         ) {
             super.onOffsetsChanged(xOffset, yOffset, xOffsetStep, yOffsetStep, xPixelOffset, yPixelOffset)
             offsetX = xOffset.coerceIn(0f, 1f)
+            if (isStillPhoto()) scheduleFrame(immediate = true)
         }
 
         override fun onTouchEvent(event: MotionEvent) {
@@ -167,15 +247,28 @@ class HalynWallpaperService : WallpaperService() {
                     spatialTracker.flyTo(destination)
                 }
             }
+            val previous = settings
             settings = preferences.get()
-            // Dragging the clock updates several preference keys in quick
-            // succession. Do not tear down the animation/sensors per pixel.
-            if (key == "clock_x" || key == "clock_y" ||
-                key == "clock_custom_placement" || key == "clock_font" ||
-                key == "clock_font_revision") {
-                scheduleFrame()
-            } else {
+            if (settings.fps != previous.fps) {
+                adaptiveFps = settings.fps.coerceIn(24, 60)
+                slowFrames = 0
+                fastFrames = 0
+            }
+            val trackerChanged = settings.preset != previous.preset ||
+                settings.gyroMode != previous.gyroMode ||
+                settings.starSensitivity != previous.starSensitivity ||
+                settings.skyAligned != previous.skyAligned ||
+                key == "sky_latitude" || key == "sky_longitude" ||
+                key == "sky_fix_time"
+            if (trackerChanged) {
                 refresh()
+            } else {
+                if (acceptsTouch(settings) != acceptsTouch(previous)) {
+                    setTouchEventsEnabled(acceptsTouch(settings))
+                }
+                // Colour, clock position, frame rate and motion strength
+                // edits are repaint-only: do not restart the sensors.
+                scheduleFrame(immediate = true)
             }
         }
 

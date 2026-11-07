@@ -1,5 +1,16 @@
 # HALYN Motion
 
+## v0.10.1 — Rendering engine optimization
+
+- **Less overdraw:** The AGSL scene paints directly to the wallpaper surface without the redundant full-screen clear that previously preceded it.
+- **Shader uniform caching:** Scene/palette/colour/intensity/speed and resolution are only re-applied on changes. Frame time, parallax and touch uniforms remain live.
+- **Smarter frame pacing:** Uses delayed Choreographer callbacks to target the chosen frame rate (30/45/60 FPS) without waking at every vsync. Automatically steps down when sustained frame processing exceeds the budget, then recovers toward the selected FPS when stable.
+- **Static wallpaper sleep:** An offline photo with gyro switched off draws on demand, or once per second if its clock is enabled. A photo with gyro remains live.
+- **GPU recovery:** Shader state reinitializes with wallpaper surface creation. Shader errors or software canvases show a cached, palette-matched fallback gradient instead of a blank black field.
+- **Smoother controls:** Editing colours, clock positions and intensity repaints without unnecessarily restarting motion sensors. The studio preview also idles for motionless photos.
+
+The 28 HALYN Original abstract effects, online licensed 4K search, live clocks and gyro remain unchanged in content. Build-time Android checks cannot substitute for real GPU frame-time and power measurements on a Samsung device.
+
 Native Android live wallpaper studio with **28 original animated shader wallpapers**, an optional real **licensed online 4K+ photo gallery**, gyro parallax and **5 customizable real-time clock styles**. The illustrated poster packs (cars, flowers, cityscapes, foxes and similar cartoons) are removed.
 
 ## v0.10.0 — HALYN Originals return
