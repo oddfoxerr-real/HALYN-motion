@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.22.1)
+project(halyn_vulkan LANGUAGES CXX)
+add_library(halyn-vulkan SHARED vulkan_bridge.cpp)
+target_compile_features(halyn-vulkan PRIVATE cxx_std_17)
+target_compile_options(halyn-vulkan PRIVATE -Wall -Wextra)
+target_link_libraries(halyn-vulkan PRIVATE vulkan android log)

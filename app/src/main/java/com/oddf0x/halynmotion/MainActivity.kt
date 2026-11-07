@@ -77,6 +77,8 @@ class MainActivity : Activity() {
     private lateinit var palettes: LinearLayout
     private lateinit var frameRates: LinearLayout
     private lateinit var qualityModes: LinearLayout
+    private lateinit var renderEngines: LinearLayout
+    private lateinit var renderEngineStatus: TextView
     private lateinit var activeSceneName: TextView
     private lateinit var activeColourName: TextView
 
@@ -124,6 +126,7 @@ class MainActivity : Activity() {
         refreshPalette()
         refreshFps()
         refreshShaderQuality()
+        refreshRenderEngines()
         refreshClockStyles()
         refreshClockPositions()
         refreshClockFonts()
@@ -272,6 +275,12 @@ class MainActivity : Activity() {
         buildOriginalRail(root, "New motion collection", (52..63).toList())
         root.addView(section("SHADES · Material Engine", "Reflections, simulated surface depth and luminous materials."))
         buildOriginalRail(root, "Dimensional materials", (ShadesRenderer.FIRST..ShadesRenderer.LAST).toList())
+        root.addView(section("Ray-marched scenes", "Dedicated OpenGL ES / Vulkan GPU rendering."))
+        buildOriginalRail(root, "Reflections & depth", (RaymarchScenes.FIRST..RaymarchScenes.LAST).toList())
+        root.addView(text(
+            "Gallery tiles use an approximate Canvas preview. Apply the wallpaper to see direct GPU rendering.",
+            11f, secondary
+        ).apply { setPadding(dp(1), 0, dp(1), dp(12)) })
         buildOriginalRail(root, "Star Window", listOf(StarWindowRenderer.SCENE_INDEX))
 
         root.addView(section("Explore online · 4K+", "Real, licensed images from independent creators."))
@@ -1103,6 +1112,71 @@ class MainActivity : Activity() {
             LinearLayout.LayoutParams(-1, dp(1)).apply { topMargin = dp(7) })
         panel.addView(perfRow)
         root.addView(panel)
+        buildRenderEngineSelection(root)
+    }
+
+    private fun buildRenderEngineSelection(root: LinearLayout) {
+        root.addView(section("Graphics engine", "Choose the API used to render ray-marched live wallpapers."))
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = rounded(cardColor, 22, borderColor)
+            setPadding(dp(15), dp(13), dp(15), dp(15))
+        }
+        renderEngines = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        panel.addView(renderEngines, LinearLayout.LayoutParams(-1, dp(47)))
+        renderEngineStatus = text("", 11f, secondary).apply {
+            setPadding(dp(2), dp(12), dp(2), 0)
+        }
+        panel.addView(renderEngineStatus)
+        root.addView(panel, LinearLayout.LayoutParams(-1, -2))
+    }
+
+    private fun refreshRenderEngines() {
+        if (!::renderEngines.isInitialized) return
+        renderEngines.removeAllViews()
+        val selected = prefs.get().renderBackend
+        val supported = VulkanBridge.supported()
+        val names = listOf("System", "OpenGL ES", "Vulkan")
+        names.forEachIndexed { index, label ->
+            val active = index == selected
+            val enabled = index != 2 || supported
+            val chip = text(label, 11f,
+                if (!enabled) subtle else if (active) backgroundColor else secondary,
+                if (active) Typeface.BOLD else Typeface.NORMAL
+            ).apply {
+                gravity = Gravity.CENTER
+                background = rounded(if (active) ink else Color.rgb(37, 38, 45), 12)
+                isFocusable = enabled
+                isClickable = enabled
+                isEnabled = enabled
+                contentDescription = "$label rendering engine, " +
+                    if (!enabled) "unavailable" else if (active) "selected" else "available"
+                if (enabled) setOnClickListener {
+                    prefs.setRenderBackend(index)
+                    refreshRenderEngines()
+                    preview.invalidate()
+                }
+            }
+            renderEngines.addView(chip, LinearLayout.LayoutParams(0, dp(46), 1f).apply {
+                marginEnd = dp(if (index < 2) 6 else 0)
+            })
+        }
+        val state = prefs.get()
+        renderEngineStatus.text = when {
+            !RaymarchScenes.supports(state.preset) ->
+                "This wallpaper uses the compatible System renderer. OpenGL ES and Vulkan apply to the Ray-marched collection only."
+            state.clockStyle != 0 ->
+                "Live clock is enabled: System rendering is used to preserve clock overlays. Turn off the clock for direct OpenGL ES / Vulkan rendering."
+            selected == 0 ->
+                "System compatibility mode. Select OpenGL ES or Vulkan for direct GPU ray marching."
+            selected == 2 && !supported ->
+                "Vulkan 1.3 dynamic rendering unavailable. HALYN will use the System renderer."
+            else ->
+                "Direct ${names[selected]} rendering when applied. Renderer failure automatically falls back to System."
+        }
     }
 
     private fun buildFooter(root: LinearLayout) {
@@ -1154,12 +1228,14 @@ class MainActivity : Activity() {
                 (prefs.raw.getString("online_resolution", "") ?: "")
         }
         refreshOriginalCards()
+        refreshRenderEngines()
         if (::effectPanel.isInitialized) {
-            effectPanel.visibility = if (selected in 0..11 || selected in 13..16 || selected in 52..ShadesRenderer.LAST)
+            effectPanel.visibility = if (selected in 0..11 || selected in 13..16 || selected in 52..RaymarchScenes.LAST)
                 View.VISIBLE else View.GONE
         }
         if (::shadesPanel.isInitialized) shadesPanel.visibility =
-            if (ShadesRenderer.isShades(selected)) View.VISIBLE else View.GONE
+            if (ShadesRenderer.isShades(selected) || RaymarchScenes.supports(selected))
+                View.VISIBLE else View.GONE
         if (::starControls.isInitialized) starControls.visibility =
             if (selected == StarWindowRenderer.SCENE_INDEX) View.VISIBLE else View.GONE
         if (::gyroPanel.isInitialized) {

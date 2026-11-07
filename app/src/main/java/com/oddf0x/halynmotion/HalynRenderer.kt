@@ -20,6 +20,7 @@ data class MotionState(
     val speed: Float = 1.0f,
     val fps: Int = 30,
     val shaderQuality: Int = 1,
+    val renderBackend: Int = 0,
     val shadesDepth: Float = 1.0f,
     val shadesGloss: Float = 1.0f,
     val shadesGlow: Float = 1.0f,
@@ -74,6 +75,7 @@ class MotionPreferences(context: Context) {
                 else -> 30
             },
             shaderQuality = preferences.getInt("shader_quality", 1).coerceIn(0, 2),
+            renderBackend = preferences.getInt("render_backend", 0).coerceIn(0, 2),
             shadesDepth = float("shades_depth", 1f, .4f, 2.0f),
             shadesGloss = float("shades_gloss", 1f, .1f, 2.0f),
             shadesGlow = float("shades_glow", 1f, 0f, 2.0f),
@@ -107,7 +109,8 @@ class MotionPreferences(context: Context) {
     }
 
     private fun sanitizePreset(value: Int): Int = when {
-        value in 0..20 || value == PhotoWallpaperStore.SCENE_INDEX || value in 52..ShadesRenderer.LAST -> value
+        value in 0..20 || value == PhotoWallpaperStore.SCENE_INDEX ||
+            value in 52..ShadesRenderer.LAST || RaymarchScenes.supports(value) -> value
         else -> 0 // The retired illustrated poster IDs 21–50 must never render.
     }
 
@@ -124,6 +127,8 @@ class MotionPreferences(context: Context) {
     fun setSpeed(value: Float) = preferences.edit().putFloat("speed", value.coerceIn(.25f, 2f)).apply()
     fun setFps(value: Int) = preferences.edit().putInt("fps", value).apply()
     fun setShaderQuality(value: Int) = preferences.edit().putInt("shader_quality", value.coerceIn(0, 2)).apply()
+    fun setRenderBackend(value: Int) = preferences.edit()
+        .putInt("render_backend", value.coerceIn(0, 2)).apply()
     fun setShadesDepth(value: Float) = preferences.edit().putFloat("shades_depth", value.coerceIn(.4f, 2f)).apply()
     fun setShadesGloss(value: Float) = preferences.edit().putFloat("shades_gloss", value.coerceIn(.1f, 2f)).apply()
     fun setShadesGlow(value: Float) = preferences.edit().putFloat("shades_glow", value.coerceIn(0f, 2f)).apply()
@@ -319,6 +324,17 @@ class HalynRenderer(private val context: Context) {
             shadesRenderer.draw(canvas, state, elapsedSeconds, touchX, touchY, offsetX, gyro)
             return
         }
+        if (RaymarchScenes.supports(state.preset)) {
+            // Canvas/preview compatibility. The dedicated Vulkan and OpenGL
+            // renderers activate only when selected and clocks are disabled.
+            // Shader-backed SHADES materials provide a safe fallback.
+            shadesRenderer.draw(
+                canvas,
+                state.copy(preset = ShadesRenderer.FIRST + state.preset - RaymarchScenes.FIRST),
+                elapsedSeconds, touchX, touchY, offsetX, gyro
+            )
+            return
+        }
         val width = canvas.width.coerceAtLeast(1).toFloat()
         val height = canvas.height.coerceAtLeast(1).toFloat()
         // The shader writes every pixel: clearing the canvas first produced
@@ -409,7 +425,7 @@ class HalynRenderer(private val context: Context) {
             "Velvet Flux", "Crystal Current", "Neon Ink", "Zenith Borealis",
             "Quartz Ripple", "Lumen Dusk", "Flux Filament", "Celestial Mist",
             "Liquid Copper", "Polar Halo", "Prism Flow", "Voltage Bloom"
-        ) + ShadesRenderer.SCENES
+        ) + ShadesRenderer.SCENES + RaymarchScenes.NAMES
         val PALETTES = listOf(
             "Arctic", "Ultraviolet", "Ember", "Rose", "Verdant"
         )

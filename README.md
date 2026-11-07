@@ -1,5 +1,17 @@
 # HALYN Motion
 
+## v0.13.0 — Real graphics API selection (A56)
+
+HALYN includes three explicit rendering modes in **Preferences → Graphics engine**:
+
+- **System:** Existing Android Canvas/AGSL path. Compatible with all old wallpapers, the 4K gallery, custom clocks, and the on-device editor.
+- **OpenGL ES 3:** An EGL surface and GLSL ES 3.0 fragment-shader renderer for the new ray-marched Glass Horizon, Liquid Mirror, and Prism Monolith styles.
+- **Vulkan 1.3:** A separate NDK-backed Vulkan swapchain/graphics pipeline using compiled SPIR-V and dynamic rendering. Selectable only when GPU support is detected. It uses the Android wallpaper Surface without adding a second screen overlay.
+
+Direct OpenGL/Vulkan applies to the three **Ray-marched scenes** when the clock overlay is **off**. Other wallpapers (and clock-enabled ray-marched scenes) use the original System backend to preserve existing effects and clock drawing; this fallback is indicated in the settings. GPU initialization/presentation failure also falls back to System. The editor tiles deliberately use a lower-cost Canvas approximation, so apply the wallpaper to see actual native shaders.
+
+These scenes perform limited fragment-shader ray marching and a secondary reflection sample, **not hardware NVIDIA RTX or real-time Vulkan hardware RT acceleration**. The Xclipse 540 in the A56 supports Vulkan and OpenGL ES but does not expose hardware ray-tracing acceleration. Full-resolution ray marching can consume significant GPU power; use Efficient or Balanced shader detail on phones. No root, third-party driver or network connection is needed for native rendering. Android CI checks compilation and bundled SPIR-V, while actual shader appearance, clock fallback, and thermal performance require Samsung device testing.
+
 ## v0.12.0 — SHADES dimensional material engine
 
 **Eight new procedural live wallpapers** are rendered by a distinct `ShadesRenderer.kt` engine. Instead of adding yet another glow formula to the older shader, SHADES reconstructs normals from animated surface-height functions, computes key/fill lighting and reflective lobes, uses Fresnel edge light, approximates self-shadow and ambient occlusion, then composites analytical emission and colour-graded atmosphere. Materials: **Obsidian Current, Mercury Fold, Opaline Depth, Aurora Satin, Crystal Facets, Abyssal Tide, Molten Veins, and Prismatic Rift.**
