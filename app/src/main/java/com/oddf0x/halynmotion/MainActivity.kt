@@ -78,6 +78,7 @@ class MainActivity : Activity() {
     private lateinit var frameRates: LinearLayout
     private lateinit var qualityModes: LinearLayout
     private lateinit var activeSceneName: TextView
+    private lateinit var activeMechanicDescription: TextView
     private lateinit var activeColourName: TextView
 
     private val backgroundColor = Color.rgb(10, 11, 14)
@@ -193,9 +194,11 @@ class MainActivity : Activity() {
         }
         activeSceneName = text("", 24f, ink, Typeface.BOLD)
         foot.addView(activeSceneName)
-        foot.addView(text("Live originals · 4K photos · Clock & motion", 12f, Color.rgb(205, 205, 215)).apply {
-            setPadding(0, dp(4), 0, 0)
-        })
+        activeMechanicDescription = text("", 12f, Color.rgb(205, 205, 215)).apply {
+            setPadding(0, dp(5), 0, 0)
+            maxLines = 3
+        }
+        foot.addView(activeMechanicDescription)
         shell.addView(foot, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
 
         val density = resources.displayMetrics
@@ -220,7 +223,8 @@ class MainActivity : Activity() {
                 clipToOutline = true
                 isClickable = true
                 isFocusable = true
-                contentDescription = "Select ${HalynRenderer.PRESETS[index]} animated wallpaper"
+                contentDescription = "Select ${HalynRenderer.PRESETS[index]} animated wallpaper. " +
+                    (SmoothWallpaperRenderer.mechanicDescription(index) ?: "HALYN original effect")
                 setOnClickListener {
                     prefs.setPreset(index)
                     refreshScene()
@@ -1155,6 +1159,11 @@ class MainActivity : Activity() {
             selected == PhotoWallpaperStore.SCENE_INDEX -> "Choose a 4K wallpaper"
             else -> HalynRenderer.PRESETS.getOrElse(selected) { "HALYN Original" }
         }
+        if (::activeMechanicDescription.isInitialized) {
+            activeMechanicDescription.text =
+                SmoothWallpaperRenderer.mechanicDescription(selected)
+                    ?: "Live originals · 4K photography · Clock & motion"
+        }
         if (::onlineCredit.isInitialized) {
             onlineCredit.visibility =
                 if (selected == PhotoWallpaperStore.SCENE_INDEX && !source.isNullOrBlank())
@@ -1452,7 +1461,10 @@ class MainActivity : Activity() {
                 (SystemClock.uptimeMillis() - startTime) / 1000f,
                 touchX, touchY,
                 starPose = if (state.preset == StarWindowRenderer.SCENE_INDEX) previewTracker.pose() else null,
-                gyro = tilt
+                gyro = tilt,
+                touchForce = if (state.touch && pointerDownMs > 0L)
+                    (1f - (SystemClock.uptimeMillis() - pointerDownMs) / 2400f).coerceIn(0f, 1f)
+                else 0f
             )
             clockRenderer.draw(canvas, state)
             renderer.drawForeground(canvas, state, tilt)
@@ -1474,7 +1486,8 @@ class MainActivity : Activity() {
             // Do not intercept taps or scrolling in the Star Window preview
             // when the user prefers a passive live wallpaper.
             val state = prefs.get()
-            if (state.preset == StarWindowRenderer.SCENE_INDEX && !state.starTapTravel) {
+            if ((state.preset == StarWindowRenderer.SCENE_INDEX && !state.starTapTravel) ||
+                (state.preset != StarWindowRenderer.SCENE_INDEX && !state.touch)) {
                 return false
             }
             when (event.actionMasked) {

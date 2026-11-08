@@ -330,7 +330,10 @@ class HalynWallpaperService : WallpaperService() {
                     (startedMs - startTimeMs) / 1000f,
                     touchX, touchY, offsetX,
                     if (settings.preset == StarWindowRenderer.SCENE_INDEX) spatialTracker.pose() else null,
-                    gyro = tilt
+                    gyro = tilt,
+                    touchForce = if (settings.touch && touchDownMs > 0L)
+                        (1f - (startedMs - touchDownMs) / 2400f).coerceIn(0f, 1f)
+                    else 0f
                 )
                 clockRenderer.draw(canvas, settings)
                 // Reuse the exact same gyro pose for background/foreground;

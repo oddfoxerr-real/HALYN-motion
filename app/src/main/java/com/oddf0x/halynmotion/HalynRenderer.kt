@@ -302,7 +302,8 @@ class HalynRenderer(private val context: Context) {
         touchY: Float = .5f,
         offsetX: Float = .5f,
         starPose: StarPose? = null,
-        gyro: ParallaxPose = ParallaxPose()
+        gyro: ParallaxPose = ParallaxPose(),
+        touchForce: Float = 0f
     ) {
         if (state.preset == StarWindowRenderer.SCENE_INDEX) {
             starRenderer.draw(canvas, state, elapsedSeconds, starPose ?: StarPose())
@@ -317,7 +318,9 @@ class HalynRenderer(private val context: Context) {
             return
         }
         if (SmoothWallpaperRenderer.isSmooth(state.preset)) {
-            smoothRenderer.draw(canvas, state, elapsedSeconds, touchX, touchY, offsetX, gyro)
+            smoothRenderer.draw(
+                canvas, state, elapsedSeconds, touchX, touchY, offsetX, gyro, touchForce
+            )
             return
         }
         val width = canvas.width.coerceAtLeast(1).toFloat()

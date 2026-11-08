@@ -52,17 +52,21 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='21'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='22'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.16.0-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.16.0-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.17.0-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.17.0-preview.apk > SHA256SUMS.txt)
 
       - name: Verify curated wallpaper collection
         shell: bash
         run: |
           set -euo pipefail
           grep -q 'const val COUNT = 30' app/src/main/java/com/oddf0x/halynmotion/SmoothWallpaperRenderer.kt
+          grep -q 'require(MECHANICS.map { it.code }.distinct().size == COUNT)' app/src/main/java/com/oddf0x/halynmotion/SmoothWallpaperRenderer.kt
+          grep -q 'float4 motion=dynamics' app/src/main/java/com/oddf0x/halynmotion/SmoothWallpaperRenderer.kt
+          grep -q 'u_model' app/src/main/java/com/oddf0x/halynmotion/SmoothWallpaperRenderer.kt
+          grep -q 'touchForce = if' app/src/main/java/com/oddf0x/halynmotion/HalynWallpaperService.kt
           test ! -e app/src/main/java/com/oddf0x/halynmotion/ShadesRenderer.kt
           grep -q 'buildOriginalRail(root, "The classics"' app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
           grep -q 'buildOriginalRail(root, "Original motion collection"' app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
@@ -88,42 +92,42 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.16.0 Originals Restored
+      - name: Publish HALYN v0.17.0 Distinct Shader Mechanics
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.16.0-preview.1
+          TAG: v0.17.0-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.16.0-preview.apk
-          unzip -t dist/HALYN-Motion-v0.16.0-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.17.0-preview.apk
+          unzip -t dist/HALYN-Motion-v0.17.0-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN Motion v0.16.0 — Originals Restored + 30 New Shaders
+          # HALYN v0.17.0 — Independent Wallpaper Mechanics
 
-          Fixes the v0.15.0 regression that removed the original shader
-          collection rather than adding to it.
-
-          - Restores all 28 original animated HALYN shaders at their
-            original preset IDs (0-11, 13-16, 52-63), including the
-            original filmic AGSL rendering engine.
-          - Replaces the thirty v0.15.0 material, nature, and architectural
-            wallpaper designs with thirty separately authored abstract,
-            fluid, optical, cosmic, electrical and geometric motion effects.
-          - The new effects are inspired by HALYN's signature smooth,
-            luminous motion language, not recolours of existing shaders.
-          - Both collections appear independently in the Gallery.
-          - Keeps the four mountain scenes, Star Window, licensed 4K
-            photo gallery, local imports, clock fonts/placement and gyro.
-          - Previously saved original preset selections work again.
-          - Retired flat-colour SHADES material engine stays removed.
-          - Runtime AGSL quality and battery performance still require
-            device testing on Galaxy A56.
+          - Preserves all 28 original HALYN shaders at their original IDs.
+          - Each of the 30 new shaders has its own dynamic field, motion
+            profile, phase behaviour, speed and interaction response.
+          - Five distinct material renderers: fluid, optical/refraction,
+            atmospheric space, electrical energy and structured geometry.
+          - Real-time mechanics include reflected wave interference,
+            vortex advection, braided currents, lens caustics, orbital
+            shear, expanding pressure fronts, electrical conduction
+            sequences, resonant membrane impacts and folding geometry.
+          - A short description of each new effect's distinct mechanics
+            appears under the wallpaper preview.
+          - Touch is now a transient 2.4-second force in the new effects,
+            decaying after interaction rather than glowing permanently.
+          - Preserves mountains, Star Window, existing photo/4K galleries,
+            adjustable clock and gyro, frame pacing and prior presets.
+          - No OpenGL or Vulkan engine selectors or native rendering library.
+          - Debug-signed preview. Runtime AGSL shader compilation and device
+            thermals still require Galaxy A56 testing.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.16.0-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.17.0-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.16.0 — 28 Originals + 30 New Motion Effects" \
+            --title "HALYN Motion v0.17.0 — Distinct Shader Mechanics" \
             --notes-file notes.md --prerelease

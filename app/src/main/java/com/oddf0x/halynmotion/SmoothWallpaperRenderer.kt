@@ -54,6 +54,58 @@ class SmoothWallpaperRenderer {
         Scene("Infinite Weave", "Geometric motion", 0xFF375F89.toInt(), 0xFF9EC4F0.toInt(), 0xFF07132C.toInt(), 0xFFDDE7FF.toInt(), 0.36f, 0f, "float4 surface(float2 p,float t) {\nfloat2 q=p*float2(.82,1.23);\nfloat a=atan(q.y,q.x),r=length(q);\nfloat lem=sin(2.0*a)*r-.20*sin(t*.12);\nfloat weave=sin(22.0*lem+3.0*sin(r*5.0-t*.23));\nfloat local=exp(-5.0*abs(lem));\nreturn float4(.39+.24*weave*local,.25+.68*local,.49*pow(max(0.0,weave),7.0)*local,.22+.66*local);\n}")
         )
         fun isSmooth(value: Int): Boolean = value in FIRST..LAST
+
+        /**
+         * A unique motion field per scene. These are shader mechanisms,
+         * not palette variants: every effect displaces, phases and emits
+         * light through a different equation and interaction response.
+         */
+        data class Mechanic(
+            val name: String,
+            val explanation: String,
+            val materialModel: Int,
+            val playbackRate: Float,
+            val code: String
+        )
+        val MECHANICS = listOf(
+        Mechanic("Ripple Cadence", "Two travelling wavefronts form and cancel moving interference rings.", 0, 0.88f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float2 a=p-float2(-.20,.12),b=p-float2(.26,-.16);\nfloat ra=max(length(a),.001),rb=max(length(b),.001);\nfloat pulse=sin(22.0*ra-t*1.7)+.7*sin(19.0*rb+t*1.2);\nfloat2 dir=a/ra+b/rb;\nfloat impulse=force*exp(-12.0*length(p-tap))*sin(t*7.0);\nreturn float4(dir*.014*pulse+dir*.04*impulse,sin(ra*9.0-rb*4.0)*.12,.21*abs(pulse)+.22*abs(impulse)); }"),
+        Mechanic("Helix Undertow", "Counter-rotating strands braid, shear and exchange their depth.", 0, 0.7f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float y=p.y*6.4-t*.48;\nfloat strand=sin(y),twist=cos(y);\nfloat2 displacement=float2(.11*strand*cos(t*.12),.045*twist);\nfloat crossing=sin(y*2.0+t*.17);\nfloat attract=force*exp(-15.0*length(p-tap));\nreturn float4(displacement+float2(-attract*.05,attract*.08),crossing*.33,.23*pow(max(0.0,crossing),4.0)); }"),
+        Mechanic("Viscous Portal", "An inward vortex advects thick ribbons toward its moving core.", 0, 0.61f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float2 q=p+float2(.02*sin(t*.11),-.01*cos(t*.09));\nfloat radius=max(length(q),.03);\nfloat angular=t*.15+1.3/(.28+radius);\nfloat2 rotational=float2(-q.y,q.x)*(.12/(.3+radius))*sin(angular);\nfloat suction=-q*(.11/(.5+radius));\nfloat touch=force*exp(-8.0*length(p-tap));\nreturn float4(rotational+suction+touch*float2(.08,-.03),angular*.14,.12/(1.0+radius)); }"),
+        Mechanic("Mirror Interference", "Opposing waves reflect across a central mirror and phase-cancel.", 0, 1.07f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float edge=abs(p.x);\nfloat arriving=sin(19.0*edge-t*.73+p.y*5.0);\nfloat departing=sin(19.0*edge+t*.73-p.y*5.0);\nfloat standing=arriving+departing;\nfloat signX=p.x/sqrt(p.x*p.x+.0004);\nfloat touch=force*exp(-16.0*length(p-tap));\nreturn float4(signX*.028*standing+touch*.025,.025*(arriving-departing),sin(standing)*.18,.18*abs(standing)); }"),
+        Mechanic("Pressure Lines", "Two shear layers deform streamlines without a flat texture overlay.", 0, 0.64f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float2 a=p+float2(.17*sin(p.y*3.0+t*.14),0.0);\nfloat curl=sin(a.y*7.0-t*.4)*cos(a.x*4.0);\nfloat2 field=float2(.08*curl,-.045*sin(a.x*7.0+t*.3));\nfloat push=force*exp(-9.0*length(p-tap));\nreturn float4(field+push*(p-tap)*.11,curl*.21,.16*abs(curl)); }"),
+        Mechanic("Current Fold", "A continuous sheet folds over itself with a travelling crease.", 0, 0.75f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float folded=sin(p.y*3.8-t*.32);\nfloat flap=sin(p.x*8.2+folded*2.6+t*.13);\nfloat fold=exp(-12.0*abs(flap));\nfloat touch=force*exp(-12.0*length(p-tap));\nreturn float4(.09*folded+.055*fold,touch*.1+.025*flap,fold*.3,.24*fold); }"),
+        Mechanic("Glass Caustics", "Moving curved lenses focus refracted light into drifting caustics.", 1, 0.68f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float2 wave=float2(sin(p.y*7.0+t*.32),cos(p.x*6.0-t*.27));\nfloat focus=sin(p.x*14.0+wave.x*1.7)*cos(p.y*13.0+wave.y*1.4);\nfloat taplens=force*exp(-13.0*length(p-tap));\nreturn float4(.045*wave+.04*taplens*(p-tap),focus*.11,.40*pow(max(focus,0.0),5.0)+.1*taplens); }"),
+        Mechanic("Refractive Helix", "A rotating optical helix bends the background through its depth.", 1, 0.83f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float radius=max(length(p),.05),a=atan(p.y,p.x);\nfloat phase=a*4.0+radius*18.0-t*.58;\nfloat twist=sin(phase);\nfloat2 tangent=float2(-p.y,p.x)/radius;\nfloat proximity=force*exp(-9.0*length(p-tap));\nreturn float4(tangent*.075*twist+proximity*.025,.18*cos(phase),.22*pow(abs(twist),4.0)); }"),
+        Mechanic("Prism Diffusion", "Spectral bands separate and recombine as a prism slowly rotates.", 1, 0.58f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float angle=t*.1;\nfloat2 axis=float2(cos(angle),sin(angle));\nfloat projection=dot(p,axis);\nfloat dispersion=sin(projection*19.0+t*.38);\nfloat split=sin((p.x*axis.y-p.y*axis.x)*13.0-t*.24);\nfloat forceLens=force*exp(-17.0*length(p-tap));\nreturn float4(axis*.065*dispersion+float2(-axis.y,axis.x)*.03*split,\n    forceLens*.13,.3*pow(max(0.0,dispersion*split),3.0)); }"),
+        Mechanic("Phase Lens", "A breathing lens alternates focus and defocus with a soft meniscus.", 1, 0.66f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float2 q=p-float2(.03*sin(t*.12),.03*cos(t*.11));\nfloat radius=max(length(q),.03),breath=sin(t*.44);\nfloat focus=(.045+.035*breath)/(radius+.2);\nfloat disturb=force*exp(-10.0*length(p-tap));\nreturn float4(-q*focus+disturb*q*.10,.12*breath,.34*exp(-22.0*abs(radius-.35-.03*breath))); }"),
+        Mechanic("Lumen Chamber", "An iris-like chamber opens in timed cycles and reflects its rim.", 1, 0.53f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float2 q=p;\nfloat a=atan(q.y,q.x),r=length(q);\nfloat shutter=.5+.5*sin(t*.35);\nfloat blade=sin(a*8.0+t*.12);\nfloat opening=.26+.09*shutter+.025*blade;\nfloat rim=exp(-17.0*abs(r-opening));\nreturn float4(-q*.055*(1.0-shutter)+force*(p-tap)*.03,.24*(1.0-shutter),.32*rim); }"),
+        Mechanic("Chroma Shell", "Two floating refractive bubbles orbit, approach and separate.", 1, 0.72f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float2 a=float2(-.19+.10*sin(t*.21),.08*cos(t*.23));\nfloat2 b=float2(.20+.11*cos(t*.18),.11*sin(t*.19));\nfloat da=length(p-a),db=length(p-b);\nfloat influence=exp(-10.0*da)+exp(-10.0*db);\nfloat2 bend=float2(sin(da*15.0),cos(db*14.0));\nreturn float4(.045*bend*influence+force*(p-tap)*.07,.16*(da-db),.30*influence); }"),
+        Mechanic("Accretion Band", "Inner orbital layers rotate faster than outer material.", 2, 0.58f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float2 q=p;\nfloat radius=max(length(q),.10),a=atan(q.y,q.x);\nfloat orbit=t*.40/(.38+radius*1.5);\nfloat2 tang=float2(-q.y,q.x)*(.09/(radius+.24));\nfloat hotspot=exp(-11.0*abs(radius-.4));\nreturn float4(tang*sin(orbit+a),orbit*.22+force*.09,.22*hotspot*(.5+.5*sin(a*5.0-orbit))); }"),
+        Mechanic("Void Echo", "Concentric shock fronts expand, fade and repeat into darkness.", 2, 0.81f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float r=length(p),wave=sin(17.0*r-t*1.1);\nfloat envelope=exp(-1.9*r);\nfloat2 radial=p/sqrt(r*r+.002);\nfloat touchRing=force*exp(-20.0*abs(length(p-tap)-.23));\nreturn float4(radial*.045*wave*envelope,wave*.16,.32*pow(max(wave,0.0),6.0)*envelope+.2*touchRing); }"),
+        Mechanic("Distant Bloom", "A volumetric-looking cloud blooms through two independently evolving fields.", 2, 0.44f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float a=snoise(p*3.4+float2(t*.025,-t*.019));\nfloat b=snoise(p*6.3+float2(-t*.021,t*.014));\nfloat grow=.5+.5*sin(t*.25);\nfloat2 drift=float2(a-.5,b-.5)*.085*grow;\nfloat halo=exp(-2.0*length(p))*a*b;\nreturn float4(drift,grow*.23,.22*pow(max(halo,0.0),2.0)+force*.1*exp(-10.0*length(p-tap))); }"),
+        Mechanic("Event Ribbons", "Ribbons bend around a gravitational focus with different trajectories.", 2, 0.73f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float2 q=p-float2(.02,-.07);\nfloat r=max(length(q),.08),a=atan(q.y,q.x);\nfloat2 tangent=float2(-q.y,q.x)/r;\nfloat bend=.06/(.12+r*r);\nfloat spiral=sin(6.0*a+13.0*r-t*.42);\nfloat response=force*exp(-13.0*length(p-tap));\nreturn float4(tangent*bend*spiral+q*.02*response,spiral*.17,.19*exp(-5.0*r)*abs(spiral)); }"),
+        Mechanic("Parallax Nebula", "Three cloud depths drift independently, with gyro-driven perspective.", 2, 0.57f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float n1=snoise(p*2.6+float2(t*.018,-t*.024));\nfloat n2=snoise(p*4.2+float2(-t*.023,t*.015));\nfloat n3=snoise(p*7.6+float2(t*.011,t*.008));\nfloat2 offset=float2(n1-n2,n3-n1)*.11;\nfloat swirl=n2*.4+n3*.6;\nreturn float4(offset,swirl*.21,.20*pow(max(n1*n2,0.0),2.0)+force*.06); }"),
+        Mechanic("Cosmic Aperture", "A rotating nine-bladed aperture contracts and reveals deep layers.", 2, 0.62f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float r=length(p),a=atan(p.y,p.x);\nfloat petals=sin(a*9.0+t*.23);\nfloat shutter=.5+.5*sin(t*.34);\nfloat size=.27+.09*shutter+.05*petals;\nfloat edge=exp(-24.0*abs(r-size));\nreturn float4(p*.045*(1.0-shutter),petals*.18,.28*edge+.05*force); }"),
+        Mechanic("Ion Threads", "Charged filaments branch and flicker at changing junctions.", 3, 1.18f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float a=sin(p.y*15.0-t*.83),b=cos(p.x*9.0+t*.61);\nfloat fil=sin(p.x*20.0+2.0*a+b);\nfloat branch=exp(-20.0*abs(fil));\nfloat snap=.5+.5*sin(t*12.0+p.y*7.0);\nreturn float4(.034*a,.031*b,fil*.14,.42*branch*snap+.30*force*exp(-8.0*length(p-tap))); }"),
+        Mechanic("Plasma Convergence", "Seven plasma streams focus energy into a pulsing central core.", 3, 0.88f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float r=max(length(p),.04),a=atan(p.y,p.x);\nfloat rays=pow(max(0.0,cos(7.0*a-r*6.0+t*.36)),12.0);\nfloat converge=.5+.5*cos(t*.78);\nfloat2 inward=-p*(.085/(r+.4))*converge;\nreturn float4(inward,rays*.1,.39*rays*exp(-3.0*r)+.30*converge*exp(-8.0*r)); }"),
+        Mechanic("Flux Cascade", "Charged current drops through a descending cascade of vortex eddies.", 3, 0.79f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float2 q=p+float2(t*.013,-t*.081);\nfloat vortex=snoise(q*float2(3.0,6.8));\nfloat2 fall=float2(.055*sin(q.y*8.0+vortex*3.0),-.09+.04*cos(q.x*7.0));\nfloat pulse=.5+.5*sin(t*2.5+p.y*17.0);\nreturn float4(fall,.15*vortex,.25*pulse*pow(vortex,3.0)+.12*force); }"),
+        Mechanic("Electric Lacing", "A woven arc network transfers light between crossings in sequences.", 3, 0.94f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float2 q=p*float2(10.0,11.0);\nfloat node=sin(q.x+t*.55)*sin(q.y-t*.41);\nfloat conduction=.5+.5*sin((q.x+q.y)*.7-t*1.1);\nfloat crossing=pow(max(0.0,node),5.0);\nfloat2 weave=float2(.025*sin(q.y+t*.2),.025*cos(q.x-t*.16));\nreturn float4(weave,node*.16,.42*crossing*conduction+.10*force); }"),
+        Mechanic("Arc Reservoir", "A resonant arc ring charges, discharges and recovers cyclically.", 3, 0.65f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float r=length(p*float2(.84,1.17)),a=atan(p.y,p.x);\nfloat charge=pow(.5+.5*sin(t*1.35),2.0);\nfloat ring=exp(-25.0*abs(r-.33));\nfloat filament=sin(a*16.0-t*.39);\nreturn float4(p*.018*(1.0-charge),.2*charge,.52*ring*charge*(.5+.5*filament)+.2*force*ring); }"),
+        Mechanic("Magnetic Pulse", "Moving magnetic field lines compress and release in successive waves.", 3, 0.87f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float r=length(p),angle=atan(p.y,p.x);\nfloat polarity=cos(angle*4.0+t*.19);\nfloat compression=sin(27.0*r-t*1.25);\nfloat2 radial=p/sqrt(r*r+.001);\nfloat touch=force*exp(-17.0*length(p-tap));\nreturn float4(radial*.05*compression*polarity+touch*.03,compression*.12,.27*pow(max(0.0,compression),6.0)); }"),
+        Mechanic("Gyroid Passage", "A three-axis gyroid lattice appears to rotate through a tunnel.", 4, 0.62f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float2 q=p;\nfloat angle=t*.19;\nfloat2 rotate=float2(q.x*cos(angle)-q.y*sin(angle),q.x*sin(angle)+q.y*cos(angle));\nfloat lattice=sin(rotate.x*8.0)*cos(rotate.y*8.0);\nfloat tunnel=exp(-1.5*length(q));\nreturn float4((rotate-q)*.33,lattice*.15,.23*tunnel*pow(max(lattice,0.0),5.0)); }"),
+        Mechanic("Elastic Membrane", "A tensioned membrane propagates damped impact waves from touch.", 4, 0.73f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float r=length(p-tap);\nfloat phase=r*25.0-t*3.0;\nfloat ripple=force*exp(-r*3.1)*sin(phase);\nfloat2 radial=(p-tap)/sqrt(r*r+.003);\nfloat oscillation=sin(p.x*7.0+t*.49)*cos(p.y*5.0-t*.22);\nreturn float4(radial*.12*ripple,.14*oscillation+.21*ripple,.24*abs(ripple)); }"),
+        Mechanic("Sonic Contours", "Intersecting standing-wave harmonics create wandering nodal contours.", 4, 0.97f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float modeA=sin(p.x*12.0)*sin(t*.78+p.y*5.0);\nfloat modeB=cos(p.y*16.0)*cos(t*.53-p.x*3.0);\nfloat beat=modeA+modeB;\nfloat node=exp(-15.0*abs(beat));\nreturn float4(.031*modeA,.029*modeB,.18*beat,.30*node); }"),
+        Mechanic("Folded Continuum", "Space reflects across alternating fold boundaries as they travel.", 4, 0.49f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float fold=sin(p.x*7.0+t*.23)+.3*cos(p.y*6.0-t*.17);\nfloat mirrored=abs(fold);\nfloat crease=exp(-12.0*abs(fold));\nfloat2 warp=float2(.06*(mirrored-.4),.035*sin(p.y*6.0+t*.19));\nreturn float4(warp,crease*.22,.30*crease+.13*force); }"),
+        Mechanic("Morphing Torus", "A toroidal ring breathes and pinches around travelling lobes.", 4, 0.64f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float r=length(p*float2(1.13,.89)),a=atan(p.y,p.x);\nfloat breath=.5+.5*sin(t*.65);\nfloat pinch=sin(a*6.0-t*.34);\nfloat ring=exp(-18.0*abs(r-.33-.05*pinch-.035*breath));\nreturn float4(p*.07*pinch,.18*breath+.12*pinch,.28*ring); }"),
+        Mechanic("Infinite Weave", "Two looped strands exchange over-under depth at successive crossings.", 4, 0.76f, "float4 dynamics(float2 p,float t,float2 tap,float force) { float2 q=p;\nfloat a=atan(q.y,q.x),r=length(q);\nfloat over=sin(2.0*a+t*.35),under=sin(3.0*a-t*.26);\nfloat crossing=sin(22.0*r+over*2.0-under*1.5);\nfloat knot=exp(-9.0*abs(over-under));\nreturn float4(float2(-q.y,q.x)*.04*(over-under),crossing*.14,.27*knot*pow(max(crossing,0.0),2.0)); }")
+        )
+        init {
+            require(SCENES.size == COUNT && MECHANICS.size == COUNT)
+            require(SCENES.indices.all { SCENES[it].name == MECHANICS[it].name })
+            require(MECHANICS.map { it.code }.distinct().size == COUNT)
+        }
+        fun mechanicDescription(preset: Int): String? =
+            if (isSmooth(preset)) MECHANICS[preset - FIRST].explanation else null
     }
 
     private val shaderCache = object : LinkedHashMap<Int, RuntimeShader>(6, .75f, true) {
@@ -73,18 +125,24 @@ class SmoothWallpaperRenderer {
     }
 
     fun draw(canvas: Canvas, state: MotionState, time: Float,
-             touchX: Float, touchY: Float, offsetX: Float, pose: ParallaxPose) {
+             touchX: Float, touchY: Float, offsetX: Float, pose: ParallaxPose,
+             touchForce: Float = 0f) {
         val index = (state.preset - FIRST).coerceIn(0, COUNT - 1)
         val spec = SCENES[index]
+        val mechanic = MECHANICS[index]
         val w = canvas.width.coerceAtLeast(1).toFloat()
         val h = canvas.height.coerceAtLeast(1).toFloat()
         if (Build.VERSION.SDK_INT >= 33 && canvas.isHardwareAccelerated && index !in failed) {
             try {
-                val shader = shaderCache[index] ?: RuntimeShader(PREFIX + spec.field + SUFFIX).also {
+                val shader = shaderCache[index] ?: RuntimeShader(PREFIX + mechanic.code + spec.field + SUFFIX).also {
                     shaderCache[index] = it
                 }
                 shader.setFloatUniform("u_resolution", w, h)
-                shader.setFloatUniform("u_time", time * (.33f + state.speed * .67f))
+                shader.setFloatUniform(
+                    "u_time", time * mechanic.playbackRate * (.33f + state.speed * .67f)
+                )
+                shader.setFloatUniform("u_model", mechanic.materialModel.toFloat())
+                shader.setFloatUniform("u_touch_force", touchForce.coerceIn(0f, 1f))
                 shader.setFloatUniform("u_quality", state.shaderQuality.toFloat())
                 shader.setFloatUniform("u_intensity", state.intensity.coerceIn(.35f, 2.3f))
                 shader.setFloatUniform("u_depth", state.shadesDepth.coerceIn(.4f, 2f))
@@ -146,6 +204,8 @@ uniform float u_gloss;
 uniform float u_emission;
 uniform float u_roughness;
 uniform float u_metallic;
+uniform float u_model;
+uniform float u_touch_force;
 
 float hash21(float2 p) {
     return fract(sin(dot(p, float2(127.1,311.7))) * 43758.5453);
@@ -171,12 +231,16 @@ half4 main(float2 frag) {
     float size=min(res.x,res.y);
     float2 p=(frag-res*.5)/size-u_parallax*float2(.06,.045);
     float t=u_time;
-    float4 s=surface(p,t);
+    float2 touch=(u_touch-.5)*res/size;
+    float4 motion=dynamics(p,t,touch,u_touch_force);
+    float2 warped=p+motion.xy;
+    float phase=t+motion.z;
+    float4 s=surface(warped,phase);
     float eps=max(1.0/size,.0028);
     if (u_quality < .5) eps*=1.65;
     float2 slope=float2(
-        surface(p+float2(eps,0.0),t).x-s.x,
-        surface(p+float2(0.0,eps),t).x-s.x)/eps;
+        surface(warped+float2(eps,0.0),phase).x-s.x,
+        surface(warped+float2(0.0,eps),phase).x-s.x)/eps;
     float3 normal=normalize(float3(-slope*u_depth*.28,1.0));
     float3 view=normalize(float3(-p.x*.23,-p.y*.23,1.55));
     float3 key=normalize(float3(-.51,-.67,1.0));
@@ -190,20 +254,47 @@ half4 main(float2 frag) {
         mix(8.0,60.0,1.0-rough));
     float fresnel=pow(1.0-clamp(dot(normal,view),0.0,1.0),5.0);
     float shadow=clamp(.58+normal.z*.42-length(slope)*.017,.34,1.0);
-    float2 touch=(u_touch-.5)*res/size;
-    float touchGlow=exp(-12.0*length(p-touch))*.035;
+    float touchGlow=exp(-12.0*length(p-touch))*.12*u_touch_force;
     float heightFade=smoothstep(-.72,.75,p.y);
     float atmosphere=exp(-3.0*length(p-float2(.14,-.18)));
     float3 bg=u_sky*(.65+.31*heightFade)+u_light*(.045+.082*atmosphere);
     float3 material=mix(u_base,u_second,clamp(s.w,0.0,1.0));
     float3 ambient=mix(u_light,u_tint,.09);
+    float coverage=clamp(s.y,0.0,1.0);
     float3 lit=material*(.27+diffuse*.64+bounce*.19)*shadow;
     lit+=ambient*(.11*diffuse+.043*bounce);
     float3 reflection=mix(u_light,u_second,.34)*spec*(.48+.72*u_metallic);
     reflection+=u_light*other*.13;
     lit+=reflection*(.65+.45*u_gloss);
     lit+=u_second*fresnel*(.16+.44*u_metallic);
-    float3 col=mix(bg,lit,clamp(s.y,0.0,1.0));
+    float3 col=mix(bg,lit,coverage);
+
+    // Each collection has a distinct material response; motion.glow
+    // originates inside the scene-specific mechanics shader.
+    if (u_model < .5) {
+        // Fluid: diffused inner light and broad liquid highlights.
+        col+=u_second*pow(max(0.0,diffuse),4.0)*.07*coverage;
+        col+=u_light*motion.w*.22;
+    } else if (u_model < 1.5) {
+        // Optics: environment refraction and focused caustics.
+        float lens=clamp(length(motion.xy)*6.0,0.0,1.0);
+        col=mix(col,bg+u_second*.16,lens*.28);
+        col+=u_light*(.16*fresnel+.42*motion.w)*(1.0-rough*.42);
+    } else if (u_model < 2.5) {
+        // Space: depth-fog scattering and independent luminous strata.
+        col=mix(col,bg+material*.34,.18*(1.0-coverage));
+        col+=u_second*motion.w*.68;
+        col*=.88+.12*atmosphere;
+    } else if (u_model < 3.5) {
+        // Energy: arc emission and charge flashes, not a generic glow.
+        col=col*.77+u_second*(motion.w*.85)+u_light*motion.w*.45;
+        col+=u_base*pow(max(0.0,diffuse),8.0)*.14;
+    } else {
+        // Geometry: differentiated sharp highlights and soft bevels.
+        col+=u_light*(.24*spec+.16*fresnel)*coverage;
+        col=mix(bg*.91,col,coverage);
+        col+=u_second*motion.w*.18;
+    }
     col+=(u_light*.72+u_second*.28)*
         (max(0.0,s.z)*u_emission+touchGlow)*u_intensity;
     if (u_quality > 1.5) {

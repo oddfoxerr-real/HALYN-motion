@@ -1,5 +1,29 @@
 # HALYN Motion
 
+## v0.17.0 — Independent effect mechanics
+
+The 30 new abstract wallpapers now have **30 independently authored animation and interaction functions**, not just differing surface equations evaluated under a universal animation. Each function defines spatial displacement, time-phase distortion, its own emission mechanic and tap response. Scene playback rates vary based on the intended motion.
+
+Five shader response models now distinguish liquids (broad specular flow), optics (focusing/caustic refraction), space (multilayer scattering), electricity (energy transfer and charge bursts), and geometric forms (precision highlights and edge illumination). These material responses are applied only to the 30 additions. The **28 original shaders are unchanged** and remain in their original gallery sections.
+
+Each selected new effect displays a short explanation of its mechanism below the wallpaper preview. Touch events decay over 2.4 seconds and propagate through the effect's own shader logic, rather than adding an always-on circle. Existing touch toggle, gyro parallax, gallery, clock and wallpapers remain compatible.
+
+### Example motion mechanisms
+
+- **Ripple Cadence:** phase-cancelling expanding waves from two sources
+- **Helix Undertow:** counter-rotating strands trading depth
+- **Viscous Portal:** nonlinear inward vortex advection
+- **Glass Caustics:** dynamic light focusing through moving lenses
+- **Accretion Band:** radius-dependent orbital angular velocity
+- **Parallax Nebula:** three independent layers drifting at different velocities
+- **Ion Threads:** branching filaments with changing junction charge
+- **Arc Reservoir:** cyclical charge, discharge and ring recovery
+- **Elastic Membrane:** damped wave propagation from touch impacts
+- **Infinite Weave:** over-under crossing transitions of looped strands
+
+This release uses Android Canvas/AGSL; it does **not** require or claim hardware RTX, OpenGL switching or Vulkan. The GitHub build checks Kotlin/APK packaging; on-device AGSL runtime compilation, aesthetics and thermals remain to be verified.
+
+
 ## v0.16.0 — Original shaders restored, 30 new abstract motion effects added
 
 HALYN Motion now contains **28 original animated shader wallpapers** and **30 additional smooth abstract effects**, shown as separate gallery collections. The previous v0.15.0 update incorrectly removed the original 28 instead of adding wallpapers alongside them. This release restores their original effect definitions, preset IDs, render semantics and studio controls. Older saved original preset selections remain valid; the updated reader no longer redirects them to the new collection.
