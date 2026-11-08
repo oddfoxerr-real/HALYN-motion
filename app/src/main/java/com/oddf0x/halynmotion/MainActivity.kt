@@ -64,7 +64,6 @@ class MainActivity : Activity() {
     private val originalCards = mutableListOf<Pair<Int, LinearLayout>>()
     private val originalTileRenderer by lazy { HalynRenderer(this) }
     private lateinit var effectPanel: LinearLayout
-    private lateinit var shadesPanel: LinearLayout
     private lateinit var gyroModes: LinearLayout
     private lateinit var gyroPanel: LinearLayout
     private lateinit var mountainDepthPanel: LinearLayout
@@ -276,13 +275,13 @@ class MainActivity : Activity() {
         buildOriginalRail(root, "Original atmospheres", (13..16).toList())
         buildOriginalRail(root, "Original motion collection", (52..63).toList())
 
-        root.addView(section("30 New Motion Originals",
-            "Distinct fluid, optical, cosmic and kinetic shader designs — not recolours."))
-        buildOriginalRail(root, "Fluid dynamics", (75..80).toList())
-        buildOriginalRail(root, "Optical structures", (81..86).toList())
-        buildOriginalRail(root, "Space dynamics", (87..92).toList())
-        buildOriginalRail(root, "Energy & motion", (93..98).toList())
-        buildOriginalRail(root, "Geometric motion", (99..104).toList())
+        root.addView(section("30 More HALYN Originals",
+            "Same signature luminous style as the originals, with thirty new shapes and motions."))
+        buildOriginalRail(root, "Fluid ribbons", (75..80).toList())
+        buildOriginalRail(root, "Optical light", (81..86).toList())
+        buildOriginalRail(root, "Cosmic formations", (87..92).toList())
+        buildOriginalRail(root, "Energy fields", (93..98).toList())
+        buildOriginalRail(root, "Geometry & motion", (99..104).toList())
 
         root.addView(section("Landscapes & exploration",
             "Minimalistic mountains and interactive Star Window."))
@@ -971,32 +970,10 @@ class MainActivity : Activity() {
         }
         panel.addView(qualityModes, LinearLayout.LayoutParams(-1, dp(45)))
         panel.addView(text(
-            "Efficient saves GPU work. Balanced adds light depth. Cinematic adds moving turbulence.",
+            "Efficient minimizes shader work; Balanced adds light depth; Cinematic adds drifting haze.",
             11f, secondary
         ).apply { setPadding(0, dp(9), 0, dp(4)) })
         root.addView(panel)
-        shadesPanel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = rounded(cardColor, 22, borderColor)
-            setPadding(dp(17), dp(14), dp(17), dp(13))
-        }
-        shadesPanel.addView(text("MATERIAL LIGHTING", 10f, subtle, Typeface.BOLD).apply {
-            letterSpacing = .12f
-            setPadding(0, 0, 0, dp(12))
-        })
-        addSlider(shadesPanel, "Surface depth", prefs.get().shadesDepth,
-            min = .4f, max = 2f, prefs::setShadesDepth)
-        addSlider(shadesPanel, "Reflectivity", prefs.get().shadesGloss,
-            min = .1f, max = 2f, prefs::setShadesGloss)
-        addSlider(shadesPanel, "Emission", prefs.get().shadesGlow,
-            min = 0f, max = 2f, prefs::setShadesGlow)
-        shadesPanel.addView(text(
-            "Adjust depth, specular softness and restrained material emission.",
-            11f, secondary
-        ).apply { setPadding(0, dp(7), 0, dp(2)) })
-        root.addView(shadesPanel, LinearLayout.LayoutParams(-1, -2).apply {
-            topMargin = dp(12)
-        })
         // Show intensity and flow only where an AGSL shader actually uses them.
 
         gyroPanel = LinearLayout(this).apply {
@@ -1180,9 +1157,6 @@ class MainActivity : Activity() {
                 selected in 52..63 || SmoothWallpaperRenderer.isSmooth(selected)
             ) View.VISIBLE else View.GONE
         }
-        if (::shadesPanel.isInitialized) shadesPanel.visibility =
-            if (SmoothWallpaperRenderer.isSmooth(selected))
-                View.VISIBLE else View.GONE
         if (::starControls.isInitialized) starControls.visibility =
             if (selected == StarWindowRenderer.SCENE_INDEX) View.VISIBLE else View.GONE
         if (::gyroPanel.isInitialized) {

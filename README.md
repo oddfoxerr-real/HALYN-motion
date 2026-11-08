@@ -1,5 +1,21 @@
 # HALYN Motion
 
+## v0.18.0 — Original HALYN look, 30 new shapes
+
+The previous release's new effects used an independent surface-normal/material shader and therefore looked more like illuminated objects than the original HALYN designs. This version deliberately reuses **the actual original AGSL shading pipeline**: black/ink backgrounds, the same five colour palettes, companion highlights, soft bloom, emissive contours and filmic tone mapping. Only the 30 new effects' geometry, waveform patterns, silhouettes and motion are new.
+
+All **28 original effect definitions and preset IDs stay unchanged**. The 30 new shaders appear in their own gallery as five sets of six:
+- **Fluid ribbons:** Ripple Cadence, Helix Undertow, Viscous Portal, Mirror Interference, Pressure Lines, Current Fold.
+- **Optical light:** Glass Caustics, Refractive Helix, Prism Diffusion, Phase Lens, Lumen Chamber, Chroma Shell.
+- **Cosmic formations:** Accretion Band, Void Echo, Distant Bloom, Event Ribbons, Parallax Nebula, Cosmic Aperture.
+- **Energy fields:** Ion Threads, Plasma Convergence, Flux Cascade, Electric Lacing, Arc Reservoir, Magnetic Pulse.
+- **Geometry & motion:** Gyroid Passage, Elastic Membrane, Sonic Contours, Folded Continuum, Morphing Torus, Infinite Weave.
+
+Each scene is implemented with a unique time-varying procedural formula, creating different narrow trails, flowing contours, orbital curves, caustics, resonance and luminous edge behaviour. The 30 additions share the *original* optical renderer by design, so they belong to the same visual family rather than constituting a different surface/material renderer. Unused 3D material-depth controls were removed from the UI; strength, speed, colour, detail, clock and gyro remain.
+
+A continuity check in GitHub Actions verifies both the original shader source and the new original-style optical composition are present. Android CI checks compilation, not whether the shader runtime compiles or looks right on the Galaxy A56.
+
+
 ## v0.17.0 — Independent effect mechanics
 
 The 30 new abstract wallpapers now have **30 independently authored animation and interaction functions**, not just differing surface equations evaluated under a universal animation. Each function defines spatial displacement, time-phase distortion, its own emission mechanic and tap response. Scene playback rates vary based on the intended motion.
