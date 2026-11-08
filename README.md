@@ -1,5 +1,16 @@
 # HALYN Motion
 
+## v0.19.0 — Unlimited clock-font library and working presets
+
+HALYN no longer imposes a **3 MB file-size ceiling** or replaces the previous imported font each time. You can store any number of valid TrueType/OpenType font files (`.ttf`, `.otf`, `.ttc`) up to the actual free storage and file-system constraints of your Android device. Files are imported in a streaming manner with a bounded RAM buffer, validated by Android's font loader, and kept in app-private storage. They are content-addressed with SHA-256 to avoid duplicate copies. Previous single custom-font imports are migrated automatically.
+
+The clock editor now displays six **visually differentiated preset fonts** (Default, Casual, Serif, Monospace, Condensed, Heavy), rendered in their actual chosen font. Selecting a preset or imported font changes the live clock, and selecting a font while the clock is switched off automatically opens the Digital clock so the effect is visible. The Analogue clock shows hour numerals when a non-default font is selected. The renderer fits longer clock text to the screen width.
+
+Tap **Imported fonts** to browse and preview the local font library. Long-press an entry to remove its copy from HALYN, or choose **Add fonts** to import multiple files through Android's document picker. No font requires Internet or root access, and the library survives app updates.
+
+The original 28 effects, added 30 shaders, 4K wallpaper gallery, clock positioning and all existing motion controls remain untouched.
+
+
 ## v0.18.0 — Original HALYN look, 30 new shapes
 
 The previous release's new effects used an independent surface-normal/material shader and therefore looked more like illuminated objects than the original HALYN designs. This version deliberately reuses **the actual original AGSL shading pipeline**: black/ink backgrounds, the same five colour palettes, companion highlights, soft bloom, emissive contours and filmic tone mapping. Only the 30 new effects' geometry, waveform patterns, silhouettes and motion are new.

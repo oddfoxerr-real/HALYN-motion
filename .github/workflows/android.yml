@@ -52,11 +52,11 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='23'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='24'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.18.0-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.18.0-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.19.0-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.19.0-preview.apk > SHA256SUMS.txt)
 
       - name: Verify curated wallpaper collection
         shell: bash
@@ -80,6 +80,25 @@ jobs:
           grep -q 'private val AGSL = """' app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
           grep -q 'value in 52..63 || SmoothWallpaperRenderer.isSmooth(value)' app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
 
+      - name: Verify clock font storage and preset recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          fonts=app/src/main/java/com/oddf0x/halynmotion/ClockFontStore.kt
+          ui=app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
+          renderer=app/src/main/java/com/oddf0x/halynmotion/ClockOverlayRenderer.kt
+          prefs=app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
+          test -s "$fonts"
+          ! grep -q 'MAX_BYTES' "$fonts"
+          ! grep -q 'under 3 MB' "$ui"
+          grep -q 'MessageDigest.getInstance("SHA-256")' "$fonts"
+          grep -q 'fun list(context: Context): List<ImportedFont>' "$fonts"
+          grep -q 'Intent.EXTRA_ALLOW_MULTIPLE' "$ui"
+          grep -q 'ClockFontStore.presetTypeface(index)' "$ui"
+          grep -q 'fun selectImportedClockFont(id: String)' "$prefs"
+          grep -q 'state.clockFontId' "$renderer"
+          grep -q 'if (selectedFont != null)' "$renderer"
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -97,42 +116,44 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.18.0 Original Shader Style
+      - name: Publish HALYN v0.19.0 Unlimited Clock Fonts
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.18.0-preview.1
+          TAG: v0.19.0-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.18.0-preview.apk
-          unzip -t dist/HALYN-Motion-v0.18.0-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.19.0-preview.apk
+          unzip -t dist/HALYN-Motion-v0.19.0-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN Motion v0.18.0 — The Original HALYN Look
+          # HALYN Motion v0.19.0 — Unlimited Font Library
 
-          Fixes the previous attempt to introduce new independent motion
-          effects in a separate 3D-like material shader that did not look
-          like the original HALYN wallpapers.
-
-          - Keeps all 28 original shader effects and exact preset IDs.
-          - The 30 additional effects now render with HALYN's original
-            deep-dark background, colour palettes, luminous ribbons,
-            focused highlights, halo glow and filmic colour treatment.
-          - All 30 have new individually designed pattern equations,
-            silhouettes and movement, including fluid ribbons, optical
-            caustics, cosmic apertures, charged filaments and soft geometry.
-          - Removes the separate surface-normal material engine and
-            unsupported physical-material controls from the new collection.
-          - Preserves the clock studio, gyro/parallax, mountains,
-            Star Window, 4K photo gallery and local photo imports.
-          - OpenGL/Vulkan options remain removed.
-          - Debug-signed preview. Requires on-device AGSL visual testing
-            on Galaxy A56 beyond APK compilation verification.
+          - Removes the 3 MB imported clock font cap.
+          - No artificial total-library count or size quotas; installed fonts
+            use ordinary app-private storage limited by available device space.
+          - Import multiple TTF/OTF/TTC font files together using Android's
+            document picker without overwriting earlier imports.
+          - Fonts are content-addressed and validated before being saved;
+            identical files are stored only once.
+          - Previously imported single-font files migrate into the library.
+          - Preset clock fonts use distinct real typeface families, with
+            actual font previews in their selectable chips.
+          - Font selection immediately reveals the digital clock in preview
+            if the clock was previously disabled.
+          - Analogue clock displays hour numerals with non-default fonts,
+            making preset and custom font selection visible there too.
+          - Imported font picker supports previewing, selecting and deleting
+            individual local fonts, with persistence across app restarts.
+          - Clocks auto-fit their lettering to different font widths.
+          - All 28 original shaders and 30 additions are retained.
+          - Debug-signed preview. Native Android font rendering still needs
+            on-device verification on Samsung Galaxy A56.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.18.0-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.19.0-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.18.0 — The Original HALYN Look" \
+            --title "HALYN Motion v0.19.0 — Unlimited Fonts & Preset Repairs" \
             --notes-file notes.md --prerelease

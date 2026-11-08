@@ -72,7 +72,7 @@ class ClockOverlayRenderer(private val context: Context) {
         if (lastFontStyle != state.clockFont || lastFontRevision != state.clockFontRevision) {
             lastFontStyle = state.clockFont
             lastFontRevision = state.clockFontRevision
-            selectedFont = ClockFontStore.resolve(context, state.clockFont)
+            selectedFont = ClockFontStore.resolve(context, state.clockFont, state.clockFontId)
         }
         updateTime(now, state)
 
@@ -116,6 +116,16 @@ class ClockOverlayRenderer(private val context: Context) {
         labelPaint.setShadowLayer(size * .08f, 0f, size * .03f, Color.argb(120, 3, 5, 10))
     }
 
+    private fun fittedText(
+        canvas: Canvas, value: String, x: Float, y: Float, maxWidth: Float
+    ) {
+        val measured = labelPaint.measureText(value)
+        if (measured > maxWidth && maxWidth > 0f) {
+            labelPaint.textSize *= maxWidth / measured
+        }
+        canvas.drawText(value, x, y, labelPaint)
+    }
+
     private fun line(color: Int, alpha: Int, width: Float) {
         linePaint.reset()
         linePaint.isAntiAlias = true
@@ -139,7 +149,7 @@ class ClockOverlayRenderer(private val context: Context) {
         c: Canvas, x: Float, y: Float, size: Float, color: Int, showDate: Boolean, progress: Float
     ) {
         ink(color, 255, size * .204f, typefaceLight)
-        c.drawText(time, x, y + size * .055f, labelPaint)
+        fittedText(c, time, x, y + size * .055f, c.width * .88f)
         if (suffix.isNotEmpty()) {
             ink(color, 200, size * .031f, typefaceMedium)
             c.drawText(suffix, x + size * .32f, y - size * .045f, labelPaint)
@@ -157,8 +167,8 @@ class ClockOverlayRenderer(private val context: Context) {
     ) {
         val fontSize = size * .236f
         ink(color, 255, fontSize, typefaceLight)
-        c.drawText(hours, x, y - size * .008f, labelPaint)
-        c.drawText(minutes, x, y + size * .204f, labelPaint)
+        fittedText(c, hours, x, y - size * .008f, c.width * .76f)
+        fittedText(c, minutes, x, y + size * .204f, c.width * .76f)
         if (suffix.isNotEmpty()) {
             ink(color, 210, size * .032f, typefaceMedium)
             c.drawText(suffix, x + size * .23f, y + size * .015f, labelPaint)
@@ -172,7 +182,7 @@ class ClockOverlayRenderer(private val context: Context) {
         c: Canvas, x: Float, y: Float, size: Float, color: Int, showDate: Boolean, progress: Float
     ) {
         ink(color, 245, size * .11f, typefaceMono)
-        c.drawText(time, x, y + size * .028f, labelPaint)
+        fittedText(c, time, x, y + size * .028f, c.width * .86f)
         line(color, 180, size * .004f)
         c.drawLine(x - size * .245f, y + size * .080f,
             x - size * .245f + .49f * size * progress, y + size * .080f, linePaint)
@@ -215,6 +225,25 @@ class ClockOverlayRenderer(private val context: Context) {
         linePaint.style = Paint.Style.FILL
         linePaint.color = color
         c.drawCircle(x, y, size * .007f, linePaint)
+        // Analogue clocks were font-insensitive because their faces contained
+        // only strokes. Add number markers for non-default font selections.
+        if (selectedFont != null) {
+            ink(color, 224, size * .034f, typefaceMedium)
+            val metrics = labelPaint.fontMetrics
+            val baselineOffset = -(metrics.ascent + metrics.descent) * .5f
+            val markerRadius = radius * .68f
+            for (marker in 0 until 4) {
+                val label = when (marker) {
+                    0 -> "12"
+                    1 -> "3"
+                    2 -> "6"
+                    else -> "9"
+                }
+                val angle = marker * PI.toFloat() / 2f - PI.toFloat() / 2f
+                c.drawText(label, x + cos(angle) * markerRadius,
+                    y + sin(angle) * markerRadius + baselineOffset, labelPaint)
+            }
+        }
         if (showDate) date(c, x, y + radius + size * .07f, size * .032f, color)
     }
 
@@ -228,7 +257,7 @@ class ClockOverlayRenderer(private val context: Context) {
         line(color, 255, size * .005f)
         c.drawArc(rect, -90f, (progress * 360f).coerceIn(0f, 359.99f), false, linePaint)
         ink(color, 255, size * .116f, typefaceLight)
-        c.drawText(time, x, y + size * .028f, labelPaint)
+        fittedText(c, time, x, y + size * .028f, c.width * .86f)
         if (showDate) date(c, x, y + size * .10f, size * .028f, color)
     }
 }

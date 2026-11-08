@@ -1,6 +1,7 @@
 package com.oddf0x.halynmotion
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.WallpaperManager
 import android.content.ComponentName
 import android.content.Intent
@@ -22,6 +23,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
+import android.widget.ArrayAdapter
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
@@ -59,6 +61,7 @@ class MainActivity : Activity() {
     private lateinit var clockStyles: LinearLayout
     private lateinit var clockPositions: LinearLayout
     private lateinit var clockFonts: LinearLayout
+    private lateinit var fontLibraryButton: TextView
     private lateinit var clockPlacementToggle: Switch
     private var awaitingClockOverlayPermission = false
     private val originalCards = mutableListOf<Pair<Int, LinearLayout>>()
@@ -432,13 +435,32 @@ class MainActivity : Activity() {
             isHorizontalScrollBarEnabled = false
             addView(clockFonts)
         }, LinearLayout.LayoutParams(-1, dp(48)))
-        clockOptionsPanel.addView(text("Import .ttf / .otf  ↗", 13f, ink, Typeface.BOLD).apply {
+        clockOptionsPanel.addView(text("FONT LIBRARY", 10f, subtle, Typeface.BOLD).apply {
+            letterSpacing = .15f
+            setPadding(0, dp(16), 0, dp(7))
+        })
+        fontLibraryButton = text("", 14f, ink, Typeface.BOLD).apply {
+            background = rounded(Color.rgb(35, 36, 43), 13)
+            minimumHeight = dp(52)
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            isFocusable = true
+            isClickable = true
+            contentDescription = "Browse and manage imported clock fonts"
+            setOnClickListener { openImportedFontLibrary() }
+        }
+        clockOptionsPanel.addView(fontLibraryButton, LinearLayout.LayoutParams(-1, -2))
+        clockOptionsPanel.addView(text(
+            "No HALYN font-count or file-size cap. Uses your available device storage.",
+            11f, secondary
+        ).apply { setPadding(dp(3), dp(9), dp(3), dp(4)) })
+        clockOptionsPanel.addView(text("Add fonts  .ttf / .otf / .ttc  ↗", 13f, ink, Typeface.BOLD).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(4), dp(8), dp(4), dp(8))
             minimumHeight = dp(46)
             isFocusable = true
             isClickable = true
-            contentDescription = "Import a custom TTF or OTF font for the wallpaper clock"
+            contentDescription = "Import one or more OpenType or TrueType clock fonts"
             setOnClickListener { chooseClockFont() }
         })
         val editClockRow = LinearLayout(this).apply {
@@ -489,38 +511,134 @@ class MainActivity : Activity() {
     private fun refreshClockFonts() {
         if (!::clockFonts.isInitialized) return
         clockFonts.removeAllViews()
-        val selected = prefs.get().clockFont
+        val state = prefs.get()
+
         ClockFontStore.names.forEachIndexed { index, label ->
-            val active = selected == index
-            val chip = text(label, 12f, if (active) backgroundColor else secondary,
-                if (active) Typeface.BOLD else Typeface.NORMAL).apply {
+            val active = state.clockFont == index
+            val chip = text("$label  12:34", 12f,
+                if (active) backgroundColor else ink,
+                Typeface.NORMAL
+            ).apply {
                 gravity = Gravity.CENTER
-                setPadding(dp(14), 0, dp(14), 0)
+                typeface = ClockFontStore.presetTypeface(index)
+                    ?: Typeface.create("sans-serif-light", Typeface.NORMAL)
+                setPadding(dp(13), 0, dp(13), 0)
                 background = rounded(if (active) ink else Color.rgb(36, 37, 44), 13)
                 minHeight = dp(44)
                 isClickable = true
                 isFocusable = true
-                contentDescription = "Clock font: " + label + (if (active) ", selected" else "")
+                contentDescription = "Clock font preset: $label" +
+                    if (active) ", selected" else ", available"
                 setOnClickListener {
-                    if (index == 6 && !ClockFontStore.hasCustomFont(this@MainActivity)) {
-                        chooseClockFont()
-                    } else {
-                        prefs.setClockFont(index)
-                        refreshClockFonts()
-                        preview.invalidate()
+                    prefs.setClockFont(index)
+                    if (prefs.get().clockStyle == 0) {
+                        prefs.setClockStyle(1)
+                        refreshClockStyles()
                     }
+                    refreshClockFonts()
+                    preview.invalidate()
                 }
             }
             clockFonts.addView(chip, LinearLayout.LayoutParams(-2, dp(44)).apply {
                 marginEnd = dp(7)
             })
         }
+
+        if (::fontLibraryButton.isInitialized) {
+            val imported = ClockFontStore.list(this)
+            val chosen = imported.firstOrNull { it.id == state.clockFontId }
+            val display = if (state.clockFont == 6 && chosen != null) {
+                "Imported fonts (${imported.size})  ·  ${chosen.name}  ›"
+            } else {
+                "Imported fonts (${imported.size})  ·  Browse & manage  ›"
+            }
+            fontLibraryButton.text = display
+            fontLibraryButton.typeface =
+                if (state.clockFont == 6 && chosen != null)
+                    ClockFontStore.preview(this, chosen.id) ?: Typeface.DEFAULT
+                else Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            fontLibraryButton.contentDescription = display
+        }
+    }
+
+    private fun selectClockFont(id: String) {
+        prefs.selectImportedClockFont(id)
+        // Selecting a font should immediately show the result in the studio,
+        // even when the clock had previously been switched off.
+        if (prefs.get().clockStyle == 0) {
+            prefs.setClockStyle(1)
+            refreshClockStyles()
+        }
+        refreshClockFonts()
+        preview.invalidate()
+    }
+
+    private fun openImportedFontLibrary() {
+        val fonts = ClockFontStore.list(this)
+        if (fonts.isEmpty()) {
+            chooseClockFont()
+            return
+        }
+        val adapter = object : ArrayAdapter<ClockFontStore.ImportedFont>(
+            this, android.R.layout.simple_list_item_1, fonts
+        ) {
+            override fun getView(
+                position: Int, convertView: View?, parent: ViewGroup
+            ): View {
+                val cell = super.getView(position, convertView, parent) as TextView
+                val item = getItem(position) ?: return cell
+                val kb = item.bytes / 1024.0
+                val sizeLabel = if (kb < 1024.0) {
+                    "%.0f KB".format(Locale.ROOT, kb)
+                } else {
+                    "%.1f MB".format(Locale.ROOT, kb / 1024.0)
+                }
+                cell.text = "${item.name}  ·  12:34\n$sizeLabel · Long-press to remove"
+                cell.typeface = ClockFontStore.preview(this@MainActivity, item.id)
+                    ?: Typeface.DEFAULT
+                cell.setTextColor(ink)
+                cell.textSize = 15f
+                cell.maxLines = 2
+                cell.setPadding(dp(17), dp(12), dp(17), dp(12))
+                cell.setBackgroundColor(cardColor)
+                return cell
+            }
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Imported fonts (${fonts.size})")
+            .setAdapter(adapter) { _, position -> selectClockFont(fonts[position].id) }
+            .setPositiveButton("Add more") { _, _ -> chooseClockFont() }
+            .setNegativeButton("Close", null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.listView.setOnItemLongClickListener { _, _, position, _ ->
+                val font = fonts[position]
+                AlertDialog.Builder(this)
+                    .setTitle("Remove ${font.name}?")
+                    .setMessage("Only the copy stored in HALYN will be deleted.")
+                    .setNegativeButton("Cancel", null)
+                    .setPositiveButton("Remove") { _, _ ->
+                        if (ClockFontStore.remove(this, font.id)) {
+                            prefs.removedImportedClockFont(font.id)
+                            refreshClockFonts()
+                            preview.invalidate()
+                            dialog.dismiss()
+                            openImportedFontLibrary()
+                        } else {
+                            Toast.makeText(this, "Unable to remove font", Toast.LENGTH_SHORT).show()
+                        }
+                    }.show()
+                true
+            }
+        }
+        dialog.show()
     }
 
     private fun chooseClockFont() {
         val pick = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "*/*"
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
         }
         try {
             startActivityForResult(pick, REQUEST_CLOCK_FONT)
@@ -595,15 +713,40 @@ class MainActivity : Activity() {
             }.start()
             return
         }
-        if (requestCode == REQUEST_CLOCK_FONT && resultCode == RESULT_OK && data?.data != null) {
-            if (ClockFontStore.install(this, data.data!!)) {
-                prefs.importedClockFont()
-                refreshClockFonts()
-                preview.invalidate()
-                Toast.makeText(this, "Clock font imported locally", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "Select a valid .ttf or .otf file under 3 MB", Toast.LENGTH_LONG).show()
+        if (requestCode == REQUEST_CLOCK_FONT && resultCode == RESULT_OK && data != null) {
+            val uris = linkedSetOf<Uri>()
+            data.data?.let { uris.add(it) }
+            data.clipData?.let { clips ->
+                for (index in 0 until clips.itemCount) {
+                    clips.getItemAt(index).uri?.let { uris.add(it) }
+                }
             }
+            if (uris.isEmpty()) return
+
+            Toast.makeText(this, "Importing ${uris.size} font file(s)", Toast.LENGTH_SHORT).show()
+            // Stream from SAF on an IO thread so large font libraries do not
+            // freeze the Android UI during import or validation.
+            Thread {
+                val saved = mutableListOf<String>()
+                var rejected = 0
+                for (uri in uris) {
+                    val id = ClockFontStore.install(applicationContext, uri)
+                    if (id != null) saved.add(id) else rejected++
+                }
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    if (saved.isNotEmpty()) selectClockFont(saved.last())
+                    else refreshClockFonts()
+                    val status = when {
+                        saved.isNotEmpty() && rejected == 0 ->
+                            "${saved.size} font(s) added to HALYN"
+                        saved.isNotEmpty() ->
+                            "${saved.size} font(s) added · $rejected invalid or unavailable"
+                        else -> "No valid .ttf, .otf, or .ttc fonts found"
+                    }
+                    Toast.makeText(this, status, Toast.LENGTH_LONG).show()
+                }
+            }.start()
         }
     }
 

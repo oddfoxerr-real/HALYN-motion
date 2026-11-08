@@ -44,6 +44,7 @@ data class MotionState(
     val skyLongitude: Double = 0.0,
     val skyFixTime: Long = 0L,
     val clockFont: Int = 0,
+    val clockFontId: String = "",
     val clockFontRevision: Int = 0,
     val clockCustomPlacement: Boolean = false,
     val clockX: Float = .5f,
@@ -98,6 +99,7 @@ class MotionPreferences(context: Context) {
             skyLongitude = Double.fromBits(preferences.getLong("sky_longitude", 0L)).takeIf { it.isFinite() && it in -180.0..180.0 } ?: 0.0,
             skyFixTime = preferences.getLong("sky_fix_time", 0L),
             clockFont = preferences.getInt("clock_font", 0).coerceIn(0, 6),
+            clockFontId = preferences.getString("clock_font_custom_id", "") ?: "",
             clockFontRevision = preferences.getInt("clock_font_revision", 0),
             clockCustomPlacement = preferences.getBoolean("clock_custom_placement", false),
             clockX = float("clock_x", .5f, .08f, .92f),
@@ -138,10 +140,25 @@ class MotionPreferences(context: Context) {
     fun setClockPosition(value: Int) = preferences.edit()
         .putInt("clock_position", value.coerceIn(0, 2))
         .putBoolean("clock_custom_placement", false).apply()
-    fun setClockFont(value: Int) = preferences.edit().putInt("clock_font", value.coerceIn(0, 6)).apply()
-    fun importedClockFont() = preferences.edit()
+    fun setClockFont(value: Int) = preferences.edit()
+        .putInt("clock_font", value.coerceIn(0, 5))
+        .putInt("clock_font_revision", preferences.getInt("clock_font_revision", 0) + 1)
+        .apply()
+
+    fun selectImportedClockFont(id: String) = preferences.edit()
         .putInt("clock_font", 6)
-        .putInt("clock_font_revision", preferences.getInt("clock_font_revision", 0) + 1).apply()
+        .putString("clock_font_custom_id", id)
+        .putInt("clock_font_revision", preferences.getInt("clock_font_revision", 0) + 1)
+        .apply()
+
+    fun removedImportedClockFont(id: String) {
+        if (preferences.getString("clock_font_custom_id", "") == id) {
+            preferences.edit().putInt("clock_font", 0)
+                .remove("clock_font_custom_id")
+                .putInt("clock_font_revision", preferences.getInt("clock_font_revision", 0) + 1)
+                .apply()
+        }
+    }
     fun setClockPlacement(x: Float, y: Float) = preferences.edit()
         .putFloat("clock_x", x.coerceIn(.08f, .92f))
         .putFloat("clock_y", y.coerceIn(.14f, .88f))
