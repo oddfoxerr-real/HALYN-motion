@@ -1,32 +1,38 @@
-# HALYN Motion — 30 Smooth Originals
+# HALYN Motion
 
-## v0.15.0 Preview
+## v0.16.0 — Original shaders restored, 30 new abstract motion effects added
 
-The HALYN collection now includes 30 distinct live procedural wallpaper scenes. Each uses an individually authored geometry/motion field and its own material colours, with continuously interpolated textures rather than mismatched pixel effects or recoloured flat shading. A native-resolution AGSL material compositor reconstructs surface normals, soft lighting, reflection highlights, atmosphere, and subtle filmic tonemapping.
+HALYN Motion now contains **28 original animated shader wallpapers** and **30 additional smooth abstract effects**, shown as separate gallery collections. The previous v0.15.0 update incorrectly removed the original 28 instead of adding wallpapers alongside them. This release restores their original effect definitions, preset IDs, render semantics and studio controls. Older saved original preset selections remain valid; the updated reader no longer redirects them to the new collection.
 
-**Glass & minerals:** Frosted Glass Ridges, Spun Aluminum, Cathedral Quartz, Basalt Cross-Section, Acrylic Lens Stack, Pearlescent Shell.
+**Preserved original shaders:** Ion Veil, Liquid Chrome, Nebula Drift, Electric Silk, Solar Bloom, Prism Tide, Silk Reactor, Glass Orbit, Magnetic Dust, Midnight Horizon, Chromatic Flow, Circuit Pulse, Orbital Halo, Cosmic Rain, Plasma Loom, Eclipse Glass, Velvet Flux, Crystal Current, Neon Ink, Zenith Borealis, Quartz Ripple, Lumen Dusk, Flux Filament, Celestial Mist, Liquid Copper, Polar Halo, Prism Flow and Voltage Bloom.
 
-**Nature & water:** Submerged Silk, Auroral Curtains, Wind-Carved Dunes, Glacial Snowbanks, Mist-Cut Canyon, Rainy Window.
+### Thirty new motion scenes
 
-**Tactile materials:** Satin Pleats, Titanium Brushwork, Silken Carbon Weave, Porcelain Sculpture, Velvet Cascade, Slate Relief.
+The added scenes use HALYN's **smooth, luminous abstract motion aesthetic**, without duplicating the originals' individual shader formulas. Each new scene has a separately authored spatial field, silhouette, dynamic motion equation, material response, and lighting composition. The unwanted 0.15.0 material/architectural collection was replaced instead of being added on top.
 
-**Space & atmosphere:** Cosmic Filament, Solar Corona, Observatory Night, Planet Atmosphere, Gravitational Halo, Meteor Smoke.
+**Fluid dynamics:** Ripple Cadence, Helix Undertow, Viscous Portal, Mirror Interference, Pressure Lines, Current Fold.
 
-**Architecture & sculpture:** Illuminated Colonnade, Marble Archways, Sculpted Wall Panels, Suspended Basalt, Silent Atrium, Twisting Ribbon Canopy.
+**Optical structures:** Glass Caustics, Refractive Helix, Prism Diffusion, Phase Lens, Lumen Chamber, Chroma Shell.
 
-### Preserved features
+**Space dynamics:** Accretion Band, Void Echo, Distant Bloom, Event Ribbons, Parallax Nebula, Cosmic Aperture.
 
-Four minimalist mountain wallpapers and Star Window remain in their own collection. The licensed 4K photo gallery, local photo imports, five clock designs, optional moveable clock, custom fonts, and gyro tracking remain available. Previously saved flat-colour wallpaper IDs migrate to Frosted Glass Ridges, while existing photo choices keep their ID.
+**Energy & motion:** Ion Threads, Plasma Convergence, Flux Cascade, Electric Lacing, Arc Reservoir, Magnetic Pulse.
 
-### Architecture
+**Geometric motion:** Gyroid Passage, Elastic Membrane, Sonic Contours, Folded Continuum, Morphing Torus, Infinite Weave.
 
-- SmoothWallpaperRenderer.kt: thirty independent shader definitions, runtime-compiled AGSL, six-program LRU, continuous smooth noise and GPU-failure fallback.
-- HalynRenderer.kt: compact wallpaper dispatcher for smooth materials, photographs, mountain scenes and Star Window. Previous flat-colour shader library has been physically deleted.
-- MainActivity.kt: five groups of six new scenes, with separate landscape/star rows and all previous studio controls.
-- HalynWallpaperService.kt: adaptive FPS, surface lifecycle and clock composition.
+No new pixel-art or low-resolution textures are used. Procedural noise is smoothly interpolated, and shading is evaluated at Canvas resolution with filmic tone mapping, surface-normal lighting and sub-LSB static dithering. All 30 newly added shaders remain independent of the old coloured SHADES materials renderer, which stays removed.
 
-Android 13+ required (API 33); same package name as older HALYN versions. The APK is debug-signed. Android CI tests compilation and archive integrity but cannot confirm AGSL compilation, animation quality, or thermals on a Galaxy A56. Verify on the phone after installing.
+### Other features
 
-### Build
+The four minimalist mountain scenes and Star Window remain available, along with the licensed online 4K gallery, imported photos, gyro, touch settings, custom clock fonts, clock move mode, and live-clock overlay.
 
-JDK 17, Android SDK 35, Gradle 8.11.1: run `gradle --no-daemon :app:assembleDebug`. APK output: `app/build/outputs/apk/debug/app-debug.apk`.
+### Code
+
+- `HalynRenderer.kt`: restored original AGSL effect renderer from the earlier HALYN revision, plus additional scene dispatch to `SmoothWallpaperRenderer`. Previous photo/mountain/star routing and original IDs are preserved.
+- `SmoothWallpaperRenderer.kt`: 30 new scene-specific motion functions, dynamic shader compilation, six-program LRU and safe fallback.
+- `MainActivity.kt`: originals and additions displayed as separate rails, with matching native preview and controls.
+- `HalynWallpaperService.kt`: existing adaptive frame pacing, motion sensors and live wallpaper surface lifecycle remain unchanged.
+
+### Installation
+
+Android 13+ (API 33), package `com.oddf0x.halynmotion`. The GitHub release contains a debug-signed APK; CI verifies build and packaging, but shader output and thermal performance must still be tested on the actual phone.

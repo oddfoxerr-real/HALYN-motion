@@ -38,7 +38,7 @@ import kotlin.math.roundToInt
  *
  * Editorial typography, a generous live preview, understated scene selection,
  * one-touch palettes and a full HSV/HEX editor. All controls use standard
- * accessible Android views. A curated 30-scene smooth collection replaces flat shaders.
+ * accessible Android views. Preserves all 28 original shaders alongside 30 new ones.
  */
 class MainActivity : Activity() {
     private val prefs by lazy { MotionPreferences(this) }
@@ -266,16 +266,22 @@ class MainActivity : Activity() {
     }
 
     private fun buildScenes(root: LinearLayout) {
-        root.addView(section("HALYN Smooth Collection",
-            "30 distinct materials and scenes. No pixel textures or flat-colour shader packs."))
-        buildOriginalRail(root, "Glass & minerals", (75..80).toList())
-        buildOriginalRail(root, "Nature & water", (81..86).toList())
-        buildOriginalRail(root, "Tactile materials", (87..92).toList())
-        buildOriginalRail(root, "Space & atmosphere", (93..98).toList())
-        buildOriginalRail(root, "Architecture & sculpture", (99..104).toList())
+        root.addView(section("HALYN Originals",
+            "All 28 original animated shaders, restored exactly as before."))
+        buildOriginalRail(root, "The classics", (0..11).toList())
+        buildOriginalRail(root, "Original atmospheres", (13..16).toList())
+        buildOriginalRail(root, "Original motion collection", (52..63).toList())
 
-        root.addView(section("Other HALYN scenes",
-            "Four minimalist mountains and Star Window are retained separately."))
+        root.addView(section("30 New Motion Originals",
+            "Distinct fluid, optical, cosmic and kinetic shader designs — not recolours."))
+        buildOriginalRail(root, "Fluid dynamics", (75..80).toList())
+        buildOriginalRail(root, "Optical structures", (81..86).toList())
+        buildOriginalRail(root, "Space dynamics", (87..92).toList())
+        buildOriginalRail(root, "Energy & motion", (93..98).toList())
+        buildOriginalRail(root, "Geometric motion", (99..104).toList())
+
+        root.addView(section("Landscapes & exploration",
+            "Minimalistic mountains and interactive Star Window."))
         buildOriginalRail(root, "Minimal landscapes", (17..20).toList())
         buildOriginalRail(root, "Star Window", listOf(StarWindowRenderer.SCENE_INDEX))
 
@@ -1160,8 +1166,10 @@ class MainActivity : Activity() {
         }
         refreshOriginalCards()
         if (::effectPanel.isInitialized) {
-            effectPanel.visibility = if (SmoothWallpaperRenderer.isSmooth(selected))
-                View.VISIBLE else View.GONE
+            effectPanel.visibility = if (
+                selected in 0..11 || selected in 13..16 ||
+                selected in 52..63 || SmoothWallpaperRenderer.isSmooth(selected)
+            ) View.VISIBLE else View.GONE
         }
         if (::shadesPanel.isInitialized) shadesPanel.visibility =
             if (SmoothWallpaperRenderer.isSmooth(selected))
