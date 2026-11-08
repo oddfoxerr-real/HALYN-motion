@@ -52,11 +52,19 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='19'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='20'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.14.0-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.14.0-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.15.0-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.15.0-preview.apk > SHA256SUMS.txt)
+
+      - name: Verify curated wallpaper collection
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'const val COUNT = 30' app/src/main/java/com/oddf0x/halynmotion/SmoothWallpaperRenderer.kt
+          test ! -e app/src/main/java/com/oddf0x/halynmotion/ShadesRenderer.kt
+          ! grep -q 'buildOriginalRail(root, "The classics"' app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -75,33 +83,38 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.14.0 Simplified Renderer
+      - name: Publish HALYN v0.15.0 Smooth Wallpapers
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.14.0-preview.1
+          TAG: v0.15.0-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.14.0-preview.apk
-          unzip -t dist/HALYN-Motion-v0.14.0-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.15.0-preview.apk
+          unzip -t dist/HALYN-Motion-v0.15.0-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN v0.14.0 — Simplified Rendering
+          # HALYN v0.15.0 — 30 Smooth Originals
 
-          - Removed Vulkan and OpenGL ES choices and the graphics API selector.
-          - Deleted native EGL and Vulkan implementations, graphics shaders,
-            NDK build requirements and Vulkan APK verification.
-          - All wallpapers now use the hardware-accelerated Canvas/AGSL renderer.
-          - Preserved 28 original effects, 8 SHADES material wallpapers,
-            and 3 reflective presets at their existing IDs.
-          - Live clock, gyro, wallpaper gallery and uploaded photos retained.
-          - Previously saved backend choices are harmlessly ignored.
-          - Debug-signed preview. Verify display on Galaxy A56 hardware.
+          - Added thirty individually authored native-resolution procedural
+            wallpaper shaders. Every scene has a different material/shape
+            field, motion equation and physically coherent colour scheme.
+          - Replaced the flat-colour original shader packs, older coloured
+            SHADES renderer, and retired illustrated posters.
+          - Five galleries with six styles each: minerals, nature, fabrics,
+            astronomy and architectural scenes.
+          - Continuous smooth texture interpolation, height-field lighting,
+            restrained emission and filmic colour mapping.
+          - Kept four mountain wallpapers, Star Window, the licensed 4K
+            image gallery, imported photos, gyro and clock customisation.
+          - Old preset selections migrate to Frosted Glass Ridges.
+          - Debug-signed. Test visual output and temperatures on actual
+            Galaxy A56 hardware; CI cannot execute AGSL shaders.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.14.0-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.15.0-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.14.0 — Simplified Rendering" \
+            --title "HALYN Motion v0.15.0 — 30 Smooth Originals" \
             --notes-file notes.md --prerelease

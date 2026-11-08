@@ -1,164 +1,32 @@
-# HALYN Motion
+# HALYN Motion — 30 Smooth Originals
 
-## v0.14.0 — Simplified renderer
+## v0.15.0 Preview
 
-HALYN now uses **Android hardware-accelerated Canvas/AGSL** for every wallpaper. Vulkan and OpenGL ES engine selectors have been removed, along with their separate native implementations and build dependencies. Previously saved engine choices are ignored automatically.
+The HALYN collection now includes 30 distinct live procedural wallpaper scenes. Each uses an individually authored geometry/motion field and its own material colours, with continuously interpolated textures rather than mismatched pixel effects or recoloured flat shading. A native-resolution AGSL material compositor reconstructs surface normals, soft lighting, reflection highlights, atmosphere, and subtle filmic tonemapping.
 
-All 28 original animated wallpapers, eight SHADES materials, and three reflective styles (Glass Horizon, Liquid Mirror, Prism Monolith) remain selectable. The reflective wallpapers now use existing SHADES material lighting with clocks, gyro, colours and motion. 4K online images and local photo imports remain unchanged.
+**Glass & minerals:** Frosted Glass Ridges, Spun Aluminum, Cathedral Quartz, Basalt Cross-Section, Acrylic Lens Stack, Pearlescent Shell.
 
-The smaller, simpler app no longer packages Vulkan binaries or requires driver selection. Hardware ray tracing is not part of the renderer. GitHub Android compilation checks do not replace on-device visual testing.
+**Nature & water:** Submerged Silk, Auroral Curtains, Wind-Carved Dunes, Glacial Snowbanks, Mist-Cut Canyon, Rainy Window.
 
-## v0.12.0 — SHADES dimensional material engine
+**Tactile materials:** Satin Pleats, Titanium Brushwork, Silken Carbon Weave, Porcelain Sculpture, Velvet Cascade, Slate Relief.
 
-**Eight new procedural live wallpapers** are rendered by a distinct `ShadesRenderer.kt` engine. Instead of adding yet another glow formula to the older shader, SHADES reconstructs normals from animated surface-height functions, computes key/fill lighting and reflective lobes, uses Fresnel edge light, approximates self-shadow and ambient occlusion, then composites analytical emission and colour-graded atmosphere. Materials: **Obsidian Current, Mercury Fold, Opaline Depth, Aurora Satin, Crystal Facets, Abyssal Tide, Molten Veins, and Prismatic Rift.**
+**Space & atmosphere:** Cosmic Filament, Solar Corona, Observatory Night, Planet Atmosphere, Gravitational Halo, Meteor Smoke.
 
-Use **SHADES · Material Engine** to select a new material. Under Motion, customize **Surface depth**, **Reflectivity**, and **Emission**, plus existing shader detail (Efficient / Balanced / Cinematic), intensity, speed and gyro. Cinematic adds extra procedural turbulence and caustics. All render inside Android's `RuntimeShader` / live WallpaperService; no camera or screen recording. A cached gradient is used when a software canvas or unsupported GPU cannot execute AGSL.
+**Architecture & sculpture:** Illuminated Colonnade, Marble Archways, Sculpted Wall Panels, Suspended Basalt, Silent Atrium, Twisting Ribbon Canopy.
 
-**Limitations:** The lighting is a deliberately stylized height-field approximation, not physical ray tracing, real environment reflections or a multipass global-illumination solver. Android CI validates Kotlin compilation and APK integrity; actual AGSL execution and thermal performance require phone testing. The prior 28 originals, 4K photo gallery, clocks and removed illustrated poster policy are preserved.
+### Preserved features
 
-## v0.11.0 — Shader Studio
+Four minimalist mountain wallpapers and Star Window remain in their own collection. The licensed 4K photo gallery, local photo imports, five clock designs, optional moveable clock, custom fonts, and gyro tracking remain available. Previously saved flat-colour wallpaper IDs migrate to Frosted Glass Ridges, while existing photo choices keep their ID.
 
-The 28 original animated effects now use a redesigned AGSL material and colour compositor, not just revised frame scheduling. Highlights receive filmic tone mapping rather than hard clipping; reflective effects have brighter focused specular light, while atmospheric effects use softer scattering. Palette-tinted shadows, depth lighting, and stable sub-LSB dithering improve dimensionality and gradient quality. Nebula Drift and Neon Ink have optional smooth procedural density. The new **Motion → Shader Detail** control has Efficient, Balanced (default), and Cinematic rendering, with additional noise calculations only in Cinematic. Gallery thumbnails render in Efficient mode to keep scrolling responsive.
+### Architecture
 
-Removed illustrated cars, cities, flowers and foxes stay removed. The live clock, gyro and online 4K gallery are unchanged. Shader compilation and visual performance require on-device checks; an AGSL failure triggers the existing fallback.
+- SmoothWallpaperRenderer.kt: thirty independent shader definitions, runtime-compiled AGSL, six-program LRU, continuous smooth noise and GPU-failure fallback.
+- HalynRenderer.kt: compact wallpaper dispatcher for smooth materials, photographs, mountain scenes and Star Window. Previous flat-colour shader library has been physically deleted.
+- MainActivity.kt: five groups of six new scenes, with separate landscape/star rows and all previous studio controls.
+- HalynWallpaperService.kt: adaptive FPS, surface lifecycle and clock composition.
 
-## v0.10.1 — Rendering engine optimization
+Android 13+ required (API 33); same package name as older HALYN versions. The APK is debug-signed. Android CI tests compilation and archive integrity but cannot confirm AGSL compilation, animation quality, or thermals on a Galaxy A56. Verify on the phone after installing.
 
-- **Less overdraw:** The AGSL scene paints directly to the wallpaper surface without the redundant full-screen clear that previously preceded it.
-- **Shader uniform caching:** Scene/palette/colour/intensity/speed and resolution are only re-applied on changes. Frame time, parallax and touch uniforms remain live.
-- **Smarter frame pacing:** Uses delayed Choreographer callbacks to target the chosen frame rate (30/45/60 FPS) without waking at every vsync. Automatically steps down when sustained frame processing exceeds the budget, then recovers toward the selected FPS when stable.
-- **Static wallpaper sleep:** An offline photo with gyro switched off draws on demand, or once per second if its clock is enabled. A photo with gyro remains live.
-- **GPU recovery:** Shader state reinitializes with wallpaper surface creation. Shader errors or software canvases show a cached, palette-matched fallback gradient instead of a blank black field.
-- **Smoother controls:** Editing colours, clock positions and intensity repaints without unnecessarily restarting motion sensors. The studio preview also idles for motionless photos.
+### Build
 
-The 28 HALYN Original abstract effects, online licensed 4K search, live clocks and gyro remain unchanged in content. Build-time Android checks cannot substitute for real GPU frame-time and power measurements on a Samsung device.
-
-Native Android live wallpaper studio with **28 original animated shader wallpapers**, an optional real **licensed online 4K+ photo gallery**, gyro parallax and **5 customizable real-time clock styles**. The illustrated poster packs (cars, flowers, cityscapes, foxes and similar cartoons) are removed.
-
-## v0.10.0 — HALYN Originals return
-
-The studio now lets you select the **original 16 abstract shaders** and **12 new original dynamic shaders** directly in the wallpaper gallery. The new styles are Velvet Flux, Crystal Current, Neon Ink, Zenith Borealis, Quartz Ripple, Lumen Dusk, Flux Filament, Celestial Mist, Liquid Copper, Polar Halo, Prism Flow and Voltage Bloom. These are rendered live in Android AGSL, rather than downloaded photos or illustrations.
-
-All **30 retired generated poster scenes** and their renderer are removed. Previously selected poster scene IDs are safely mapped to the original Ion Veil effect. The photo gallery, local photo import, clock masks, custom fonts, grid positioning and gyro controls remain available. The Strength, Flow and Colour controls are visible again for shader scenes; the separate astronomy-focused Star Window is still selectable.
-
-**Previous release history** below documents earlier versions, not the current available poster collection.
-
-## v0.9.0 — Online 4K wallpapers, no new generated artwork
-
-The active wallpaper library now searches **real high-resolution images** on [Wikimedia Commons](https://commons.wikimedia.org/) rather than presenting HALYN-generated scene collections. Wallpapers are not AI-generated by HALYN, are not shipped inside the APK and are not scraped from copyright-restricted wallpaper websites.
-
-**Find a wallpaper:** Open HALYN → **Explore online · 4K+**. Search freely or choose Nature, Cars, Flowers, Space, City, Art or Mountains. Results are restricted to original images with a long side of at least **3840 px**, a short side of at least **2160 px**, and a declared CC0, public domain, CC BY or CC BY-SA license. Original source dimensions, photographer/artist and license appear on each card and in the confirmation dialog.
-
-**Download:** Tap an image → **Download & use**. HALYN downloads the **original source** directly from Wikimedia Commons, validates/decodes it in the background, and saves a private offline WebP at up to **4096 pixels** on the long side. It never upscales lower-resolution images or reduces 4K images to the old 2200-pixel limit. Select **Set as wallpaper** after downloading. The existing optional gyro, clock designs, custom clock fonts and positioning grid continue to work with the downloaded wallpaper.
-
-**Licensing:** Click **Source & license** before installing or **Source & credits** afterwards. Artist, exact license and original file description page remain accessible for attribution. Reusers must observe the source's license, including attribution and ShareAlike where applicable. Wikimedia files can be edited or taken down after being indexed; source pages remain the canonical reference. The browser intentionally excludes files without a confirmed reusable license. Copyrighted anime/film promotional images are not automatically included.
-
-**Privacy and network:** Only the gallery and a chosen download contact Wikimedia Commons. Active wallpapers work without internet. No camera, contacts, WhatsApp screenshots, messages or private content are read or uploaded. You may still use the Android system picker to supply your own photo offline. The existing 51 procedural scenes are **hidden from new selection** and retained only for already-active wallpapers, to prevent a surprise blank screen on upgrade.
-
-**Validation:** GitHub CI validates APK compilation, package identity and wallpaper service. Actual image search/download, Commons availability and launcher appearance require on-device checks.
-
-## v0.8.0 — Subject-led poster collection
-
-HALYN's collection now includes **51 built-in wallpapers**, with 30 new, original subject-based scenes rather than more anonymous geometry.
-
-- **Botanical posters:** Blue Rose, Red Anemone, Sunflower Hour, Lunar Lotus and Sakura Drift.
-- **Road & speed:** Sunset GT, Midnight Rider, Coastal Drive, Neon Circuit and Desert Runner.
-- **Quiet worlds:** Alone by the Sea, Foggy Pines, Peach Horizon, Deep Blue and Ember Forest.
-- **Illustrated creatures:** Night Cat, Little Fox, Moon Owl, Cozy Panda and Shadow Rabbit.
-- **City after dark:** Quiet Street, Streetlamp Rain, Skyline Blue, Lantern Alley and Rooftop Glow.
-- **Places & ruins:** Mountain Cabin, Island Gate, Desert Arch, Last Lighthouse and Temple Sunrise.
-
-The poster artwork uses lightweight Canvas illustration, subject-specific environments and gentle motion. Each foreground is drawn **after** the live clock, allowing the clock to partly sit behind a rose, car, creature or structure. The existing five clock styles, font selector, gyro controls, and on-home-screen positioning mode continue to work.
-
-**My Image** is one additional gallery option: tap **Choose an image**, pick a photo or artwork using Android's system file picker, and HALYN imports it into private on-device storage. Import supports up to 24 MB and produces a downsampled WebP for lightweight wallpaper use. The image does not leave your phone, is not stored in the GitHub repository and is not shared with any server. Gyro pans the image only inside its safe crop margins so no black borders appear. Your selectable clock is rendered over the image.
-
-The poster scenes deliberately **do not reproduce branded characters** from example galleries. To use character art you own or are authorized to use, choose **My Image**.
-
-## v0.7.1 — Gyro & mountain stability
-
-- **Motion that responds to your phone:** Non-Star Window scenes now use a dedicated fused rotation-vector sensor pipeline with per-activation neutral calibration, an anti-jitter deadzone, smooth damped response, hard travel limits and sensor shutdown when hidden. This is distinct from Star Window's existing space tracking.
-- **Four gyro modes:** Off, Soft, Dynamic and Space in **Motion → Gyro depth**, with an **intensity** slider. The mountain series adds a separate **Mountain depth** slider for near/far layer separation. Sensor-based movement works in the app preview and live wallpaper; launcher swipe movement remains an independent toggle.
-- **Mountain rendering fixed:** Sky, stars, light source, distant ridge, middle ridge, mist and nearest ridge move at deliberately different depths. Extending the mountain polygons beyond the screen prevents empty vertical strips at the edges during tilt.
-- **Clock masking preserved:** The same gyro pose is used before and after the clock is drawn, so the foreground cannot shear relative to its background.
-- **Gallery and colour controls:** Mountain thumbnails now include the foreground ridge. Colour selection, Strength and Flow now produce a controlled visual change on the mountain scenes.
-- **Less jank:** Scene-sized gradients and mountain geometry are cached instead of recreated on every frame, cutting avoidable allocations.
-- **No change to Star Window's navigation, sky alignment or opt-in Tap to travel.**
-
-**Verification:** Android CI validates APK compilation and package metadata. Actual gyro feel, GPU behaviour and overlay alignment still need testing on a Samsung device.
-
-## What's new in v0.7 — Mountain Clock Studio
-
-- **21 scenes:** Keeps all 13 original wallpapers and adds *Orbital Halo*, *Cosmic Rain*, *Plasma Loom* and *Eclipse Glass* (procedural artistic visuals), plus *Twilight Peaks*, *Moonlit Ridge*, *Alpine Mist* and *Ember Valley* (minimal mountain landscapes).
-- **Clock behind mountains:** Mountain wallpapers render the sky and distant ridges first, then the clock, then the foreground mountain silhouette. This provides real partial clock occlusion as the clock moves.
-- **Clock font selector:** Default, Rounded, Serif, Mono, Condensed, Bold, and locally imported .ttf/.otf fonts (3 MB size limit, validated before replacing an existing font).
-- **Move clock on Home screen:** Turn on the placement toggle in Clock atelier. Android requests permission for **Draw over other apps** on first use. HALYN opens the actual launcher with a transparent **5% snap grid**. Drag anywhere to reposition the clock; tap the **X in the top-right corner** to exit. The grid disappears, the clock position remains saved, and a temporary foreground notification also provides Exit.
-- **Permission lifecycle:** No overlay is created unless you start the editor; no persistent overlay survives editing. No image captures, location polling or network communication are needed for clock placement.
-- **Reset placement:** Tapping Upper, Centre or Lower in Clock atelier disables the custom grid placement and reuses the chosen preset. The mountain scene's Centre default is intentionally placed near the front ridge.
-- **Important:** A genuine launcher overlay requires user-granted Android overlay permission; the service uses Android 14+ `specialUse` foreground service declaration. Test Samsung launcher alignment/permissions on the phone. Debug builds are not Play Store production-signed.
-
-## What's new in v0.6.2
-
-**Tap to travel is now optional and switched off by default.** In **Star Window → Tap to travel**, turn it on to navigate by tapping the studio preview or your home-screen live wallpaper. Tap a planet or named star to approach it; tap empty space to warp forward. When disabled, Star Window ignores touch-based navigation and does not request home-screen touch events, preventing accidental travel while using your launcher.
-
-The **Warp one light-year**, **Explore a destination**, and **Return to the Solar System** buttons work regardless of the toggle. Device tilt and motion-based sky viewing are unchanged. The independent **Touch interaction** option under Preferences continues to control the other 12 GPU scenes, not Star Window navigation.
-
-Existing installations with no saved Star Window touch preference will default to off. The preference is remembered across launches.
-
-## What's new in v0.6
-
-- **Warp fixed visually and functionally:** A travel tunnel with moving star streaks, a central portal ring, progress animation, one-light-year displacement in J2000 coordinates, distance HUD, and a visible arrival pulse. The app's Warp action now also signals the live wallpaper engine instead of affecting only its preview.
-- **New space atmospheres:** Survey (astronomy only), Nebula (animated luminous cloud field), Expedition (cinematic nebula, ringed artistic planet after traveling, brighter warp effects). Fictional worlds are **clearly marked as procedural**, not represented as NASA discoveries.
-- **Location-aware sky:** Opt-in foreground GPS/network location sync, approximate location supported, local-only cached coordinates, local sidereal time plus compass/magnetic declination for astronomical orientation. GPS is **not** used for indoor movement tracking or polled continually by the wallpaper.
-- **Existing content preserved:** All 13 wallpapers, all original wallpaper styles, all five clocks, original palettes, and the HSV colour picker.
-
-### How to use the new Star Window
-
-1. Choose **Star Window** in the New Collection, then **Expedition** under Visual Atmosphere.
-2. Tap **Warp one light-year** in the studio (always works when the app is open). To tap the wallpaper to travel, enable **Tap to travel** under Star Window first (off by default); launcher support varies.
-3. You'll see an animated hyperspace tunnel, distance-from-origin label and warp-complete effect. **Return to the Solar System** resets the virtual camera.
-4. For the *real sky above your location*, choose **Sync sky location** and grant approximate or precise location. This uses the saved coordinates and Earth's rotation, not live GPS polling. Warping switches back into exploration mode.
-
-**Reality check:** This is an Android procedural *live wallpaper*, not a 3D game with terrain generation or walkable planets. The cinematic space atmosphere is original procedural art alongside the existing genuine Yale/Hipparcos star and approximate JPL planet coordinates.
-
-## Previous v0.5 changes
-
-- **Six preserved HALYN Originals:** Ion Veil, Liquid Chrome, Nebula Drift, Electric Silk, Solar Bloom and Prism Tide.
-- **Six additional scenes:** Silk Reactor, Glass Orbit, Magnetic Dust, Midnight Horizon, Chromatic Flow and Circuit Pulse.
-- **Star Window (v0.5):** Slow, weightless accelerometer-driven movement and rotation-anchored viewing. The camera starts above the actual JPL approximate solar system, shows **9,096 real Yale Bright Star Catalogue entries** with Hipparcos parallax distances where available, 150 real constellation strokes, and the Sun and eight planets computed for the current date (JPL approximate orbital elements, valid 1800–2050).
-- **Tap to warp:** In the preview, a short tap animates one light-year forward over 2.6 seconds. On the installed Home screen, tap-to-warp works only if the launcher forwards wallpaper touch events; an explicit Warp button in the app always provides access. Return to the Solar System resets distance and motion.
-- **Sensor-stutter masking:** Rejects implausible acceleration/rotation spikes, smooths pose with a continuous filter, predicts only brief (<85 ms) sensor gaps, clamps missed-frame animation time, and uses damped momentum to avoid fast, jittery motion.
-- **Clock Atelier:** Digital, Stacked, Mono, Analogue and Orbit clock faces, directly rendered on the live wallpaper and live preview (not a separate widget).
-- **Clock options:** Show/hide, Upper/Centre/Lower position, 12h or 24h format, date, seconds indicator and tint to the custom wallpaper colour.
-- **Precision colour editor:** HSV canvas, hue rail, arbitrary HEX colours and five original palettes.
-- True Android WallpaperService; GPU procedural rendering, no Unity, ads, external PC or network permission.
-- Android 13+; hardware performance still requires real-device verification.
-
-## Download
-
-[Latest releases](https://github.com/oddfoxerr-real/HALYN-motion/releases)
-
-## Architecture
-
-- `SpatialTracker.kt`: gravity-free acceleration transformed to world axes, damped integrated movement, orientation sensor, lifecycle and recenter. Inertial drift prevents exact room-scale navigation.
-- `StarWindowRenderer.kt`: real-star Canvas renderer in 3D astronomical coordinates, with approximate planet positions and constellation paths.
-- `SpaceEffectsRenderer.kt`: optional nebula AGSL, artistic worlds, warp tunnel, progress and arrival overlays.
-- `SkyLocationController.kt`: user-initiated foreground GPS/network location capture, permission and local cache.
-- `SkyCoordinates.kt`: local sidereal time and geomagnetic true-north correction for aligning the sky.
-- `MainActivity.kt`: native minimalist wallpaper studio and Clock Atelier UI.
-- `ClockOverlayRenderer.kt`: 5 live-time clock face renderers on a hardware-accelerated Android Canvas.
-- `HalynRenderer.kt`: 12 procedural AGSL GPU wallpaper scenes and preferences.
-- `HalynWallpaperService.kt`: Android live wallpaper service that draws wallpaper and clock in the same frame and stops when hidden.
-- `ColorPickerDialog.kt`: HSV + HEX colour editor.
-
-### Important engineering distinctions
-
-The Star Window is an estimated inertial navigation effect: accelerometers cannot reliably recover absolute travel distance. Warp moves the virtual view one light-year mathematically; it is a rendering interaction, not physical tracking. Star coordinates and available distances originate from Yale/Hipparcos, rather than NASA; JPL supplies the planetary elements. Unknown star distances are drawn as remote directions, never invented numeric distances. Planetary marker sizes are enlarged for visibility, while their heliocentric spatial coordinates retain approximate JPL scale. The new Glass Orbit, Magnetic Dust and Chromatic Flow scenes are procedural shader effects. Chromatic Flow is **not a persistent fluid physics solver**; adding a multi-pass fluid simulation is future work. The original six scene formulas remain unchanged. Samsung launcher placement, thermal performance, Always On Display and lock-screen behaviour must be tested on the actual phone.
-
-
-## Astronomy data and attribution
-
-- **Planetary position model:** NASA/JPL SSD [Approximate Positions of the Planets](https://ssd.jpl.nasa.gov/planets/approx_pos.html), Table 1, J2000 approximate orbital elements and rates valid 1800–2050. Earth uses the Earth–Moon barycenter approximation. These are *not* real-time Horizons high-precision vectors.
-- **Stars:** [Yale Bright Star Catalogue, 5th revised edition](http://tdc-www.harvard.edu/catalogs/bsc5.html), J2000 RA/Dec and visual magnitudes, ESA [Hipparcos parallaxes](https://cdsarc.cds.unistra.fr/viz-bin/cat/I/239) where reliable, and IAU proper names. Offline facts compiled by [isene/starmap](https://github.com/isene/starmap/blob/master/data/README.md); the original data are public domain. Dataset is **9,096 bright stars**, not every star in the Galaxy.
-- **Constellation lines:** [d3-celestial](https://github.com/ofrohn/d3-celestial), copyright 2015–2020 Olaf Frohn, licensed BSD-3-Clause; its copyright, permission and disclaimer are retained in `docs/CONSTELLATION-LICENSE.md`. These are sky-chart line segments, not physical structures in space.
-- In **Explore** mode, phone orientation is calibrated relative to the initial screen direction. In **Location Sky** mode, a user-requested approximate/precise foreground location fix, sidereal time and compass sensor align view to the local sky (approximately). No camera or background-location permission is used; location is stored locally and can be disabled.
-- The Solar System and near stars occupy wildly different real-world scales. Correct mathematical coordinates are used, but Solar System body markers are deliberately magnified for visibility. Only the eight major planets and Sun are modelled; this is not a complete asteroid/moon catalogue.
+JDK 17, Android SDK 35, Gradle 8.11.1: run `gradle --no-daemon :app:assembleDebug`. APK output: `app/build/outputs/apk/debug/app-debug.apk`.

@@ -38,7 +38,7 @@ import kotlin.math.roundToInt
  *
  * Editorial typography, a generous live preview, understated scene selection,
  * one-touch palettes and a full HSV/HEX editor. All controls use standard
- * accessible Android views. The original six renderer scenes are preserved.
+ * accessible Android views. A curated 30-scene smooth collection replaces flat shaders.
  */
 class MainActivity : Activity() {
     private val prefs by lazy { MotionPreferences(this) }
@@ -266,18 +266,17 @@ class MainActivity : Activity() {
     }
 
     private fun buildScenes(root: LinearLayout) {
-        root.addView(section("HALYN Originals", "Dynamic shaders, no illustrated posters or generated characters."))
-        buildOriginalRail(root, "The classics", (0..11).toList())
-        buildOriginalRail(root, "Original atmospheres", (13..16).toList())
-        buildOriginalRail(root, "New motion collection", (52..63).toList())
-        root.addView(section("SHADES · Material Engine", "Reflections, simulated surface depth and luminous materials."))
-        buildOriginalRail(root, "Dimensional materials", (ShadesRenderer.FIRST..ShadesRenderer.LAST).toList())
-        root.addView(section("Reflective materials", "Animated glass and metal, powered by SHADES."))
-        buildOriginalRail(root, "Reflections & depth", (ReflectiveScenes.FIRST..ReflectiveScenes.LAST).toList())
-        root.addView(text(
-            "The same live clock, colours and gyro controls work with these styles.",
-            11f, secondary
-        ).apply { setPadding(dp(1), 0, dp(1), dp(12)) })
+        root.addView(section("HALYN Smooth Collection",
+            "30 distinct materials and scenes. No pixel textures or flat-colour shader packs."))
+        buildOriginalRail(root, "Glass & minerals", (75..80).toList())
+        buildOriginalRail(root, "Nature & water", (81..86).toList())
+        buildOriginalRail(root, "Tactile materials", (87..92).toList())
+        buildOriginalRail(root, "Space & atmosphere", (93..98).toList())
+        buildOriginalRail(root, "Architecture & sculpture", (99..104).toList())
+
+        root.addView(section("Other HALYN scenes",
+            "Four minimalist mountains and Star Window are retained separately."))
+        buildOriginalRail(root, "Minimal landscapes", (17..20).toList())
         buildOriginalRail(root, "Star Window", listOf(StarWindowRenderer.SCENE_INDEX))
 
         root.addView(section("Explore online · 4K+", "Real, licensed images from independent creators."))
@@ -971,7 +970,7 @@ class MainActivity : Activity() {
             background = rounded(cardColor, 22, borderColor)
             setPadding(dp(17), dp(14), dp(17), dp(13))
         }
-        shadesPanel.addView(text("SHADES MATERIAL CONTROLS", 10f, subtle, Typeface.BOLD).apply {
+        shadesPanel.addView(text("MATERIAL LIGHTING", 10f, subtle, Typeface.BOLD).apply {
             letterSpacing = .12f
             setPadding(0, 0, 0, dp(12))
         })
@@ -982,7 +981,7 @@ class MainActivity : Activity() {
         addSlider(shadesPanel, "Emission", prefs.get().shadesGlow,
             min = 0f, max = 2f, prefs::setShadesGlow)
         shadesPanel.addView(text(
-            "Controls real-time height-field lighting, reflections and emissive edges.",
+            "Adjust depth, specular softness and restrained material emission.",
             11f, secondary
         ).apply { setPadding(0, dp(7), 0, dp(2)) })
         root.addView(shadesPanel, LinearLayout.LayoutParams(-1, -2).apply {
@@ -1161,11 +1160,11 @@ class MainActivity : Activity() {
         }
         refreshOriginalCards()
         if (::effectPanel.isInitialized) {
-            effectPanel.visibility = if (selected in 0..11 || selected in 13..16 || selected in 52..ReflectiveScenes.LAST)
+            effectPanel.visibility = if (SmoothWallpaperRenderer.isSmooth(selected))
                 View.VISIBLE else View.GONE
         }
         if (::shadesPanel.isInitialized) shadesPanel.visibility =
-            if (ShadesRenderer.isShades(selected) || ReflectiveScenes.supports(selected))
+            if (SmoothWallpaperRenderer.isSmooth(selected))
                 View.VISIBLE else View.GONE
         if (::starControls.isInitialized) starControls.visibility =
             if (selected == StarWindowRenderer.SCENE_INDEX) View.VISIBLE else View.GONE
@@ -1409,8 +1408,8 @@ class MainActivity : Activity() {
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
             val state = prefs.get().copy(preset = sceneIndex, clockStyle = 0, shaderQuality = 0)
-            // Thumbnails are intentionally static to avoid rendering twelve extra
-            // continuously animated views while browsing the gallery.
+            // Static previews use the same full-resolution shader at Efficient
+            // detail, so browsing the 30-scene collection remains responsive.
             renderer.draw(canvas, state, 7f + sceneIndex * 1.7f)
             // Mountain cards previously omitted their foreground entirely.
             renderer.drawForeground(canvas, state)
