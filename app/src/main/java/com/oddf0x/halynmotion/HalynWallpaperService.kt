@@ -24,6 +24,7 @@ class HalynWallpaperService : WallpaperService() {
         private val clockRenderer = ClockOverlayRenderer(this@HalynWallpaperService)
         private val spatialTracker = SpatialTracker(this@HalynWallpaperService)
         private val gyroParallax = GyroParallax(this@HalynWallpaperService)
+        private val signalSampler = SceneSignalSampler(this@HalynWallpaperService, preferences.raw)
         private val choreographer = Choreographer.getInstance()
         private val mainHandler = Handler(Looper.getMainLooper())
         private var framePosted = false
@@ -333,7 +334,8 @@ class HalynWallpaperService : WallpaperService() {
                     gyro = tilt,
                     touchForce = if (settings.touch && touchDownMs > 0L)
                         (1f - (startedMs - touchDownMs) / 2400f).coerceIn(0f, 1f)
-                    else 0f
+                    else 0f,
+                    reactions = signalSampler.sample()
                 )
                 clockRenderer.draw(canvas, settings)
                 // Reuse the exact same gyro pose for background/foreground;
