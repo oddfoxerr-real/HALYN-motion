@@ -623,7 +623,7 @@ class SmoothWallpaperRenderer {
             float d=length(center*float2(1.0,1.18));
             float lens=exp(-37.0*abs(d-.31));
             float inner=sin(center.y*11.0+center.x*7.0-t*.33)*cos(center.x*9.0-t*.16);
-            float shimmer=pow(max(0.0,inner),12.0)*smoothstep(.31,.08,d);
+            float shimmer=pow(max(0.0,inner),12.0)*(1.0-smoothstep(.08,.31,d));
             v=lens*.66+shimmer*.83;
             glow=exp(-9.0*abs(d-.31))*.25+exp(-6.0*d)*.16;
             """.trimIndent(),
