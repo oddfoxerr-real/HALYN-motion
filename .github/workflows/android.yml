@@ -52,11 +52,11 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='25'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='26'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.20.0-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.20.0-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.20.1-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.20.1-preview.apk > SHA256SUMS.txt)
 
       - name: Verify curated wallpaper collection
         shell: bash
@@ -90,6 +90,9 @@ jobs:
           prefs=app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
           grep -q 'uniform float u_music;' app/src/main/java/com/oddf0x/halynmotion/SmoothWallpaperRenderer.kt
           grep -q 'uniform float u_notification;' app/src/main/java/com/oddf0x/halynmotion/SmoothWallpaperRenderer.kt
+          grep -q 'AGSL.replace(SCENE_MARKER, SCENE_FORMULAS\[sceneIndex\])' app/src/main/java/com/oddf0x/halynmotion/SmoothWallpaperRenderer.kt
+          grep -q 'failedSceneIndices.add(sceneIndex)' app/src/main/java/com/oddf0x/halynmotion/SmoothWallpaperRenderer.kt
+          grep -q 'val outline = recoveryPath' app/src/main/java/com/oddf0x/halynmotion/SmoothWallpaperRenderer.kt
           grep -q 'SceneSignalSampler' app/src/main/java/com/oddf0x/halynmotion/HalynWallpaperService.kt
           test -s app/src/main/java/com/oddf0x/halynmotion/HalynNotificationListener.kt
           test -s "$fonts"
@@ -120,21 +123,21 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.20.0 Reactive Originals
+      - name: Publish HALYN v0.20.1 Shader Recovery
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.20.0-preview.2
+          TAG: v0.20.1-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.20.0-preview.apk
+          test -s dist/HALYN-Motion-v0.20.1-preview.apk
           unzip -t dist/HALYN-Motion-v0.20.0-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN Motion v0.20.0 — 12 Reactive Originals
+          # HALYN Motion v0.20.1 — Shader Recovery
 
           - 12 unique shader wallpapers (IDs 105-116), keeping the original HALYN
             optical palette, smooth contours, bloom and motion renderer.
@@ -156,5 +159,5 @@ jobs:
           NOTES
           gh release create "$TAG" dist/HALYN-Motion-v0.20.0-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.20.0 — 12 Reactive Originals" \
+            --title "HALYN Motion v0.20.1 — Shader Recovery" \
             --notes-file notes.md --prerelease
