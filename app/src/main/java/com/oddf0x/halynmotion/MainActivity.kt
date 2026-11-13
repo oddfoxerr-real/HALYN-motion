@@ -46,6 +46,7 @@ class MainActivity : Activity() {
     private val prefs by lazy { MotionPreferences(this) }
     private val previewTracker by lazy { SpatialTracker(this) }
     private val previewGyro by lazy { GyroParallax(this) }
+    private val previewSignals by lazy { SceneSignalSampler(this, prefs.raw) }
     private val skyLocation by lazy {
         SkyLocationController(this, prefs,
             onStatus = { message -> if (::skyStatus.isInitialized) skyStatus.text = message },
@@ -285,6 +286,13 @@ class MainActivity : Activity() {
         buildOriginalRail(root, "Cosmic formations", (87..92).toList())
         buildOriginalRail(root, "Energy fields", (93..98).toList())
         buildOriginalRail(root, "Geometry & motion", (99..104).toList())
+
+        root.addView(section("12 Reactive Originals",
+            "Signature HALYN optical style, with a different live device interaction in each scene."))
+        buildOriginalRail(root, "Music & motion", (105..107).toList())
+        buildOriginalRail(root, "Energy & battery", (108..109).toList())
+        buildOriginalRail(root, "Time & atmosphere", (110..111).toList())
+        buildOriginalRail(root, "Signals & touch", (112..116).toList())
 
         root.addView(section("Landscapes & exploration",
             "Minimalistic mountains and interactive Star Window."))
@@ -1237,6 +1245,20 @@ class MainActivity : Activity() {
         panel.addView(View(this).apply { setBackgroundColor(borderColor) },
             LinearLayout.LayoutParams(-1, dp(1)).apply { topMargin = dp(7) })
         panel.addView(perfRow)
+        panel.addView(text("Enable notification ripples  ↗", 13f, ink, Typeface.BOLD).apply {
+            setPadding(0, dp(22), 0, dp(7))
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Open Android notification access settings. Optional for Notification Ripple and Signal Wings."
+            setOnClickListener {
+                startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+            }
+        })
+        panel.addView(text(
+            "Optional. HALYN saves only the time of a notification event, never its sender or text. " +
+                "Music playback detection, battery, time, and touch need no microphone or screen capture.",
+            12f, secondary
+        ))
         root.addView(panel)
     }
 
@@ -1581,7 +1603,8 @@ class MainActivity : Activity() {
                 gyro = tilt,
                 touchForce = if (state.touch && pointerDownMs > 0L)
                     (1f - (SystemClock.uptimeMillis() - pointerDownMs) / 2400f).coerceIn(0f, 1f)
-                else 0f
+                else 0f,
+                reactions = previewSignals.sample()
             )
             clockRenderer.draw(canvas, state)
             renderer.drawForeground(canvas, state, tilt)

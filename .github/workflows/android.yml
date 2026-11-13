@@ -52,17 +52,17 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='24'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='25'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.19.0-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.19.0-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.20.0-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.20.0-preview.apk > SHA256SUMS.txt)
 
       - name: Verify curated wallpaper collection
         shell: bash
         run: |
           set -euo pipefail
-          grep -q 'const val COUNT = 30' app/src/main/java/com/oddf0x/halynmotion/SmoothWallpaperRenderer.kt
+          grep -q 'const val COUNT = 42' app/src/main/java/com/oddf0x/halynmotion/SmoothWallpaperRenderer.kt
           grep -q 'float3 inkBlack = float3(0.0035, 0.006, 0.014)' app/src/main/java/com/oddf0x/halynmotion/SmoothWallpaperRenderer.kt
           grep -q 'float3 emission = mix(companion, accent' app/src/main/java/com/oddf0x/halynmotion/SmoothWallpaperRenderer.kt
           grep -q 'float3 col = inkBlack' app/src/main/java/com/oddf0x/halynmotion/SmoothWallpaperRenderer.kt
@@ -88,6 +88,10 @@ jobs:
           ui=app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
           renderer=app/src/main/java/com/oddf0x/halynmotion/ClockOverlayRenderer.kt
           prefs=app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
+          grep -q 'uniform float u_music;' app/src/main/java/com/oddf0x/halynmotion/SmoothWallpaperRenderer.kt
+          grep -q 'uniform float u_notification;' app/src/main/java/com/oddf0x/halynmotion/SmoothWallpaperRenderer.kt
+          grep -q 'SceneSignalSampler' app/src/main/java/com/oddf0x/halynmotion/HalynWallpaperService.kt
+          test -s app/src/main/java/com/oddf0x/halynmotion/HalynNotificationListener.kt
           test -s "$fonts"
           ! grep -q 'MAX_BYTES' "$fonts"
           ! grep -q 'under 3 MB' "$ui"
@@ -116,21 +120,21 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.19.0 Unlimited Clock Fonts
+      - name: Publish HALYN v0.20.0 Unlimited Clock Fonts
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.19.0-preview.1
+          TAG: v0.20.0-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.19.0-preview.apk
-          unzip -t dist/HALYN-Motion-v0.19.0-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.20.0-preview.apk
+          unzip -t dist/HALYN-Motion-v0.20.0-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN Motion v0.19.0 — Unlimited Font Library
+          # HALYN Motion v0.20.0 — Unlimited Font Library
 
           - Removes the 3 MB imported clock font cap.
           - No artificial total-library count or size quotas; installed fonts
@@ -153,7 +157,7 @@ jobs:
           - Debug-signed preview. Native Android font rendering still needs
             on-device verification on Samsung Galaxy A56.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.19.0-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.20.0-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.19.0 — Unlimited Fonts & Preset Repairs" \
+            --title "HALYN Motion v0.20.0 — Unlimited Fonts & Preset Repairs" \
             --notes-file notes.md --prerelease
