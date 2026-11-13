@@ -719,6 +719,7 @@ half4 main(float2 frag) {
         color = Color.rgb(5, 8, 18)
     }
     private val fallbackPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.DITHER_FLAG)
+    private val recoveryPath = Path()
     private val recoveryStroke = Paint(Paint.ANTI_ALIAS_FLAG or Paint.DITHER_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
@@ -820,18 +821,18 @@ half4 main(float2 frag) {
         // Even on devices that reject AGSL, do not turn every wallpaper into
         // the same featureless gradient. Draw an inexpensive distinct
         // procedural silhouette, without screen capture or GPU shader code.
-        val sceneIndex = (state.preset - FIRST).coerceIn(0, COUNT - 1)
+        val recoveryIndex = sceneIndex.coerceIn(0, COUNT - 1)
         val minDimension = minOf(width, height)
-        val phase = time * (.22f + state.speed * .17f) + sceneIndex * .49f
+        val phase = time * (.22f + state.speed * .17f) + recoveryIndex * .49f
         val centerX = width * .5f
         val centerY = height * .48f
-        val scale = minDimension * (.25f + (sceneIndex % 5) * .023f)
-        val outline = Path()
-        val count = 2 + (sceneIndex % 4)
+        val scale = minDimension * (.25f + (recoveryIndex % 5) * .023f)
+        val outline = recoveryPath
+        val count = 2 + (recoveryIndex % 4)
         for (line in 0 until count) {
             val lineOffset = line.toFloat() - (count - 1) * .5f
             outline.reset()
-            val mode = sceneIndex % 6
+            val mode = recoveryIndex % 6
             when (mode) {
                 0 -> {
                     // Long, flowing ribbons.
@@ -891,7 +892,7 @@ half4 main(float2 frag) {
                     for (step in 0..100) {
                         val a = step * 6.2831853f / 100f
                         val radius = scale * (.55f + .18f * kotlin.math.cos(
-                            a * (4 + sceneIndex % 4) + phase + lineOffset
+                            a * (4 + recoveryIndex % 4) + phase + lineOffset
                         ))
                         val x = centerX + radius * kotlin.math.cos(a)
                         val y = centerY + radius * kotlin.math.sin(a)
