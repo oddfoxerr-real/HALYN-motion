@@ -30,7 +30,7 @@ class SmoothWallpaperRenderer {
 
     companion object {
         const val FIRST = 75
-        const val COUNT = 42
+        const val COUNT = 62
         const val LAST = FIRST + COUNT - 1
         val SCENES = listOf(
         Scene("Ripple Cadence", "Fluid ribbons", "Three travelling ripple sources alternate between constructive and destructive interference."),
@@ -74,7 +74,27 @@ class SmoothWallpaperRenderer {
         Scene("Signal Wings", "Signals & touch", "A notification briefly opens opposing glowing wings, without using message content."),
         Scene("Gyro Filaments", "Signals & touch", "Tilting the phone steers two intertwining luminous filaments."),
         Scene("Touch Lantern", "Signals & touch", "Touch ignites a smooth seven-petal lantern that fades into a ring."),
-        Scene("Quiet Sanctuary", "Signals & touch", "Silent or vibrate mode settles a restless field into calmer concentric waves.")
+        Scene("Quiet Sanctuary", "Signals & touch", "Silent or vibrate mode settles a restless field into calmer concentric waves."),
+        Scene("Satin Tide", "Apple-inspired", "Liquid-satin folds slide across one another, with gentle depth shifts when you tilt the phone."),
+        Scene("Frosted Petals", "Apple-inspired", "Six translucent glass petals open and close around a softly illuminated center."),
+        Scene("Liquid Pearl", "Apple-inspired", "A pearlescent droplet refracts two independently rippling surfaces."),
+        Scene("Pastel Canyon", "Apple-inspired", "Smooth interlocking glass valleys form an endlessly drifting sculpted landscape."),
+        Scene("Aurora Fold", "Apple-inspired", "Layered aurora fabric shears slowly as the device tilts."),
+        Scene("Glass Tunnels", "Apple-inspired", "Nested translucent portals breathe at different rates and catch soft caustic highlights."),
+        Scene("Velvet Horizon", "Apple-inspired", "A silk horizon warms and cools through the day using the local clock."),
+        Scene("Opaline Rings", "Apple-inspired", "Three offset opaline hoops phase through one another with a shimmering front-back illusion."),
+        Scene("Prism Ribbon", "Apple-inspired", "A braided glass ribbon swings with parallax while catching shifting refracted highlights."),
+        Scene("Soft Eclipse", "Apple-inspired", "A glowing moonlike disc slowly passes behind a satin translucent crescent."),
+        Scene("One Pulse", "Samsung-inspired", "A bold sweeping wave draws brighter arcs whenever the phone is charging."),
+        Scene("Infinity Bloom", "Samsung-inspired", "A layered spiral flower unfolds concentric translucent blades without pixelated effects."),
+        Scene("AMOLED Current", "Samsung-inspired", "Deep-black electric currents reveal an extra braided channel while music plays."),
+        Scene("Galaxy Orbit", "Samsung-inspired", "Several orbital light lanes drift at different speeds around a dark center."),
+        Scene("Dynamic Fold", "Samsung-inspired", "A split-screen sheet of light flexes as the phone is tilted and screen pages move."),
+        Scene("Edge Aurora", "Samsung-inspired", "Curved aurora strands glide along both edges and follow device rotation."),
+        Scene("Prism Cascade", "Samsung-inspired", "Diagonal transparent blades cascade downward as separate light channels."),
+        Scene("Signal Halo", "Samsung-inspired", "Incoming notifications launch a bright orbiting halo and fading secondary ring."),
+        Scene("Electric Canvas", "Samsung-inspired", "A touch injects a branching electric pulse across curved energy traces."),
+        Scene("Midnight Wave", "Samsung-inspired", "Inky layered waves slow down when silent mode is enabled for a calmer home screen.")
         )
         fun isSmooth(value: Int): Boolean = value in FIRST..LAST
         fun mechanicDescription(preset: Int): String? =
@@ -576,6 +596,209 @@ class SmoothWallpaperRenderer {
                     v=ring*(.48+.35*pow(max(0.0,ripple),8.0))+
                         pow(max(0.0,ripple),18.0)*exp(-3.6*r)*(.12+.32*calm);
                     glow=exp(-10.0*abs(ellipse-.27))*(.16+.13*calm);
+            """.trimIndent(),
+            // 42: Satin Tide — Liquid-satin folds slide across one another, with gentle depth shifts when you tilt the phone.
+            """
+            float2 q=p-float2(u_gyro.x*.09,u_gyro.y*.07);
+            float fold=q.x+.21*sin(q.y*4.8+t*.24);
+            float lane=sin((fold+q.y*.2)*15.0-t*.28);
+            float silk=exp(-3.4*abs(fold))*(.38+.62*pow(max(0.0,lane),10.0));
+            float seam=exp(-60.0*abs(fold-.16*sin(q.y*5.0+t*.15)));
+            v=silk*.8+seam*.63;
+            glow=exp(-7.0*abs(fold))*.26+seam*.12;
+            """.trimIndent(),
+            // 43: Frosted Petals — Six translucent glass petals open and close around a softly illuminated center.
+            """
+            float a=atan(p.y,p.x);
+            float petal=cos(a*6.0+t*.12);
+            float radius=.21+.085*petal+.02*sin(t*.21);
+            float shell=exp(-45.0*abs(r-radius));
+            float inner=exp(-24.0*length(p-float2(.04*sin(t*.16),.03*cos(t*.14))));
+            v=shell*(.54+.32*max(0.0,petal))+inner*.44;
+            glow=exp(-8.0*abs(r-radius))*.24+inner*.18;
+            """.trimIndent(),
+            // 44: Liquid Pearl — A pearlescent droplet refracts two independently rippling surfaces.
+            """
+            float2 center=p-float2(.06*sin(t*.19),.04*cos(t*.13));
+            float d=length(center*float2(1.0,1.18));
+            float lens=exp(-37.0*abs(d-.31));
+            float inner=sin(center.y*11.0+center.x*7.0-t*.33)*cos(center.x*9.0-t*.16);
+            float shimmer=pow(max(0.0,inner),12.0)*smoothstep(.31,.08,d);
+            v=lens*.66+shimmer*.83;
+            glow=exp(-9.0*abs(d-.31))*.25+exp(-6.0*d)*.16;
+            """.trimIndent(),
+            // 45: Pastel Canyon — Smooth interlocking glass valleys form an endlessly drifting sculpted landscape.
+            """
+            float ridge=p.y+.19*sin(p.x*4.9+t*.14)+.085*sin(p.x*10.0-t*.12);
+            float lower=exp(-26.0*abs(ridge+.19));
+            float upper=exp(-32.0*abs(ridge-.16));
+            float throat=exp(-60.0*abs(ridge));
+            v=lower*.55+upper*.71+throat*.31;
+            glow=exp(-6.0*abs(ridge))*.35+upper*.13;
+            """.trimIndent(),
+            // 46: Aurora Fold — Layered aurora fabric shears slowly as the device tilts.
+            """
+            float2 q=p-float2(u_gyro.x*.12,u_gyro.y*.10);
+            float fold=q.x+.17*sin(q.y*7.1+t*.11);
+            float sheet=exp(-21.0*abs(fold));
+            float crease=exp(-75.0*abs(fold+.11*cos(q.y*5.8-t*.21)));
+            float beams=pow(max(0.0,cos(q.y*13.0+t*.18)),10.0);
+            v=sheet*(.31+.41*beams)+crease*.82;
+            glow=sheet*.28+crease*.11;
+            """.trimIndent(),
+            // 47: Glass Tunnels — Nested translucent portals breathe at different rates and catch soft caustic highlights.
+            """
+            float2 q=p+float2(.03*sin(t*.22),.025*cos(t*.15));
+            float d=length(q*float2(1.0,1.35));
+            float ring1=exp(-71.0*abs(d-.28-.04*sin(t*.24)));
+            float ring2=exp(-76.0*abs(d-.40+.025*cos(t*.19)));
+            float caustic=pow(max(0.0,sin(atan(q.y,q.x)*7.0+t*.37)),14.0);
+            v=ring1*(.50+.57*caustic)+ring2*.51;
+            glow=exp(-10.0*abs(d-.32))*.29;
+            """.trimIndent(),
+            // 48: Velvet Horizon — A silk horizon warms and cools through the day using the local clock.
+            """
+            float sun=.5+.5*cos((u_dayphase-.5)*6.2831853);
+            float horizon=p.y+.08*sin(p.x*3.7+t*.06);
+            float band=exp(-33.0*abs(horizon+.11));
+            float glowLine=exp(-11.0*abs(horizon-.18));
+            float rays=pow(max(0.0,cos(p.x*7.0+t*.10)),13.0);
+            v=band*(.36+.35*sun)+glowLine*(.18+.32*sun)+rays*exp(-5.0*r)*sun*.23;
+            glow=exp(-6.0*abs(horizon))*(.17+.28*sun);
+            """.trimIndent(),
+            // 49: Opaline Rings — Three offset opaline hoops phase through one another with a shimmering front-back illusion.
+            """
+            float2 a=p-float2(.14*sin(t*.15),.03);
+            float2 b=p-float2(-.13,.06*cos(t*.13));
+            float ar=length(a*float2(1.0,1.23));
+            float br=length(b*float2(1.17,1.0));
+            float shellA=exp(-76.0*abs(ar-.27));
+            float shellB=exp(-73.0*abs(br-.30));
+            float front=.5+.5*sin(p.y*12.0+t*.31);
+            v=shellA*(.3+.65*front)+shellB*(.95-.56*front);
+            glow=exp(-10.0*abs(ar-.27))*.13+exp(-10.0*abs(br-.30))*.18;
+            """.trimIndent(),
+            // 50: Prism Ribbon — A braided glass ribbon swings with parallax while catching shifting refracted highlights.
+            """
+            float2 q=p-float2(u_gyro.x*.12,u_gyro.y*.08);
+            float left=q.x-.17*sin(q.y*8.0+t*.27);
+            float right=q.x+.17*sin(q.y*8.0-t*.23);
+            float crossings=.5+.5*sin(q.y*10.0+t*.37);
+            float a=exp(-85.0*abs(left))*(.39+.60*crossings);
+            float b=exp(-85.0*abs(right))*(.99-.60*crossings);
+            v=(a+b)*exp(-.75*abs(q.y));
+            glow=(exp(-15.0*abs(left))+exp(-15.0*abs(right)))*.18;
+            """.trimIndent(),
+            // 51: Soft Eclipse — A glowing moonlike disc slowly passes behind a satin translucent crescent.
+            """
+            float2 q=p-float2(.07*sin(t*.09),0.0);
+            float disc=length(q);
+            float mask=length(q-float2(.115*sin(t*.12)+.07,.025));
+            float crescent=clamp((disc-.235)*-55.0,0.0,1.0)*
+                clamp((mask-.24)*55.0,0.0,1.0);
+            float rim=exp(-79.0*abs(disc-.255));
+            v=crescent*.64+rim*.75;
+            glow=exp(-8.0*abs(disc-.255))*.29+exp(-8.0*mask)*.09;
+            """.trimIndent(),
+            // 52: One Pulse — A bold sweeping wave draws brighter arcs whenever the phone is charging.
+            """
+            float wave=p.x+.23*sin(p.y*5.0-t*.35);
+            float arc=exp(-55.0*abs(wave));
+            float secondary=exp(-64.0*abs(wave+.17*sin(p.y*7.0+t*.23)));
+            float charge=.5+.5*sin(p.y*19.0+t*(.22+u_charging*.9));
+            v=arc*(.56+.52*u_charging*pow(charge,8.0))+secondary*.51;
+            glow=exp(-9.0*abs(wave))*(.12+.24*u_charging);
+            """.trimIndent(),
+            // 53: Infinity Bloom — A layered spiral flower unfolds concentric translucent blades without pixelated effects.
+            """
+            float a=atan(p.y,p.x);
+            float petal=.19+.14*sin(a*8.0+t*.21);
+            float bloom=exp(-44.0*abs(r-petal));
+            float outer=exp(-59.0*abs(r-.34-.055*sin(a*5.0-t*.16)));
+            float glint=pow(max(0.0,sin(a*9.0-t*.38)),12.0);
+            v=bloom*(.61+.3*glint)+outer*.74;
+            glow=exp(-9.0*abs(r-petal))*.23+outer*.12;
+            """.trimIndent(),
+            // 54: AMOLED Current — Deep-black electric currents reveal an extra braided channel while music plays.
+            """
+            float q=p.x+.12*sin(p.y*9.1-t*.36);
+            float main=exp(-92.0*abs(q));
+            float companionLine=exp(-101.0*abs(q+.23*sin(p.y*6.0+t*.27)));
+            float sparks=pow(max(0.0,sin(p.y*31.0+t*.56)),14.0);
+            v=main*(.42+.65*sparks)+companionLine*(.20+.85*u_music);
+            glow=exp(-13.0*abs(q))*(.17+.26*u_music);
+            """.trimIndent(),
+            // 55: Galaxy Orbit — Several orbital light lanes drift at different speeds around a dark center.
+            """
+            float a=atan(p.y,p.x);
+            float elliptical=length(p*float2(1.0,1.27));
+            float lane=exp(-84.0*abs(elliptical-.31-.046*sin(a*3.0+t*.23)));
+            float outer=exp(-94.0*abs(r-.42+.039*cos(a*4.0-t*.19)));
+            float star=pow(max(0.0,cos(a*11.0-t*.45)),24.0);
+            v=lane*(.41+.81*star)+outer*.49;
+            glow=exp(-11.0*abs(elliptical-.31))*.26+outer*.11;
+            """.trimIndent(),
+            // 56: Dynamic Fold — A split-screen sheet of light flexes as the phone is tilted and screen pages move.
+            """
+            float2 q=p-float2(u_gyro.x*.11,u_gyro.y*.08);
+            float hinge=q.x+.16*sin(q.y*5.2+t*.15);
+            float fold=abs(hinge)-.14-.045*sin(q.y*4.7-t*.21);
+            float sheet=exp(-37.0*abs(fold));
+            float seam=exp(-88.0*abs(hinge));
+            float edge=pow(max(0.0,cos(q.y*13.0+t*.18)),14.0);
+            v=sheet*(.43+.44*edge)+seam*.61;
+            glow=exp(-8.0*abs(fold))*.27+seam*.13;
+            """.trimIndent(),
+            // 57: Edge Aurora — Curved aurora strands glide along both edges and follow device rotation.
+            """
+            float2 q=p-float2(u_gyro.x*.13,u_gyro.y*.10);
+            float left=q.x+.30+.10*sin(q.y*6.0+t*.22);
+            float right=q.x-.30-.10*cos(q.y*6.7-t*.21);
+            float c1=exp(-36.0*abs(left));
+            float c2=exp(-36.0*abs(right));
+            float stream=pow(max(0.0,cos(q.y*17.0+t*.3)),12.0);
+            v=(c1+c2)*(.43+.49*stream);
+            glow=(exp(-8.0*abs(left))+exp(-8.0*abs(right)))*.27;
+            """.trimIndent(),
+            // 58: Prism Cascade — Diagonal transparent blades cascade downward as separate light channels.
+            """
+            float rotated=p.x*.78+p.y*.62;
+            float blade=sin(rotated*24.0-t*.41);
+            float stagger=sin((p.y-p.x)*9.0+t*.22);
+            float bands=pow(max(0.0,blade),22.0)*exp(-1.3*r);
+            float edge=exp(-47.0*abs(rotated-.11*sin(t*.12)));
+            v=bands*(.43+.36*max(0.0,stagger))+edge*.71;
+            glow=pow(abs(blade),4.0)*exp(-2.0*r)*.17+edge*.12;
+            """.trimIndent(),
+            // 59: Signal Halo — Incoming notifications launch a bright orbiting halo and fading secondary ring.
+            """
+            float age=1.0-u_notification;
+            float radius=.20+age*.44;
+            float burst=exp(-90.0*abs(r-radius))*u_notification;
+            float secondary=exp(-75.0*abs(r-(radius-.11)))*u_notification*.61;
+            float standby=exp(-76.0*abs(r-.27));
+            v=standby*.33+burst*1.1+secondary;
+            glow=exp(-10.0*abs(r-radius))*(.11+.32*u_notification);
+            """.trimIndent(),
+            // 60: Electric Canvas — A touch injects a branching electric pulse across curved energy traces.
+            """
+            float line=p.x+.13*sin(p.y*9.0+t*.33);
+            float branch=p.y+.19*sin(p.x*10.0-t*.37);
+            float current=exp(-67.0*abs(line));
+            float transverse=exp(-79.0*abs(branch));
+            float touchGlow=exp(-10.0*length(p-touch))*u_touchForce;
+            v=current*.62+transverse*.33+touchGlow*1.1;
+            glow=exp(-10.0*abs(line))*.14+touchGlow*.43;
+            """.trimIndent(),
+            // 61: Midnight Wave — Inky layered waves slow down when silent mode is enabled for a calmer home screen.
+            """
+            float rate=.11+.30*(1.0-u_silent);
+            float ridge=p.y+.20*sin(p.x*5.1+t*rate);
+            float lower=exp(-30.0*abs(ridge+.18));
+            float upper=exp(-45.0*abs(ridge-.13));
+            float horizon=exp(-80.0*abs(ridge));
+            v=lower*.46+upper*.70+horizon*.42;
+            glow=exp(-8.0*abs(ridge))*(.16+.18*(1.0-u_silent));
             """.trimIndent()
         )
 
@@ -650,6 +873,16 @@ half4 main(float2 frag) {
     if (u_palette > 4.5) {
         accent = u_customColor;
     }
+    // Original, independent Apple-inspired and Samsung-inspired looks.
+    // Do not alter the colour of any existing HALYN presets.
+    // User-selected palettes and custom colours always override these defaults.
+    if (u_palette < 0.5 && u_variant > 41.5 && u_variant < 51.5) {
+        float hue = .5 + .5*sin(u_variant*1.67);
+        accent = mix(float3(.76, .41, 1.0), float3(.38, .79, 1.0), hue);
+    } else if (u_palette < 0.5 && u_variant > 51.5) {
+        float hue = .5 + .5*cos(u_variant*1.47);
+        accent = mix(float3(.25, .53, 1.0), float3(.26, .95, .79), hue);
+    }
     float3 companion = mix(accent, accent.zxy, 0.46) * 0.72;
     float3 highlight = mix(accent, float3(0.97, 0.985, 1.0), 0.59);
     float r = length(p);
@@ -674,6 +907,16 @@ half4 main(float2 frag) {
     float3 inkBlack = float3(0.0035, 0.006, 0.014);
     float3 ambientTint = mix(companion, accent, .36) * (.065 + .045 * horizon);
     float3 col = inkBlack + ambientTint * (.5 + .5 * vignette);
+    // Apple-inspired optical glass uses broad, flowing pastel reflection.
+    // Samsung-inspired scenes remain predominantly black for AMOLED contrast.
+    if (u_variant > 41.5 && u_variant < 51.5) {
+        float wave = p.y + .17*sin(p.x*4.4+t*.13+u_variant*.17);
+        float satin = exp(-3.3*abs(wave));
+        col += accent*(.13+.16*satin) + companion*.06*vignette;
+    } else if (u_variant > 51.5) {
+        float innerDark = exp(-3.0*r);
+        col += companion*.025*innerDark + accent*.013*vignette;
+    }
 
     // Balanced: animated light gradients, without expensive noise samples.
     if (u_quality > 0.5) {
@@ -691,6 +934,11 @@ half4 main(float2 frag) {
     float halo = max(0.0, glow) * k;
     float broadLight = energy * (.56 - .10 * metal) +
         halo * (.25 + .24 * atmospheric);
+    if (u_variant > 41.5 && u_variant < 51.5) {
+        broadLight = energy*.76 + halo*.56;
+    } else if (u_variant > 51.5) {
+        broadLight = energy*.79 + halo*.38;
+    }
     float3 emission = mix(companion, accent, clamp(energy * .56 + .35, 0.0, 1.0));
     col += emission * broadLight;
     col += companion * halo * (.17 + .18 * atmospheric);
@@ -784,7 +1032,13 @@ half4 main(float2 frag) {
                     35, 36 -> active.setFloatUniform("u_dayphase", reactions.dayPhase)
                     37, 38 -> active.setFloatUniform("u_notification", reactions.notification)
                     40 -> active.setFloatUniform("u_touchForce", touchForce)
-                    41 -> active.setFloatUniform("u_silent", reactions.silent)
+                    41, 61 -> active.setFloatUniform("u_silent", reactions.silent)
+                    42, 46, 50, 56, 57 -> Unit // The gyro uniform is already set above.
+                    48 -> active.setFloatUniform("u_dayphase", reactions.dayPhase)
+                    52 -> active.setFloatUniform("u_charging", reactions.charging)
+                    54 -> active.setFloatUniform("u_music", reactions.music)
+                    59 -> active.setFloatUniform("u_notification", reactions.notification)
+                    60 -> active.setFloatUniform("u_touchForce", touchForce)
                 }
                 paint.shader = active
                 canvas.drawRect(0f, 0f, width, height, paint)
