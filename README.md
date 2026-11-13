@@ -1,5 +1,19 @@
 # HALYN Motion
 
+## v0.20.0 — 12 reactive originals, no screen capture
+
+Twelve brand-new original-style shaders extend the 28 original effects and the previous 30 extra wallpapers, preserving their IDs, appearance, palette behavior, and shader pipeline. New scenes: Resonant Veil, Melody Vortex, Harmonic Ladder, Charge Current, Battery Halo, Solar Dial, Nightfall Canopy, Notification Ripple, Signal Wings, Gyro Filaments, Touch Lantern, and Quiet Sanctuary.
+
+Each scene has a different functional mechanic:
+
+- **Music & motion**: reacts to playback being active (not beat, waveform, title, or volume analysis). Uses Android AudioManager; microphone and playback-capture permissions are not requested.
+- **Battery & charging**: charging state powers moving light, while battery level controls the halo geometry.
+- **Time**: an orbital day clock and nightfall-driven aurora use the phone's local time.
+- **Notifications**: optional Android Notification Listener access drives two short event animations. HALYN stores only the event timestamp; never notification text, sender, app identity, or IDs. All other wallpaper mechanics work without notification access.
+- **Gyro, touch, ringer**: live tilt steering, touch bloom, and silent/vibrate-responsive ripples.
+
+No screen recording, MediaProjection, microphone, root, accessibility service, or network access is required by these smart reactions. Rendering and signal polling stop when the wallpaper is hidden. The notification listener is opt-in through the Preferences shortcut in HALYN's studio.
+
 ## v0.19.0 — Unlimited clock-font library and working presets
 
 HALYN no longer imposes a **3 MB file-size ceiling** or replaces the previous imported font each time. You can store any number of valid TrueType/OpenType font files (`.ttf`, `.otf`, `.ttc`) up to the actual free storage and file-system constraints of your Android device. Files are imported in a streaming manner with a bounded RAM buffer, validated by Android's font loader, and kept in app-private storage. They are content-addressed with SHA-256 to avoid duplicate copies. Previous single custom-font imports are migrated automatically.
