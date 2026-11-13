@@ -1,5 +1,13 @@
 # HALYN Motion
 
+## v0.20.1 — Original-style shader rendering repair
+
+The newer gallery could display identical dark blue-green gradient tiles when Android rejected the combined 42-variant AGSL program. The previous implementation cached a global shader failure and substituted the same background for every card.
+
+The renderer now **builds each scene as an independent AGSL program**, retains a small per-scene shader cache for scrolling, and isolates failures by preset. The original shader formulas and visual style remain in place. When a device driver still rejects an individual program, a distinct animated Canvas silhouette replaces the featureless gradient.
+
+No screen capture, microphone or accessibility permission is necessary. GitHub Actions verifies Android compilation; actual scene appearance still needs testing on the Galaxy A56.
+
 ## v0.20.0 — 12 reactive originals, no screen capture
 
 Twelve brand-new original-style shaders extend the 28 original effects and the previous 30 extra wallpapers, preserving their IDs, appearance, palette behavior, and shader pipeline. New scenes: Resonant Veil, Melody Vortex, Harmonic Ladder, Charge Current, Battery Halo, Solar Dial, Nightfall Canopy, Notification Ripple, Signal Wings, Gyro Filaments, Touch Lantern, and Quiet Sanctuary.
