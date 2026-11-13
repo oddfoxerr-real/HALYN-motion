@@ -29,7 +29,7 @@ class SmoothWallpaperRenderer {
 
     companion object {
         const val FIRST = 75
-        const val COUNT = 30
+        const val COUNT = 42
         const val LAST = FIRST + COUNT - 1
         val SCENES = listOf(
         Scene("Ripple Cadence", "Fluid ribbons", "Three travelling ripple sources alternate between constructive and destructive interference."),
@@ -61,7 +61,19 @@ class SmoothWallpaperRenderer {
         Scene("Sonic Contours", "Geometry & motion", "Three resonant harmonics trace bright nodal curves in changing combinations."),
         Scene("Folded Continuum", "Geometry & motion", "Continuous luminous planes fold and invert, revealing separate interior edges."),
         Scene("Morphing Torus", "Geometry & motion", "A changing toroidal loop pinches into lobes before smoothly returning to a ring."),
-        Scene("Infinite Weave", "Geometry & motion", "Two figure-eight curves exchange over-under highlights as they rotate across the screen.")
+        Scene("Infinite Weave", "Geometry & motion", "Two figure-eight curves exchange over-under highlights as they rotate across the screen."),
+        Scene("Resonant Veil", "Music & motion", "Playback gently widens two counter-running luminous silk bands."),
+        Scene("Melody Vortex", "Music & motion", "While music plays, an extra inward spiral appears and accelerates."),
+        Scene("Harmonic Ladder", "Music & motion", "Playback unlocks extra rungs of a staggered harmonic contour."),
+        Scene("Charge Current", "Energy & battery", "A luminous electric current climbs upward when the phone is charging."),
+        Scene("Battery Halo", "Energy & battery", "A smooth breathing ring tracks the remaining battery charge."),
+        Scene("Solar Dial", "Time & atmosphere", "One soft orbit completes its journey over the local day."),
+        Scene("Nightfall Canopy", "Time & atmosphere", "Curved aurora curtains glow more strongly as night approaches."),
+        Scene("Notification Ripple", "Signals & touch", "Incoming notifications send out fading ripples when optional notification access is enabled."),
+        Scene("Signal Wings", "Signals & touch", "A notification briefly opens opposing glowing wings, without using message content."),
+        Scene("Gyro Filaments", "Signals & touch", "Tilting the phone steers two intertwining luminous filaments."),
+        Scene("Touch Lantern", "Signals & touch", "Touch ignites a smooth seven-petal lantern that fades into a ring."),
+        Scene("Quiet Sanctuary", "Signals & touch", "Silent or vibrate mode settles a restless field into calmer concentric waves.")
         )
         fun isSmooth(value: Int): Boolean = value in FIRST..LAST
         fun mechanicDescription(preset: Int): String? =
@@ -80,6 +92,13 @@ uniform float u_speed;
 uniform float u_quality;
 uniform float u_offset;
 uniform float2 u_gyro;
+uniform float u_music;
+uniform float u_charging;
+uniform float u_battery;
+uniform float u_notification;
+uniform float u_dayphase;
+uniform float u_silent;
+uniform float u_touchForce;
 
 float noise21(float2 p) {
     return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);
@@ -445,6 +464,105 @@ half4 main(float2 frag) {
         float over=.5+.5*sin(q.y*12.0+t*.42);
         v=path*(.30+.76*over)+strands*.49;
         glow=exp(-13.0*abs(a*.42+b*.58))*.22;
+    } else if (u_variant < 30.5) {
+        // Resonant Veil: playback modulates two independently moving ribbons.
+        float x=p.x+.21*sin(p.y*6.2+t*.25);
+        float left=exp(-72.0*abs(x+.15-.065*u_music*sin(t*.9)));
+        float right=exp(-72.0*abs(x-.15+.065*u_music*cos(t*.7)));
+        float melody=pow(max(0.0,sin(p.y*18.0-t*.7)),10.0);
+        v=(left+right)*(.47+.5*melody)*(.75+.4*u_music)*exp(-1.3*abs(p.y));
+        glow=(left+right)*(.09+.2*u_music);
+    } else if (u_variant < 31.5) {
+        // Melody Vortex: a second spiral appears only during playback.
+        float a=atan(p.y,p.x);
+        float spiral=sin(a*4.0+23.0*r-t*(.3+u_music*.7));
+        float ribbon=exp(-56.0*abs(r-.27-.07*sin(a*3.0+t*.17)));
+        v=ribbon*(.48+.4*max(0.0,spiral))+
+            u_music*pow(max(0.0,spiral),16.0)*exp(-3.5*r)*.8;
+        glow=exp(-12.0*abs(r-.27))*(.13+.22*u_music);
+    } else if (u_variant < 32.5) {
+        // Harmonic Ladder: music activity illuminates additional overtone rails.
+        float tilt=p.x+.07*sin(p.y*4.0+t*.19);
+        float steps=sin(p.y*28.0+tilt*7.0-t*.44);
+        float rails=exp(-58.0*abs(abs(tilt)-.21));
+        float cross=pow(max(0.0,steps),18.0)*exp(-8.0*abs(tilt));
+        v=rails*(.38+.53*u_music)+cross*(.20+.78*u_music)*exp(-.9*r);
+        glow=rails*.14+cross*.11*u_music;
+    } else if (u_variant < 33.5) {
+        // Charge Current: brighter and faster charging streamlines.
+        float flow=sin(p.y*24.0+t*(.28+u_charging*1.3));
+        float spine=p.x+.13*sin(p.y*7.0-t*.24);
+        float edge=exp(-65.0*abs(spine))+
+            exp(-72.0*abs(spine+.24*sin(p.y*3.0+t*.18)))*.4;
+        v=edge*(.24+.64*u_charging*pow(max(0.0,flow),9.0));
+        glow=exp(-12.0*abs(spine))*(.08+.31*u_charging);
+    } else if (u_variant < 34.5) {
+        // Battery Halo: battery fraction maps directly to ring radius.
+        float radius=.19+.18*u_battery+.015*sin(t*.3);
+        float circle=abs(r-radius);
+        float a=atan(p.y,p.x);
+        float crest=sin(a*6.0-t*.38);
+        v=exp(-88.0*circle)*(.52+.29*max(0.0,crest))+
+            exp(-100.0*abs(r-(radius-.075)))*u_battery*.32;
+        glow=exp(-13.0*circle)*(.15+.12*u_battery);
+    } else if (u_variant < 35.5) {
+        // Solar Dial: an orbit completes one cycle per local 24-hour day.
+        float a=atan(p.y,p.x);
+        float phase=u_dayphase*6.2831853;
+        float orbit=exp(-88.0*abs(r-.33));
+        float sun=exp(-16.0*length(p-float2(cos(phase),sin(phase))*.33));
+        v=orbit*(.27+.25*max(0.0,cos(a-phase)))+sun*1.12;
+        glow=exp(-12.0*abs(r-.33))*.17+sun*.25;
+    } else if (u_variant < 36.5) {
+        // Nightfall Canopy: opacity follows the local day/night cycle.
+        float daylight=.5+.5*cos((u_dayphase-.5)*6.2831853);
+        float night=1.0-daylight;
+        float curtain=p.y+.19*sin(p.x*7.0+t*.17)+.10*sin(p.x*13.0-t*.12);
+        float layer=exp(-35.0*abs(curtain+.18));
+        float upper=exp(-42.0*abs(curtain-.04));
+        v=(layer*.84+upper*.41)*(.15+.9*night)*exp(-1.7*abs(p.x));
+        glow=exp(-9.0*abs(curtain))*(.06+.23*night);
+    } else if (u_variant < 37.5) {
+        // Notification Ripple: event pulse creates a travelling radius.
+        float phase=1.0-u_notification;
+        float base=exp(-85.0*abs(r-.22-.025*sin(t*.4)));
+        float burst=exp(-120.0*abs(r-(.06+phase*.68)))*u_notification;
+        v=base*.42+burst*1.25;
+        glow=exp(-12.0*abs(r-(.06+phase*.68)))*u_notification*.32+
+            exp(-10.0*abs(r-.22))*.11;
+    } else if (u_variant < 38.5) {
+        // Signal Wings: notification events open symmetric luminous leaves.
+        float spread=.055+.34*(1.0-u_notification);
+        float contour=abs(p.x)-spread*(.5+.5*cos(p.y*5.0));
+        float leftRight=exp(-72.0*abs(contour));
+        float inner=exp(-46.0*abs(abs(p.x)-.11-.09*sin(p.y*5.0+t*.1)));
+        v=inner*.34+leftRight*u_notification*1.05*exp(-2.5*abs(p.y));
+        glow=exp(-12.0*abs(contour))*u_notification*.28;
+    } else if (u_variant < 39.5) {
+        // Gyro Filaments: device tilt steers the weave without any camera.
+        float2 q=p-float2(u_gyro.x*.18,u_gyro.y*.14);
+        float thread1=q.x+.11*sin(q.y*12.0+t*.23+u_gyro.x*4.0);
+        float thread2=q.y+.11*cos(q.x*11.0-t*.19+u_gyro.y*4.0);
+        v=exp(-76.0*abs(thread1))*.69+
+            exp(-76.0*abs(thread2))*.56;
+        glow=(exp(-12.0*abs(thread1))+exp(-12.0*abs(thread2)))*.12;
+    } else if (u_variant < 40.5) {
+        // Touch Lantern: recently touched position blooms into seven petals.
+        float distance=length(p-touch);
+        float petals=.5+.5*cos(atan(p.y-touch.y,p.x-touch.x)*7.0+t*.3);
+        float bulb=exp(-26.0*distance)*u_touchForce*(.6+.7*petals);
+        float rim=exp(-95.0*abs(r-.22-.02*sin(t*.25)));
+        v=rim*.38+bulb*1.3;
+        glow=exp(-11.0*distance)*u_touchForce*.37+rim*.13;
+    } else if (u_variant < 41.5) {
+        // Quiet Sanctuary: ringer mode modulates ring detail and drift.
+        float calm=1.0-u_silent;
+        float ripple=sin(r*(19.0+9.0*calm)-t*(.14+.35*calm));
+        float ellipse=length(p*float2(1.0,1.25));
+        float ring=exp(-75.0*abs(ellipse-.27-.025*sin(t*.18)));
+        v=ring*(.48+.35*pow(max(0.0,ripple),8.0))+
+            pow(max(0.0,ripple),18.0)*exp(-3.6*r)*(.12+.32*calm);
+        glow=exp(-10.0*abs(ellipse-.27))*(.16+.13*calm);
     } else {
         v = 0.0;
         glow = 0.0;
@@ -526,7 +644,8 @@ half4 main(float2 frag) {
         touchY: Float,
         offsetX: Float,
         pose: ParallaxPose,
-        touchForce: Float = 0f
+        touchForce: Float = 0f,
+        reactions: SceneSignals = SceneSignals()
     ) {
         val width = canvas.width.coerceAtLeast(1).toFloat()
         val height = canvas.height.coerceAtLeast(1).toFloat()
@@ -553,6 +672,13 @@ half4 main(float2 frag) {
                     if (state.touch) touchY else .5f)
                 active.setFloatUniform("u_offset", if (state.parallax) offsetX else .5f)
                 active.setFloatUniform("u_gyro", pose.x, pose.y)
+                active.setFloatUniform("u_music", reactions.music)
+                active.setFloatUniform("u_charging", reactions.charging)
+                active.setFloatUniform("u_battery", reactions.battery)
+                active.setFloatUniform("u_notification", reactions.notification)
+                active.setFloatUniform("u_dayphase", reactions.dayPhase)
+                active.setFloatUniform("u_silent", reactions.silent)
+                active.setFloatUniform("u_touchForce", touchForce)
                 paint.shader = active
                 canvas.drawRect(0f, 0f, width, height, paint)
                 return
