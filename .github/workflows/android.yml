@@ -120,11 +120,11 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.20.0 Unlimited Clock Fonts
+      - name: Publish HALYN v0.20.0 Reactive Originals
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.20.0-preview.1
+          TAG: v0.20.0-preview.2
         run: |
           set -euo pipefail
           test -s dist/HALYN-Motion-v0.20.0-preview.apk
@@ -134,30 +134,27 @@ jobs:
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN Motion v0.20.0 — Unlimited Font Library
+          # HALYN Motion v0.20.0 — 12 Reactive Originals
 
-          - Removes the 3 MB imported clock font cap.
-          - No artificial total-library count or size quotas; installed fonts
-            use ordinary app-private storage limited by available device space.
-          - Import multiple TTF/OTF/TTC font files together using Android's
-            document picker without overwriting earlier imports.
-          - Fonts are content-addressed and validated before being saved;
-            identical files are stored only once.
-          - Previously imported single-font files migrate into the library.
-          - Preset clock fonts use distinct real typeface families, with
-            actual font previews in their selectable chips.
-          - Font selection immediately reveals the digital clock in preview
-            if the clock was previously disabled.
-          - Analogue clock displays hour numerals with non-default fonts,
-            making preset and custom font selection visible there too.
-          - Imported font picker supports previewing, selecting and deleting
-            individual local fonts, with persistence across app restarts.
-          - Clocks auto-fit their lettering to different font widths.
-          - All 28 original shaders and 30 additions are retained.
-          - Debug-signed preview. Native Android font rendering still needs
-            on-device verification on Samsung Galaxy A56.
+          - 12 unique shader wallpapers (IDs 105-116), keeping the original HALYN
+            optical palette, smooth contours, bloom and motion renderer.
+          - Resonant Veil, Melody Vortex and Harmonic Ladder react to whether
+            music is playing, without recording audio or accessing the screen.
+            They do not detect individual beats or waveform amplitude.
+          - Charge Current and Battery Halo react to charging and battery level.
+          - Solar Dial and Nightfall Canopy follow the device's local clock.
+          - Notification Ripple and Signal Wings respond to new notifications
+            after optional Notification Listener access. Only an event timestamp
+            is stored, never notification sender, content or application identity.
+          - Gyro Filaments, Touch Lantern and Quiet Sanctuary respond to tilt,
+            touch and silent/vibrate status respectively.
+          - Android 13+ AGSL, no root, microphone or screen-capture permission.
+          - Previous 28 original effects, 30 added original-style effects,
+            imported photos, star scene, settings and font library remain.
+          - Debug-signed preview: shader appearance still requires an on-device
+            check on Samsung Galaxy A56.
           NOTES
           gh release create "$TAG" dist/HALYN-Motion-v0.20.0-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.20.0 — Unlimited Fonts & Preset Repairs" \
+            --title "HALYN Motion v0.20.0 — 12 Reactive Originals" \
             --notes-file notes.md --prerelease
