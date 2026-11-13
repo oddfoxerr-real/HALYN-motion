@@ -4,6 +4,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RuntimeShader
 import android.graphics.Shader
 import android.os.Build
@@ -718,6 +719,11 @@ half4 main(float2 frag) {
         color = Color.rgb(5, 8, 18)
     }
     private val fallbackPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.DITHER_FLAG)
+    private val recoveryStroke = Paint(Paint.ANTI_ALIAS_FLAG or Paint.DITHER_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
     private var fallback: LinearGradient? = null
     private var fallbackHeight = -1
     private var fallbackColor = Int.MIN_VALUE
@@ -810,5 +816,98 @@ half4 main(float2 frag) {
         }
         fallbackPaint.shader = fallback
         canvas.drawRect(0f, 0f, width, height, fallbackPaint)
+
+        // Even on devices that reject AGSL, do not turn every wallpaper into
+        // the same featureless gradient. Draw an inexpensive distinct
+        // procedural silhouette, without screen capture or GPU shader code.
+        val sceneIndex = (state.preset - FIRST).coerceIn(0, COUNT - 1)
+        val minDimension = minOf(width, height)
+        val phase = time * (.22f + state.speed * .17f) + sceneIndex * .49f
+        val centerX = width * .5f
+        val centerY = height * .48f
+        val scale = minDimension * (.25f + (sceneIndex % 5) * .023f)
+        val outline = Path()
+        val count = 2 + (sceneIndex % 4)
+        for (line in 0 until count) {
+            val lineOffset = line.toFloat() - (count - 1) * .5f
+            outline.reset()
+            val mode = sceneIndex % 6
+            when (mode) {
+                0 -> {
+                    // Long, flowing ribbons.
+                    for (step in 0..64) {
+                        val y = height * step / 64f
+                        val x = centerX + scale * (
+                            kotlin.math.sin(step * .08f + phase + lineOffset * .7f) * .49f +
+                                lineOffset * .27f
+                            )
+                        if (step == 0) outline.moveTo(x, y) else outline.lineTo(x, y)
+                    }
+                }
+                1 -> {
+                    // Figure-eight loops with independently shifted phases.
+                    for (step in 0..100) {
+                        val a = step * 6.2831853f / 100f
+                        val x = centerX + scale * kotlin.math.sin(a + phase * .18f) *
+                            (1f + lineOffset * .09f)
+                        val y = centerY + scale * .45f *
+                            kotlin.math.sin(a * 2f + phase * .24f + lineOffset * .35f)
+                        if (step == 0) outline.moveTo(x, y) else outline.lineTo(x, y)
+                    }
+                }
+                2 -> {
+                    // Orbital halos with changing curvature.
+                    val radius = scale * (.62f + line * .13f)
+                    outline.addOval(
+                        centerX - radius,
+                        centerY - radius * (.55f + .1f * kotlin.math.sin(phase + line)),
+                        centerX + radius,
+                        centerY + radius * (.55f + .1f * kotlin.math.sin(phase + line)),
+                        Path.Direction.CW
+                    )
+                }
+                3 -> {
+                    // Soft frequency-like wave contours.
+                    for (step in 0..70) {
+                        val x = width * step / 70f
+                        val y = centerY + scale * .34f * kotlin.math.sin(
+                            x / width * 12f + phase + lineOffset * .9f
+                        ) + lineOffset * scale * .23f
+                        if (step == 0) outline.moveTo(x, y) else outline.lineTo(x, y)
+                    }
+                }
+                4 -> {
+                    // Charged diagonal filaments.
+                    for (step in 0..55) {
+                        val y = height * step / 55f
+                        val x = centerX + lineOffset * scale * .34f +
+                            y / height * scale * .45f +
+                            kotlin.math.sin(step * .43f + phase + line) * scale * .07f
+                        if (step == 0) outline.moveTo(x, y) else outline.lineTo(x, y)
+                    }
+                }
+                else -> {
+                    // Petal loops whose number differs across presets.
+                    for (step in 0..100) {
+                        val a = step * 6.2831853f / 100f
+                        val radius = scale * (.55f + .18f * kotlin.math.cos(
+                            a * (4 + sceneIndex % 4) + phase + lineOffset
+                        ))
+                        val x = centerX + radius * kotlin.math.cos(a)
+                        val y = centerY + radius * kotlin.math.sin(a)
+                        if (step == 0) outline.moveTo(x, y) else outline.lineTo(x, y)
+                    }
+                }
+            }
+            for (pass in 0..1) {
+                recoveryStroke.color = Color.argb(
+                    if (pass == 0) 48 else 202,
+                    Color.red(accent), Color.green(accent), Color.blue(accent)
+                )
+                recoveryStroke.strokeWidth = minDimension *
+                    (if (pass == 0) .023f else .0048f)
+                canvas.drawPath(outline, recoveryStroke)
+            }
+        }
     }
 }
