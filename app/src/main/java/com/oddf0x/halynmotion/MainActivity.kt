@@ -294,6 +294,16 @@ class MainActivity : Activity() {
         buildOriginalRail(root, "Time & atmosphere", (110..111).toList())
         buildOriginalRail(root, "Signals & touch", (112..116).toList())
 
+        root.addView(section("Apple-inspired originals",
+            "Ten original soft-glass, silky, layered wallpapers. Inspired by modern Apple aesthetics; no official artwork."))
+        buildOriginalRail(root, "Soft glass & flowing silk", (117..121).toList())
+        buildOriginalRail(root, "Dreamlike depth & light", (122..126).toList())
+
+        root.addView(section("Samsung-inspired originals",
+            "Ten unique deep-black AMOLED wallpapers with bold luminous motion. Not official Samsung artwork."))
+        buildOriginalRail(root, "Dynamic waves & galaxy light", (127..131).toList())
+        buildOriginalRail(root, "Edge light & energy", (132..136).toList())
+
         root.addView(section("Landscapes & exploration",
             "Minimalistic mountains and interactive Star Window."))
         buildOriginalRail(root, "Minimal landscapes", (17..20).toList())
