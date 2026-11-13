@@ -1,5 +1,19 @@
 # HALYN Motion
 
+## v0.21.0 — Original Apple- and Samsung-inspired wallpaper collections
+
+HALYN now contains **90 original procedural wallpapers**: the existing 28 classic effects, 30 earlier original-style extras, 12 reactive originals, plus **20 new device-inspired designs**. None of the existing preset IDs or names changed.
+
+**Apple-inspired originals (10):** Satin Tide, Frosted Petals, Liquid Pearl, Pastel Canyon, Aurora Fold, Glass Tunnels, Velvet Horizon, Opaline Rings, Prism Ribbon, Soft Eclipse. Deliberately soft, satin-like, glassy and layered, with brighter diffuse reflections and translucent color flow. The shader geometries include pearl refraction, nested opaline rings, sculpted canyon glass, ribbon braids, frosted petals and atmospheric horizons.
+
+**Samsung-inspired originals (10):** One Pulse, Infinity Bloom, AMOLED Current, Galaxy Orbit, Dynamic Fold, Edge Aurora, Prism Cascade, Signal Halo, Electric Canvas, Midnight Wave. Built for AMOLED contrast: predominantly black backgrounds, luminous electric filaments, dynamic folds, curved edge auroras, infinity-like orbiting forms and deeper optical highlights.
+
+Every wallpaper contains its **own original animation equation** in a distinct, lazily compiled AGSL shader program; these aren't hue-shifted copies of previous wallpapers. Several use existing privacy-conscious device signals: gyro/tilt, charging, time of day, music playing (not captured audio), touch, optional notification timestamps and silent mode. Most have independent motion without any special permission. Android's regular GPU Canvas renderer is used, with the previous per-scene fallback protection maintained.
+
+The gallery offers two separate collections in 4 horizontally scrollable rails. All existing colors, shader quality, performance settings, clock features, imported fonts and photographic backgrounds remain available.
+
+The new effects are *original style interpretations only* — no Apple or Samsung wallpaper assets, logos, proprietary illustrations or claims of affiliation are included. CI verifies Android compilation, APK packaging and shader/preset counts. Actual AGSL appearance still requires a device test on the Galaxy A56.
+
 ## v0.20.1 — Original-style shader rendering repair
 
 The newer gallery could display identical dark blue-green gradient tiles when Android rejected the combined 42-variant AGSL program. The previous implementation cached a global shader failure and substituted the same background for every card.
