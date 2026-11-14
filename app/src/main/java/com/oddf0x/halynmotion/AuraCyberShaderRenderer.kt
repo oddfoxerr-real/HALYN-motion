@@ -174,7 +174,7 @@ class AuraCyberShaderRenderer {
             // 165: Packet Drift
             """
                 float2 q=p;
-                float touchDist=length(q-u_pointer);
+                float touchDist=length(q-pointer);
                 float deflect=u_pointerDown*.05*exp(-30.0*touchDist*touchDist);
                 float curved=q.y +.048*sin(q.x*8.0 +t*.32)-deflect;
                 float channels=curved*15.0;
@@ -192,7 +192,7 @@ class AuraCyberShaderRenderer {
                 float2 g=abs(fract(q*float2(18.0,26.0))-.5);
                 float thin=1.0-smoothstep(.008,.042,min(g.x,g.y));
                 float sweep=exp(-75.0*abs(q.y+.45-.90*fract(t*.065)));
-                float activation=exp(-24.0*length(q-u_pointer))*(.13+.28*u_pointerDown);
+                float activation=exp(-24.0*length(q-pointer))*(.13+.28*u_pointerDown);
                 float2 tile=floor(q*float2(18.0,26.0));
                 float chosen=step(.94,n2(tile+floor(t*.32)));
                 core=0.0;
@@ -266,8 +266,7 @@ half4 main(float2 frag) {
     float2 p=float2((uv.x-.5)*aspect,uv.y-.5);
     p-=u_gyro*float2(.034,.026);
     p.x-=(u_offset-.5)*.065;
-    float2 u_pointerView=float2((u_pointer.x-.5)*aspect,u_pointer.y-.5);
-    float2 u_pointer=u_pointerView;
+    float2 pointer=float2((u_pointer.x-.5)*aspect,u_pointer.y-.5);
     float t=u_time*(.40+.64*u_speed);
     float r=length(p);
     float3 accent=u_defaultTint;
@@ -299,7 +298,7 @@ half4 main(float2 frag) {
     col+=highlight*(filament*.68+spark*.55)*strength;
     float ambientSignal=(u_signal.x*.016+u_signal.y*.014+u_signal.z*.029);
     col+=secondary*ambientSignal*background;
-    float nearTouch=exp(-21.0*length(p-u_pointer));
+    float nearTouch=exp(-21.0*length(p-pointer));
     col+=accent*nearTouch*u_pointerDown*.026;
     if(u_quadEnabled>.5) col+=quad*.008*background;
     if(u_quality>1.5) {
