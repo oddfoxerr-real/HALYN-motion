@@ -139,7 +139,7 @@ jobs:
           assert "Halo Chamber" not in glass_src
           material_src = Path("app/src/main/java/com/oddf0x/halynmotion/MaterialXRenderer.kt").read_text()
           assert "seconds*(.78f + state.speed*.24f)" in material_src
-          assert "h*.075f*sin(t*.68f)" in material_src
+          assert "h*(.43f+.075f*sin(t*.68f))" in material_src
           assert "val slideX=w*.055f*sin(phase)" in material_src
           ui_src = Path("app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt").read_text()
           assert "postInvalidateDelayed(84L)" in ui_src
