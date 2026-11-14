@@ -320,6 +320,11 @@ class MainActivity : Activity() {
         buildOriginalRail(root, "Lenses & refraction", (145..149).toList())
         buildOriginalRail(root, "Crystal depth & motion", (150..154).toList())
 
+        root.addView(section("Bubble Garden · Interactive",
+            "Stationary soap-glass bubbles. Drag one to stretch and pop it, " +
+                "then watch the tiny droplets fade and the bubble grow back."))
+        buildOriginalRail(root, "Touch & pop", listOf(BubbleGardenRenderer.SCENE_INDEX))
+
         root.addView(section("Landscapes & exploration",
             "Minimalistic mountains and interactive Star Window."))
         buildOriginalRail(root, "Minimal landscapes", (17..20).toList())
@@ -1366,6 +1371,8 @@ class MainActivity : Activity() {
                 SmoothWallpaperRenderer.mechanicDescription(selected)
                     ?: MaterialXRenderer.description(selected)
                     ?: GlassOrbitCollectionRenderer.description(selected)
+                    ?: (if (selected == BubbleGardenRenderer.SCENE_INDEX)
+                        BubbleGardenRenderer.DESCRIPTION else null)
                     ?: "Live originals · 4K photography · Clock & motion"
         }
         if (::onlineCredit.isInitialized) {
@@ -1667,7 +1674,8 @@ class MainActivity : Activity() {
         private val renderer get() = originalTileRenderer
         private val animationStart = SystemClock.uptimeMillis()
         private val animated = MaterialXRenderer.isMaterial(sceneIndex) ||
-            GlassOrbitCollectionRenderer.isGlassOrbit(sceneIndex)
+            GlassOrbitCollectionRenderer.isGlassOrbit(sceneIndex) ||
+            sceneIndex == BubbleGardenRenderer.SCENE_INDEX
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
@@ -1751,6 +1759,13 @@ class MainActivity : Activity() {
             if ((state.preset == StarWindowRenderer.SCENE_INDEX && !state.starTapTravel) ||
                 (state.preset != StarWindowRenderer.SCENE_INDEX && !state.touch)) {
                 return false
+            }
+            if (state.preset == BubbleGardenRenderer.SCENE_INDEX) {
+                renderer.onBubbleTouch(
+                    event.actionMasked,
+                    (event.x / width.coerceAtLeast(1)).coerceIn(0f, 1f),
+                    (event.y / height.coerceAtLeast(1)).coerceIn(0f, 1f)
+                )
             }
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {

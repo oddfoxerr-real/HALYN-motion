@@ -1,5 +1,15 @@
 # HALYN Motion
 
+## v0.24.0 — Bubble Garden interactive live wallpaper
+
+**Bubble Garden**, preset **155**, adds eleven carefully positioned translucent bubbles with soft glass reflections and nearly fixed positions. They are not procedurally rearranged or continuously floating upward: their coordinates remain anchored, with only tiny shimmer and gentle breathing.
+
+**Drag-to-pop:** With wallpaper touch interaction enabled, place a finger on a bubble and drag it farther than approximately 53% of its radius. The bubble stretches toward the drag before popping into seven small droplets and a fading circular shockwave. The fragments vanish in under a second; the bubble takes a short rest and regrows smoothly in the **same exact position** after approximately 2.35 seconds. Releasing without reaching the threshold produces a gentle spring wobble, not an unwanted burst.
+
+Interaction is handled via Android's regular wallpaper touch callbacks and the HALYN studio preview's gesture events (DOWN / MOVE / UP / CANCEL). Bubble drawings are powered by native Android Canvas and cached gradients, with no required microphone, screen capture, network access or new permissions. Some Android launchers may intercept swipe gestures before a live wallpaper receives them, so verify real home-screen drag behaviour on the Galaxy A56.
+
+The existing four-colour editor applies to individual bubble rims and droplets, and the existing palettes and custom accent remain available. All **108 preceding procedural wallpapers** keep their previous IDs, and Bubble Garden becomes procedural wallpaper **109**.
+
 ## v0.23.0 — Glass Orbit Collection & real Material X live motion
 
 **Glass Orbit remains intact.** Ten new glass-ring wallpapers are added at fixed preset IDs **145–154**, after the earlier eight Material X scenes (137–144), keeping every older saved scene ID stable.

@@ -190,6 +190,15 @@ class HalynWallpaperService : WallpaperService() {
             super.onTouchEvent(event)
             // The star scene must not hijack home-screen taps unless opted in.
             if (!acceptsTouch(settings)) return
+            if (settings.preset == BubbleGardenRenderer.SCENE_INDEX) {
+                // Send complete DOWN/MOVE/UP/CANCEL gestures. A one-shot touch
+                // pulse cannot distinguish wobbling from a real drag-to-pop.
+                renderer.onBubbleTouch(
+                    event.actionMasked,
+                    (event.x / surfaceWidth.coerceAtLeast(1)).coerceIn(0f, 1f),
+                    (event.y / surfaceHeight.coerceAtLeast(1)).coerceIn(0f, 1f)
+                )
+            }
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     touchDownX = event.x
