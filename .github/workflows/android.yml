@@ -52,11 +52,11 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='27'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='28'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.21.0-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.21.0-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.22.0-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.22.0-preview.apk > SHA256SUMS.txt)
 
       - name: Verify curated wallpaper collection
         shell: bash
@@ -81,6 +81,16 @@ jobs:
           grep -q 'value in 52..63 || SmoothWallpaperRenderer.isSmooth(value)' app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
           grep -q 'buildOriginalRail(root, "Soft glass & flowing silk"' app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
           grep -q 'buildOriginalRail(root, "Edge light & energy"' app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
+          test -s app/src/main/java/com/oddf0x/halynmotion/QuadColorSystem.kt
+          test -s app/src/main/java/com/oddf0x/halynmotion/MaterialXRenderer.kt
+          grep -q 'buildOriginalRail(root, "Soft material & horizons"' app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
+          grep -q 'buildOriginalRail(root, "Architectural motion"' app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
+          grep -q 'fun getForPreset(preset: Int)' app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
+          grep -q 'QuadColorSystem.setShaderUniforms' app/src/main/java/com/oddf0x/halynmotion/SmoothWallpaperRenderer.kt
+          grep -q 'QuadColorSystem.setShaderUniforms' app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
+          grep -q 'QuadColorSystem.drawOverlay' app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
+          grep -q 'uniform float3 u_quadFour;' app/src/main/java/com/oddf0x/halynmotion/SmoothWallpaperRenderer.kt
+          grep -q 'uniform float3 u_quadFour;' app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
           python3 - <<'PY'
           import re
           from pathlib import Path
@@ -96,6 +106,14 @@ jobs:
           assert scene_names[51] == "Soft Eclipse"
           assert scene_names[52] == "One Pulse"
           assert scene_names[61] == "Midnight Wave"
+          material_src = Path("app/src/main/java/com/oddf0x/halynmotion/MaterialXRenderer.kt").read_text()
+          material_names = re.findall(r'Scene\("([^"]+)",', material_src)
+          assert len(material_names) == 8 and len(set(material_names)) == 8, "Material X scenes must be unique"
+          assert "const val FIRST = 137" in material_src
+          assert "const val COUNT = 8" in material_src
+          assert 'MaterialXRenderer.SCENES.map { it.name }' in Path(
+              "app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt").read_text()
+          print("8 independent Material X scenes are mapped after the 62 existing smooth shaders")
           assert "AGSL.replace(SCENE_MARKER, SCENE_FORMULAS[sceneIndex])" in src
           assert "failedSceneIndices.add(sceneIndex)" in src
           print("62 unique scenes map one-to-one to 62 shader programs")
@@ -144,39 +162,39 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.21.0 Apple & Samsung Inspirations
+      - name: Publish HALYN v0.22.0 Four Colours & Material X
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.21.0-preview.1
+          TAG: v0.22.0-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.21.0-preview.apk
-          unzip -t dist/HALYN-Motion-v0.21.0-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.22.0-preview.apk
+          unzip -t dist/HALYN-Motion-v0.22.0-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN Motion v0.21.0 — Apple & Samsung Inspirations
+          # HALYN Motion v0.22.0 — Four Colours & Material X
 
-          - Adds 20 entirely original animated wallpapers: 10 Apple-inspired
-            soft-glass, pearlescent, dreamy satin designs and 10 Samsung-inspired
-            deep-black AMOLED, aurora, pulse, and dynamic-fold designs.
-          - Each uses a separate visual equation with distinct shape and motion,
-            not a recolored clone or official device wallpaper.
-          - Reactive scenes respond to tilt, local time, music playback activity,
-            charging, touch and optional notification timestamps; none capture
-            the screen or record audio. Notification access stays opt-in.
-          - Personal color palettes remain available, with curated default hues.
-          - Preserves all previous 70 original scenes, the clock editor,
-            font imports, star window, photos and app settings.
-          - Each new scene compiles independently through the v0.20.1 renderer.
-          - Debug-signed preview; still needs an on-device visual quality check
-            on a Galaxy A56 before calling the shader appearance verified.
-          - Unofficial original artworks, not endorsed by Apple or Samsung.
+          - Adds four independently editable RGB swatches for every wallpaper,
+            saved per scene. Existing original palettes remain until switched on.
+          - Each of the 62 original-style and 28 earlier original AGSL shaders
+            uses the chosen four colors in its rendering, not just the preview.
+          - Star Window, photos and mountain scenes get an optional subtle four
+            color tint without replacing their original artwork.
+          - Eight unique minimalist Material X scenes join the gallery: Paper
+            Horizon, Arc Stack, Soft Fold, Pebble Lines, Ribbon Cutout,
+            Mono Dunes, Orbit Insets and Ceramic Waves.
+          - The Material X collection renders matte curves and softly layered
+            paper geometry via a lightweight Canvas engine.
+          - Per-scene color changes persist and are restored after app restart.
+          - No new privacy permissions, microphone or screen capture.
+          - All existing 90 wallpapers, font library and editor retained.
+          - Debug-signed preview: actual shader appearance needs device test.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.21.0-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.22.0-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.21.0 — 20 Apple & Samsung-Inspired Wallpapers" \
+            --title "HALYN Motion v0.22.0 — Four Colours & Material X" \
             --notes-file notes.md --prerelease
