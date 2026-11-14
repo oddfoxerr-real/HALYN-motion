@@ -16,6 +16,11 @@ data class MotionState(
     val preset: Int = 0,
     val palette: Int = 0,
     val customColor: Int = Color.rgb(185, 174, 255),
+    val fourColorsEnabled: Boolean = false,
+    val colorOne: Int = 0xFF9CC5FF.toInt(),
+    val colorTwo: Int = 0xFFBEA4FA.toInt(),
+    val colorThree: Int = 0xFFFFBDBD.toInt(),
+    val colorFour: Int = 0xFF88D7C3.toInt(),
     val intensity: Float = 1.0f,
     val speed: Float = 1.0f,
     val fps: Int = 30,
@@ -58,6 +63,41 @@ class MotionPreferences(context: Context) {
 
     val raw: SharedPreferences get() = preferences
 
+    private fun colorFor(preset: Int, index: Int): Int =
+        preferences.getInt(
+            "quad_color_${preset}_${index}",
+            QuadColorSystem.DEFAULTS[index.coerceIn(0, 3)]
+        ) or -0x1000000
+
+    private fun enabledFor(preset: Int): Boolean =
+        preferences.getBoolean("quad_enabled_${preset}", false)
+
+    fun getForPreset(preset: Int): MotionState {
+        val id = sanitizePreset(preset)
+        return get().copy(
+            preset = id,
+            fourColorsEnabled = enabledFor(id),
+            colorOne = colorFor(id, 0),
+            colorTwo = colorFor(id, 1),
+            colorThree = colorFor(id, 2),
+            colorFour = colorFor(id, 3)
+        )
+    }
+
+    fun setFourColorsEnabled(enabled: Boolean) {
+        val id = get().preset
+        preferences.edit().putBoolean("quad_enabled_$id", enabled).apply()
+    }
+
+    fun setFourColor(index: Int, color: Int) {
+        require(index in 0..3)
+        val id = get().preset
+        preferences.edit()
+            .putInt("quad_color_${id}_$index", color or -0x1000000)
+            .putBoolean("quad_enabled_$id", true)
+            .apply()
+    }
+
     fun get(): MotionState {
         fun float(key: String, default: Float, min: Float, max: Float): Float {
             val result = preferences.getFloat(key, default)
@@ -65,6 +105,11 @@ class MotionPreferences(context: Context) {
         }
         return MotionState(
             preset = sanitizePreset(preferences.getInt("preset", 0)),
+            fourColorsEnabled = enabledFor(sanitizePreset(preferences.getInt("preset", 0))),
+            colorOne = colorFor(sanitizePreset(preferences.getInt("preset", 0)), 0),
+            colorTwo = colorFor(sanitizePreset(preferences.getInt("preset", 0)), 1),
+            colorThree = colorFor(sanitizePreset(preferences.getInt("preset", 0)), 2),
+            colorFour = colorFor(sanitizePreset(preferences.getInt("preset", 0)), 3),
             palette = preferences.getInt("palette", 0).coerceIn(0, 5),
             customColor = preferences.getInt("custom_color", Color.rgb(185, 174, 255)) or -0x1000000,
             intensity = float("intensity", 1f, .35f, 2.3f),
@@ -110,7 +155,8 @@ class MotionPreferences(context: Context) {
 
     private fun sanitizePreset(value: Int): Int = when {
         value in 0..20 || value == PhotoWallpaperStore.SCENE_INDEX ||
-            value in 52..63 || SmoothWallpaperRenderer.isSmooth(value) -> value
+            value in 52..63 || SmoothWallpaperRenderer.isSmooth(value) ||
+            MaterialXRenderer.isMaterial(value) -> value
         else -> 0 // The retired illustrated poster IDs 21–50 must never render.
     }
 
@@ -224,6 +270,7 @@ class HalynRenderer(private val context: Context) {
     private val mountainRenderer = MountainSceneRenderer()
     private val photoRenderer = PhotoWallpaperStore(context.applicationContext)
     private val smoothRenderer = SmoothWallpaperRenderer()
+    private val materialXRenderer = MaterialXRenderer()
     private var shaderFailed = false
     private var shader: RuntimeShader? = null
     private var configuredWidth = -1f
@@ -325,14 +372,21 @@ class HalynRenderer(private val context: Context) {
     ) {
         if (state.preset == StarWindowRenderer.SCENE_INDEX) {
             starRenderer.draw(canvas, state, elapsedSeconds, starPose ?: StarPose())
+            QuadColorSystem.drawOverlay(canvas, state, .17f)
             return
         }
         if (MountainSceneRenderer.isMountain(state.preset)) {
             mountainRenderer.drawBackground(canvas, state, elapsedSeconds, mountainPose(state, gyro, offsetX))
+            QuadColorSystem.drawOverlay(canvas, state, .25f)
             return
         }
         if (state.preset == PhotoWallpaperStore.SCENE_INDEX) {
             photoRenderer.draw(canvas, gyro)
+            QuadColorSystem.drawOverlay(canvas, state, .20f)
+            return
+        }
+        if (MaterialXRenderer.isMaterial(state.preset)) {
+            materialXRenderer.draw(canvas, state, elapsedSeconds, gyro)
             return
         }
         if (SmoothWallpaperRenderer.isSmooth(state.preset)) {
@@ -390,6 +444,7 @@ class HalynRenderer(private val context: Context) {
                 )
                 current.setFloatUniform("u_offset", if (state.parallax) offsetX else .5f)
                 current.setFloatUniform("u_gyro", gyro.x, gyro.y)
+                QuadColorSystem.setShaderUniforms(current, state)
                 paint.shader = current
                 canvas.drawRect(0f, 0f, width, height, paint)
                 return
@@ -402,6 +457,7 @@ class HalynRenderer(private val context: Context) {
         // A software preview or unsupported AGSL device must never show an
         // opaque near-black failure frame.
         drawFallback(canvas, state, width, height)
+        QuadColorSystem.drawOverlay(canvas, state, .48f)
     }
 
     fun drawForeground(
@@ -431,7 +487,9 @@ class HalynRenderer(private val context: Context) {
             "Velvet Flux", "Crystal Current", "Neon Ink", "Zenith Borealis",
             "Quartz Ripple", "Lumen Dusk", "Flux Filament", "Celestial Mist",
             "Liquid Copper", "Polar Halo", "Prism Flow", "Voltage Bloom"
-        ) + List(11) { "Retired material" } + SmoothWallpaperRenderer.SCENES.map { it.name }
+        ) + List(11) { "Retired material" } +
+            SmoothWallpaperRenderer.SCENES.map { it.name } +
+            MaterialXRenderer.SCENES.map { it.name }
         val PALETTES = listOf(
             "Arctic", "Ultraviolet", "Ember", "Rose", "Verdant"
         )
@@ -450,6 +508,11 @@ uniform float u_time;
 uniform float u_variant;
 uniform float u_palette;
 uniform float3 u_customColor;
+uniform float u_quadEnabled;
+uniform float3 u_quadOne;
+uniform float3 u_quadTwo;
+uniform float3 u_quadThree;
+uniform float3 u_quadFour;
 uniform float u_intensity;
 uniform float u_speed;
 uniform float u_quality;
@@ -505,6 +568,13 @@ half4 main(float2 frag) {
     }
     if (u_palette > 4.5) {
         accent = u_customColor;
+    }
+    float3 quadGradient = mix(
+        mix(u_quadOne, u_quadTwo, clamp(uv.x, 0.0, 1.0)),
+        mix(u_quadThree, u_quadFour, clamp(uv.x, 0.0, 1.0)),
+        clamp(uv.y, 0.0, 1.0));
+    if (u_quadEnabled > 0.5) {
+        accent = quadGradient;
     }
     float3 companion = mix(accent, accent.zxy, 0.46) * 0.72;
     float3 highlight = mix(accent, float3(0.97, 0.985, 1.0), 0.59);
@@ -817,6 +887,9 @@ half4 main(float2 frag) {
     float3 inkBlack = float3(0.0035, 0.006, 0.014);
     float3 ambientTint = mix(companion, accent, .36) * (.065 + .045 * horizon);
     float3 col = inkBlack + ambientTint * (.5 + .5 * vignette);
+    if (u_quadEnabled > 0.5) {
+        col += quadGradient * (.075 + .035 * vignette);
+    }
 
     // Balanced: animated light gradients, without expensive noise samples.
     if (u_quality > 0.5) {
