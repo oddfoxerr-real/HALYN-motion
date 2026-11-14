@@ -201,7 +201,7 @@ jobs:
           assert 'val age=(now-burstTime).toFloat()/' in pack_src
           assert 'drawBattleBurst(' in pack_src and 'drawCyberBurst(' in pack_src
           assert 'HALYN-Motion-v0.26.0-preview.apk' in Path(".github/workflows/android.yml").read_text()
-          assert 'versionCode = 31' in Path("app/build.gradle.kts").read_text()
+          assert 'versionCode = 32' in Path("app/build.gradle.kts").read_text()
           assert 'value == BubbleGardenRenderer.SCENE_INDEX' in renderer_src
           print("12 unique animated Aura/Cyber scenes 156..167: gesture speed, motion, 4-color, all legacy IDs verified")
           gpu_src = Path("app/src/main/java/com/oddf0x/halynmotion/AuraCyberShaderRenderer.kt").read_text()
