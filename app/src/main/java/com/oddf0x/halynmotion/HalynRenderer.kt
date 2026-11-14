@@ -157,7 +157,8 @@ class MotionPreferences(context: Context) {
         value in 0..20 || value == PhotoWallpaperStore.SCENE_INDEX ||
             value in 52..63 || SmoothWallpaperRenderer.isSmooth(value) ||
             MaterialXRenderer.isMaterial(value) ||
-            GlassOrbitCollectionRenderer.isGlassOrbit(value) -> value
+            GlassOrbitCollectionRenderer.isGlassOrbit(value) ||
+            value == BubbleGardenRenderer.SCENE_INDEX -> value
         else -> 0 // The retired illustrated poster IDs 21–50 must never render.
     }
 
@@ -273,6 +274,7 @@ class HalynRenderer(private val context: Context) {
     private val smoothRenderer = SmoothWallpaperRenderer()
     private val materialXRenderer = MaterialXRenderer()
     private val glassOrbitRenderer = GlassOrbitCollectionRenderer()
+    private val bubbleGardenRenderer = BubbleGardenRenderer()
     private var shaderFailed = false
     private var shader: RuntimeShader? = null
     private var configuredWidth = -1f
@@ -361,6 +363,10 @@ class HalynRenderer(private val context: Context) {
         canvas.drawRect(0f, 0f, width, height, fallbackPaint)
     }
 
+    fun onBubbleTouch(action: Int, x: Float, y: Float) {
+        bubbleGardenRenderer.onTouch(action, x, y)
+    }
+
     fun draw(
         canvas: Canvas,
         state: MotionState,
@@ -399,6 +405,10 @@ class HalynRenderer(private val context: Context) {
                 canvas, state, elapsedSeconds,
                 touchX, touchY, offsetX, gyro, touchForce, reactions
             )
+            return
+        }
+        if (state.preset == BubbleGardenRenderer.SCENE_INDEX) {
+            bubbleGardenRenderer.draw(canvas, state, elapsedSeconds)
             return
         }
         if (SmoothWallpaperRenderer.isSmooth(state.preset)) {
@@ -502,7 +512,8 @@ class HalynRenderer(private val context: Context) {
         ) + List(11) { "Retired material" } +
             SmoothWallpaperRenderer.SCENES.map { it.name } +
             MaterialXRenderer.SCENES.map { it.name } +
-            GlassOrbitCollectionRenderer.SCENES.map { it.name }
+            GlassOrbitCollectionRenderer.SCENES.map { it.name } +
+            listOf(BubbleGardenRenderer.SCENE_NAME)
         val PALETTES = listOf(
             "Arctic", "Ultraviolet", "Ember", "Rose", "Verdant"
         )
