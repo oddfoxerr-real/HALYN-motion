@@ -52,11 +52,11 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='28'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='29'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.22.0-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.22.0-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.23.0-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.23.0-preview.apk > SHA256SUMS.txt)
 
       - name: Verify curated wallpaper collection
         shell: bash
@@ -85,6 +85,14 @@ jobs:
           test -s app/src/main/java/com/oddf0x/halynmotion/MaterialXRenderer.kt
           grep -q 'buildOriginalRail(root, "Soft material & horizons"' app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
           grep -q 'buildOriginalRail(root, "Architectural motion"' app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
+          grep -q 'buildOriginalRail(root, "Lenses & refraction"' app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
+          grep -q 'buildOriginalRail(root, "Crystal depth & motion"' app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
+          grep -q 'postInvalidateDelayed(84L)' app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
+          grep -q 'GlassOrbitCollectionRenderer.isGlassOrbit(value)' app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
+          grep -q 'GlassOrbitCollectionRenderer.SCENES.map { it.name }' app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
+          grep -q 'materialXRenderer.draw(' app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
+          grep -q 'val t = seconds\*(.78f + state.speed\*.24f)' app/src/main/java/com/oddf0x/halynmotion/MaterialXRenderer.kt
+          test -s app/src/main/java/com/oddf0x/halynmotion/GlassOrbitCollectionRenderer.kt
           grep -q 'fun getForPreset(preset: Int)' app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
           grep -q 'QuadColorSystem.setShaderUniforms' app/src/main/java/com/oddf0x/halynmotion/SmoothWallpaperRenderer.kt
           grep -q 'QuadColorSystem.setShaderUniforms' app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
@@ -117,6 +125,25 @@ jobs:
           assert "AGSL.replace(SCENE_MARKER, SCENE_FORMULAS[sceneIndex])" in src
           assert "failedSceneIndices.add(sceneIndex)" in src
           print("62 unique scenes map one-to-one to 62 shader programs")
+          glass_src = Path("app/src/main/java/com/oddf0x/halynmotion/GlassOrbitCollectionRenderer.kt").read_text()
+          glass_block = glass_src.split("val SCENES = listOf(", 1)[1].split("fun isGlassOrbit", 1)[0]
+          glass_names = re.findall(r'Scene\("([^"]+)",', glass_block)
+          glass_formulas = glass_src.split("private val EXPRESSIONS = arrayOf(",1)[1].split(
+              "private val SOURCE =",1)[0].count('""".trimIndent()')
+          assert len(glass_names) == 10 and len(set(glass_names)) == 10, glass_names
+          assert glass_formulas == 10, "Every new Glass Orbit scene needs a distinct shader formula"
+          assert "const val FIRST = 145" in glass_src
+          assert "const val COUNT = 10" in glass_src
+          assert glass_names[0] == "Orbital Lens"
+          assert glass_names[-1] == "Luminous Orbit"
+          assert "Halo Chamber" not in glass_src
+          material_src = Path("app/src/main/java/com/oddf0x/halynmotion/MaterialXRenderer.kt").read_text()
+          assert "seconds*(.78f + state.speed*.24f)" in material_src
+          assert "h*.075f*sin(t*.68f)" in material_src
+          assert "val slideX=w*.055f*sin(phase)" in material_src
+          ui_src = Path("app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt").read_text()
+          assert "postInvalidateDelayed(84L)" in ui_src
+          print("10 Glass Orbit scenes + animated Material X verified, legacy IDs unchanged")
           PY
 
       - name: Verify clock font storage and preset recovery
@@ -162,39 +189,44 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.22.0 Four Colours & Material X
+      - name: Publish HALYN v0.23.0 Glass Orbit Collection
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.22.0-preview.1
+          TAG: v0.23.0-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.22.0-preview.apk
-          unzip -t dist/HALYN-Motion-v0.22.0-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.23.0-preview.apk
+          unzip -t dist/HALYN-Motion-v0.23.0-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN Motion v0.22.0 — Four Colours & Material X
+          # HALYN Motion v0.23.0 — Glass Orbit Collection & Living Material X
 
-          - Adds four independently editable RGB swatches for every wallpaper,
-            saved per scene. Existing original palettes remain until switched on.
-          - Each of the 62 original-style and 28 earlier original AGSL shaders
-            uses the chosen four colors in its rendering, not just the preview.
-          - Star Window, photos and mountain scenes get an optional subtle four
-            color tint without replacing their original artwork.
-          - Eight unique minimalist Material X scenes join the gallery: Paper
-            Horizon, Arc Stack, Soft Fold, Pebble Lines, Ribbon Cutout,
-            Mono Dunes, Orbit Insets and Ceramic Waves.
-          - The Material X collection renders matte curves and softly layered
-            paper geometry via a lightweight Canvas engine.
-          - Per-scene color changes persist and are restored after app restart.
-          - No new privacy permissions, microphone or screen capture.
-          - All existing 90 wallpapers, font library and editor retained.
-          - Debug-signed preview: actual shader appearance needs device test.
+          - Adds ten original Glass Orbit-style live wallpapers: Orbital Lens,
+            Refractive Orbit, Twin Glass Rings, Caustic Ring, Eclipse Lens,
+            Prism Orbit, Crystal Orbit, Orbital Bloom, Glass Nebula Ring,
+            and Luminous Orbit. These are new designs, not copied assets.
+          - Each wallpaper has independent geometry and motion, including
+            tilt/refraction, counter-orbits, charging glints, touch highlights,
+            day-phase wisps, music-active illumination and notification pulses.
+          - Preserves original Glass Orbit preset 7 and all prior 98 effects.
+          - Reworks every Material X scene to animate visibly and continuously:
+            travelling paper horizons, breathing arcs, sliding folds, drifting
+            pebbles, flowing ribbon cutouts, moving dunes, orbiting inset frames,
+            and rocking ceramic waves.
+          - Material X and Glass Orbit gallery cards now have low-rate live
+            previews only when visible, not static thumbnails.
+          - The new glass shaders compile separately and have animated Canvas
+            fallbacks instead of identical blank gradients.
+          - Four user-selected colour swatches work in the new glass shaders.
+          - No new permissions, microphone or screen capture.
+          - Debug-signed preview; physical device animation and GPU appearance
+            still need checking on the Samsung Galaxy A56.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.22.0-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.23.0-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.22.0 — Four Colours & Material X" \
+            --title "HALYN Motion v0.23.0 — Glass Orbit & Live Material X" \
             --notes-file notes.md --prerelease
