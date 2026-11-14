@@ -44,19 +44,19 @@ class AuraCyberShaderRenderer {
                 float a = n2(q * float2(6.0, 4.5) + float2(t*.22,-t*.31));
                 float b = n2(q * float2(12.0,7.0)+float2(-t*.14,-t*.49));
                 float deformation = (a-.5)*.14 + .036*sin(q.y*15.0-t*.95);
-                float plume = exp(-pow((q.x+deformation)/(.17+.06*b),2.0));
+                float plume = exp(-pow(abs(q.x+deformation)/(.17+.06*b),2.0));
                 float rise = 1.0-smoothstep(-.43,.41,q.y);
                 float petals=pow(max(0.0,sin(q.x*29.0 - q.y*8.0 +a*5.0 -t*1.3)),4.0);
                 core=plume*(.32+.48*a)*rise + exp(-23.0*length(q-float2(0.0,.16)))*.38;
                 filament=plume*petals*(.11+.31*b)*rise;
-                fog=exp(-pow(q.x/.36,2.0)-pow(q.y/.42,2.0))*(.32+.4*a);
+                fog=exp(-pow(abs(q.x)/.36,2.0)-pow(abs(q.y)/.42,2.0))*(.32+.4*a);
                 spark=pow(max(0.0, n2(floor((q+float2(0.0,t*.032))*180.0))-.93),5.0)*150000.0*plume*rise;
             """.trimIndent(),
             // 157: Nova Clash
             """
                 float2 q=p;
-                float left = exp(-pow((q.x+.22+.045*sin(q.y*10.0+t*.8))/.24,2.0)-pow((q.y+.03)/.40,2.0));
-                float right = exp(-pow((q.x-.23+.045*cos(q.y*9.0-t*.74))/.23,2.0)-pow((q.y-.04)/.41,2.0));
+                float left = exp(-pow(abs(q.x+.22+.045*sin(q.y*10.0+t*.8))/.24,2.0)-pow(abs(q.y+.03)/.40,2.0));
+                float right = exp(-pow(abs(q.x-.23+.045*cos(q.y*9.0-t*.74))/.23,2.0)-pow(abs(q.y-.04)/.41,2.0));
                 float seam = q.x-.035*sin(q.y*10.0+t*.65)-.022*sin(t*.4);
                 float turbulence=n2(q*10.0+float2(t*.19,-t*.31));
                 core=(left+right)*(.45+.26*turbulence);
@@ -130,7 +130,7 @@ class AuraCyberShaderRenderer {
                 float sd2=length(max(sheet2,float2(0.0)))+min(max(sheet2.x,sheet2.y),0.0)-.022;
                 float border=exp(-165.0*abs(sd1))+exp(-160.0*abs(sd2));
                 float path=abs(sin(q.y*47.0+sin(q.x*8.0)*.4));
-                float trace=pow(max(0.0,1.0-path),20.0)*exp(-pow(q.x/.30,4.0));
+                float trace=pow(max(0.0,1.0-path),20.0)*exp(-pow(abs(q.x)/.30,4.0));
                 float sweep=exp(-58.0*abs(q.y+.50-.90*fract(t*.065)));
                 core=border*.13;
                 filament=border*.23+trace*.11+sweep*.09;
