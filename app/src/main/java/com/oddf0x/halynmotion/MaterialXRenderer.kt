@@ -116,7 +116,16 @@ class MaterialXRenderer {
         )
     }
 
-    fun draw(canvas: Canvas, state: MotionState, seconds: Float, pose: ParallaxPose) {
+    /**
+     * Every Material X preset has a conspicuous, continuous live cycle
+     * (typically 7-13 seconds), plus several independent layer velocities.
+     * The old animation multiplier was too small to notice in real use.
+     * Drawing is bounded to a handful of Canvas paths per frame.
+     */
+    fun draw(
+        canvas: Canvas, state: MotionState, seconds: Float, pose: ParallaxPose,
+        touchForce: Float = 0f, reactions: SceneSignals = SceneSignals()
+    ) {
         val scene = (state.preset - FIRST).coerceIn(0, COUNT-1)
         val w = canvas.width.coerceAtLeast(1).toFloat()
         val h = canvas.height.coerceAtLeast(1).toFloat()
@@ -132,112 +141,184 @@ class MaterialXRenderer {
                 }
             }
         setBackdrop(canvas, w, h, scene, shades)
-        val t = seconds*(.12f+state.speed*.11f)
-        val gyroX = pose.x*w*.06f
-        val gyroY = pose.y*h*.032f
-        val motion = sin(t)
+
+        // A full-speed animation clock, scaled by the existing global motion
+        // slider. Animation remains active even without motion sensors.
+        val t = seconds*(.78f + state.speed*.24f)
+        val gyroX = pose.x*w*.065f
+        val gyroY = pose.y*h*.052f
+        val reaction = touchForce.coerceIn(0f, 1f)
         when (scene) {
             0 -> {
-                // Paper Horizon: layers move at different rates, not one global parallax.
-                ellipse(canvas, w*.71f+gyroX*.25f, h*.29f+sin(t*.49f)*m*.018f,
-                    m*.115f, m*.115f, shades[3])
-                paperWave(canvas,w,h,h*.48f+gyroY*.24f,h*.56f,
-                    m*.10f*sin(t*.24f),m*.06f,shades[1])
-                paperWave(canvas,w,h,h*.65f-gyroY*.20f,h*.42f,
-                    -m*.09f,m*.07f*cos(t*.30f),shades[2])
-                paperWave(canvas,w,h,h*.83f+sin(t*.33f)*m*.022f,h*.19f,
-                    m*.05f,m*.10f,shades[0])
+                // Paper Horizon: three continuous travelling waves and a sun
+                // travelling on its own longer orbit.
+                ellipse(canvas,
+                    w*(.63f+.19f*sin(t*.34f))+gyroX*.21f,
+                    h*(.25f+.07f*cos(t*.41f))-reaction*h*.035f,
+                    m*(.105f+.016f*sin(t*.73f)),
+                    m*(.105f+.016f*sin(t*.73f)), shades[3])
+                paperWave(canvas,w,h,
+                    h*(.43f+.075f*sin(t*.68f))+gyroY*.21f,
+                    h*.67f,
+                    m*(.18f*sin(t*.59f)),m*(.15f*cos(t*.45f)),shades[1])
+                paperWave(canvas,w,h,
+                    h*(.61f+.070f*cos(t*.82f-.6f))-gyroY*.29f,
+                    h*.55f,
+                    m*(.16f*cos(t*.47f)),m*(.15f*sin(t*.72f)),shades[2])
+                paperWave(canvas,w,h,
+                    h*(.80f+.041f*sin(t*1.12f))+reaction*h*.024f,
+                    h*.29f,m*(.10f*sin(t*.95f)),m*(.12f*cos(t*.68f)),
+                    shades[0])
             }
             1 -> {
-                // Arc Stack: nested monolithic portals with responsive width.
-                val open = sin(t*.41f)*m*.018f + gyroX*.20f
-                round(canvas,w*.08f+open,h*.25f,w*.92f-open,h*1.12f,m*.36f,shades[1])
-                round(canvas,w*.19f-open,h*.36f,w*.81f+open,h*1.13f,m*.27f,shades[2])
-                round(canvas,w*.29f+open*.6f,h*.47f,w*.71f-open*.6f,h*1.13f,m*.20f,shades[3])
-                round(canvas,w*.40f,h*.59f,w*.60f,h*1.13f,m*.12f,shades[0])
+                // Arc Stack: four hinged architectural portals open and close
+                // at different rates, revealing deeper matte surfaces.
+                val open = sin(t*.77f)*w*.065f + gyroX*.31f
+                val drift = h*.048f*cos(t*.61f)
+                round(canvas,
+                    w*.07f+open*.65f,h*.22f+drift,
+                    w*.93f-open*.65f,h*1.13f,
+                    m*.37f,shades[1])
+                round(canvas,
+                    w*.18f-open*.47f,h*.31f-drift*.35f,
+                    w*.82f+open*.47f,h*1.14f,
+                    m*.29f,shades[2])
+                round(canvas,
+                    w*.28f+open*.53f,h*.43f+drift*.40f,
+                    w*.72f-open*.53f,h*1.14f,
+                    m*.20f,shades[3])
+                val throat = w*.038f*sin(t*1.04f)+reaction*w*.035f
+                round(canvas,w*.39f+throat,h*.54f-drift*.24f,
+                    w*.61f-throat,h*1.14f,m*.11f,shades[0])
             }
             2 -> {
-                // Soft Fold: bevel highlights follow independent diagonal sheets.
+                // Soft Fold: three separately sliding sheets with a moving
+                // reflection line, not just a bobbing static polygon.
+                val slide1 = w*.090f*sin(t*.62f)+gyroX*.33f
+                val slide2 = w*.078f*cos(t*.83f-.3f)-gyroX*.22f
                 path.reset()
-                path.moveTo(-w*.07f,h*.40f+gyroY)
-                path.lineTo(w*.74f+gyroX,h*.15f)
-                path.lineTo(w*1.08f,h*.32f)
-                path.lineTo(w*.20f,h*.59f)
+                path.moveTo(-w*.17f+slide1,h*.34f+gyroY)
+                path.lineTo(w*.66f+slide1,h*.11f+h*.045f*sin(t*.78f))
+                path.lineTo(w*1.15f+slide1,h*.29f)
+                path.lineTo(w*.19f+slide1,h*.61f)
                 path.close()
                 color(canvas,shades[1]);canvas.drawPath(path,paint)
+
                 path.reset()
-                path.moveTo(-w*.08f,h*.64f)
-                path.lineTo(w*.80f+gyroX*.3f,h*.42f+motion*m*.026f)
-                path.lineTo(w*1.08f,h*.58f)
-                path.lineTo(w*.05f,h*.88f)
+                path.moveTo(-w*.14f+slide2,h*.61f)
+                path.lineTo(w*.75f+slide2,h*.34f+h*.060f*cos(t*.63f))
+                path.lineTo(w*1.13f+slide2,h*.57f)
+                path.lineTo(w*.06f+slide2,h*.90f)
                 path.close()
                 color(canvas,shades[2]);canvas.drawPath(path,paint)
-                paperWave(canvas,w,h,h*.84f+gyroY*.12f,h*.20f,m*.05f,-m*.06f,shades[3])
+                paperWave(canvas,w,h,
+                    h*(.82f+.043f*sin(t*.94f)),h*.33f,
+                    m*(.11f*sin(t*.69f)),-m*(.12f*cos(t*.52f)),shades[3])
+                paint.style=Paint.Style.STROKE
+                paint.strokeWidth=m*.009f
+                paint.strokeCap=Paint.Cap.ROUND
+                paint.color=shades[3]
+                paint.alpha=167
+                canvas.drawLine(w*.12f+slide1,h*.51f,
+                    w*.72f+slide1,h*(.23f+.038f*sin(t*.78f)),paint)
+                paint.style=Paint.Style.FILL
+                paint.alpha=255
             }
             3 -> {
-                // Pebble Lines: deliberately non-circular, smooth ceramic stones.
+                // Pebble Lines: each ceramic stone travels along an offset
+                // path of its own and independently breathes in scale.
                 for (i in 0..3) {
-                    val shift = sin(t*.33f + i*1.8f)*m*.018f
-                    val x = w*(.27f + (i%2)*.43f) + gyroX*(.1f+i*.06f)
-                    val y = h*(.24f + i*.17f) + shift
-                    ellipse(canvas,x,y,m*(.17f+i*.010f),m*(.070f+i*.012f),
+                    val phase = t*(.47f+i*.12f)+i*1.76f
+                    val shiftX = w*.13f*sin(phase)+gyroX*(.15f+i*.07f)
+                    val shiftY = h*.045f*cos(phase*1.27f)
+                    val centerX = w*(.28f+(i%2)*.40f)+shiftX
+                    val centerY = h*(.20f+i*.186f)+shiftY
+                    val breathe = 1f+.18f*sin(phase*.91f)
+                    ellipse(canvas,centerX,centerY,
+                        m*(.15f+i*.012f)*breathe,
+                        m*(.067f+i*.011f)*(1f+.14f*cos(phase)),
                         shades[(i+1)%4])
                 }
-                round(canvas,w*.09f,h*.91f,w*.91f,h*.916f,m*.003f,shades[3])
+                round(canvas,w*.085f,h*.925f,w*.915f,h*.932f,m*.004f,shades[3])
             }
             4 -> {
-                // Ribbon Cutout: two paths define the layered negative-space window.
+                // Ribbon Cutout: deform the actual Bezier control points on
+                // every frame; a layered ribbon flows through the opening.
+                val sway = w*.11f*sin(t*.64f)+gyroX*.28f
                 path.reset()
-                path.moveTo(-w*.14f,h*.15f)
-                path.cubicTo(w*.92f,h*.09f,w*.02f,h*.58f,w*1.12f,h*.61f)
-                paint.style = Paint.Style.STROKE
-                paint.strokeWidth = m*.46f
-                paint.strokeCap = Paint.Cap.ROUND
-                paint.color = shades[1]
-                paint.alpha = 255
-                canvas.save()
-                canvas.translate(gyroX*.22f,gyroY*.20f)
+                path.moveTo(-w*.16f,h*(.19f+.05f*sin(t*.51f)))
+                path.cubicTo(
+                    w*(.80f+.16f*cos(t*.73f)),h*(.06f+.07f*sin(t*.62f)),
+                    w*(.08f+.10f*sin(t*.81f)),h*(.57f+.06f*cos(t*.52f)),
+                    w*1.16f+sway,h*(.62f+.046f*sin(t*.67f)))
+                paint.style=Paint.Style.STROKE
+                paint.strokeWidth=m*.49f
+                paint.strokeCap=Paint.Cap.ROUND
+                paint.color=shades[1]
+                paint.alpha=255
                 canvas.drawPath(path,paint)
-                paint.strokeWidth=m*.30f
+                paint.strokeWidth=m*.33f
                 paint.color=shades[2]
                 canvas.drawPath(path,paint)
-                paint.strokeWidth=m*.16f
+                paint.strokeWidth=m*.17f
                 paint.color=shades[0]
                 canvas.drawPath(path,paint)
-                canvas.restore()
                 paint.style=Paint.Style.FILL
-                ellipse(canvas,w*.60f,h*.47f+sin(t*.27f)*m*.02f,
-                    m*.083f,m*.083f,shades[3])
+                ellipse(canvas,
+                    w*(.55f+.13f*sin(t*.73f))+gyroX*.18f,
+                    h*(.46f+.10f*cos(t*.68f)),
+                    m*(.072f+.013f*sin(t*.91f)),
+                    m*(.072f+.013f*sin(t*.91f)),shades[3])
             }
             5 -> {
-                // Mono Dunes: four handmade bezier trajectories with staggered drift.
+                // Mono Dunes: four independently moving hill contours with
+                // heights that change continuously, not a fixed poster.
                 for (i in 0..3) {
-                    val top = h*(.29f + i*.18f) + sin(t*.17f+i*.91f)*m*.03f
-                    paperWave(canvas,w,h,top,h-top,
-                        m*(.11f-.025f*i),m*(.04f+.017f*i),
+                    val top = h*(.26f+i*.18f)+
+                        h*.065f*sin(t*(.42f+i*.13f)+i*.84f)
+                    paperWave(canvas,w,h,top,h-top+h*.13f,
+                        m*(.22f*sin(t*(.58f+i*.09f)+i*.65f)),
+                        m*(.17f*cos(t*(.41f+i*.13f)-i*.51f)),
                         shades[(i+1)%4])
                 }
             }
             6 -> {
-                // Orbit Insets: asymmetric stacks of architectural rounded rectangles.
+                // Orbit Insets: four architectural frames translate and
+                // expand independently, like orbiting sheets of cut paper.
                 for (i in 0..3) {
-                    val inset = w*(.07f+i*.085f)
-                    val vertical = h*(.17f+i*.091f)
-                    val shift = sin(t*.22f+i*.6f)*m*.018f + gyroX*.08f
-                    round(canvas,inset+shift,vertical,
-                        w-inset+shift,h-vertical*.58f,m*(.21f-i*.028f),
-                        shades[(i+1)%4])
+                    val phase=t*(.45f+i*.10f)+i*.90f
+                    val inset=w*(.07f+i*.083f)
+                    val vertical=h*(.13f+i*.092f)
+                    val slideX=w*.055f*sin(phase)+gyroX*.20f
+                    val slideY=h*.045f*cos(phase*1.23f)+gyroY*.20f
+                    val grow=m*.020f*sin(phase*.83f)
+                    round(canvas,
+                        inset+slideX-grow,vertical+slideY-grow,
+                        w-inset+slideX+grow,
+                        h-vertical*.58f+slideY+grow,
+                        m*(.22f-i*.028f),shades[(i+1)%4])
                 }
             }
             else -> {
-                // Ceramic Waves: independently rocking convex bowls and seam.
-                paperWave(canvas,w,h,h*.34f+sin(t*.23f)*m*.018f,
-                    h*.80f,-m*.16f,m*.07f,shades[1])
-                paperWave(canvas,w,h,h*.55f+gyroY*.20f,
-                    h*.52f,m*.10f,m*.13f,shades[2])
-                ellipse(canvas,w*.64f+gyroX*.18f,h*.48f,m*.16f,m*.095f,shades[3])
-                paperWave(canvas,w,h,h*.77f+sin(t*.41f)*m*.012f,
-                    h*.29f,-m*.075f,m*.045f,shades[0])
+                // Ceramic Waves: oscillating bowls separate, reconnect,
+                // and carry a floating highlight on a different rhythm.
+                paperWave(canvas,w,h,
+                    h*(.31f+.075f*sin(t*.68f)),h*.85f,
+                    m*(.19f*sin(t*.73f)),m*(.15f*cos(t*.57f)),shades[1])
+                paperWave(canvas,w,h,
+                    h*(.52f+.070f*cos(t*.91f))+gyroY*.26f,h*.61f,
+                    m*(.15f*cos(t*.59f)),m*(.20f*sin(t*.76f)),shades[2])
+                ellipse(canvas,
+                    w*(.60f+.17f*sin(t*.54f))+gyroX*.15f,
+                    h*(.43f+.055f*cos(t*.83f))-
+                        reactions.music*h*.025f,
+                    m*(.14f+.025f*cos(t*.88f)),
+                    m*(.083f+.015f*sin(t*.61f)),
+                    shades[3])
+                paperWave(canvas,w,h,
+                    h*(.78f+.046f*sin(t*1.02f))+reaction*h*.021f,
+                    h*.35f,m*(.14f*sin(t*.64f)),
+                    m*(.12f*cos(t*.81f)),shades[0])
             }
         }
     }
