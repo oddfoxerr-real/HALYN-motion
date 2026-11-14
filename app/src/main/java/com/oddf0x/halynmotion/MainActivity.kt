@@ -1371,7 +1371,8 @@ class MainActivity : Activity() {
                 SmoothWallpaperRenderer.mechanicDescription(selected)
                     ?: MaterialXRenderer.description(selected)
                     ?: GlassOrbitCollectionRenderer.description(selected)
-                    ?: if (selected == BubbleGardenRenderer.SCENE_INDEX) BubbleGardenRenderer.DESCRIPTION else null
+                    ?: (if (selected == BubbleGardenRenderer.SCENE_INDEX)
+                        BubbleGardenRenderer.DESCRIPTION else null)
                     ?: "Live originals · 4K photography · Clock & motion"
         }
         if (::onlineCredit.isInitialized) {
