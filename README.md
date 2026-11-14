@@ -1,5 +1,28 @@
 # HALYN Motion
 
+## v0.23.0 — Glass Orbit Collection & real Material X live motion
+
+**Glass Orbit remains intact.** Ten new glass-ring wallpapers are added at fixed preset IDs **145–154**, after the earlier eight Material X scenes (137–144), keeping every older saved scene ID stable.
+
+| New wallpaper | Distinct mechanic |
+| --- | --- |
+| Orbital Lens | Tilt steers a double-layer refractive lens |
+| Refractive Orbit | Independently moving refractive lens curvature |
+| Twin Glass Rings | Two transparent rings counter-orbit and exchange highlights |
+| Caustic Ring | Charging brightens moving liquid-like glints |
+| Eclipse Lens | Foreground glass disc eclipses another ring, plus optional notification pulse |
+| Prism Orbit | Two tilted optical orbits intersect at different rates |
+| Crystal Orbit | Touch pushes an optical glint across crystal-like rims |
+| Orbital Bloom | Smooth expanding and contracting glass shell |
+| Glass Nebula Ring | Translucent lens mist responds to local day phase |
+| Luminous Orbit | Music-playback-active status brightens a circulating light arc |
+
+Every Glass Orbit Collection wallpaper has a separate short AGSL program and its own geometry, with a scene-specific moving Canvas ring fallback if a GPU driver rejects its shader. No four-spoke or swastika-like iconography and no rejected names were introduced. All ten work without microphone access, screen recording or screen sharing. The notification mechanic uses the existing optional notification listener and stores no message content.
+
+**Material X motion rework:** all eight existing minimalist wallpapers now use visibly larger, constant movement cycles: the paper sun travels and each horizon moves, arches open independently, fold surfaces slide, pebbles move on individual tracks, a ribbon's Bezier geometry flows, the dunes rise and fall, frame insets translate and breathe, and ceramic bowls oscillate. This corrects the previous almost-static look. Material X and Glass Orbit gallery previews are also live at a battery-conscious ~12 fps while visible, instead of being frozen at a fixed time.
+
+**All 4-color customizations and preexisting original wallpapers remain**. This release contains **108 procedural scenes** (28 original + 30 earlier optical + 12 reactive + 20 brand-inspired + 8 Material X + 10 Glass Orbit family). The user photo slot is separate. The project builds through GitHub Actions; on-device GPU and animation quality must still be verified on the target Galaxy A56.
+
 ## v0.22.0 — Four independent colours for every wallpaper + Material X minimalism
 
 **Four-colour palettes:** Every procedural wallpaper, Mountain landscape, Star Window and imported 4K photo now supports four editable colour swatches. Select a wallpaper, enable **Four-colour palette** in the Colour panel, then tap colour 1–4 to use the existing HEX/HSV picker. Each preset persists its own four opaque colour values in private shared preferences, with no upper limit on customization slots across the installed collection. Disabling the option restores the scene's previous native palette.
