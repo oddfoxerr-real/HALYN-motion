@@ -284,7 +284,9 @@ class HalynRenderer(private val context: Context) {
     private val materialXRenderer = MaterialXRenderer()
     private val glassOrbitRenderer = GlassOrbitCollectionRenderer()
     private val bubbleGardenRenderer = BubbleGardenRenderer()
+    // Gesture state and recoverable Canvas renderer are separate from GPU art.
     private val auraCyberRenderer = AuraCyberRenderer()
+    private val auraCyberShaderRenderer = AuraCyberShaderRenderer()
     private var shaderFailed = false
     private var shader: RuntimeShader? = null
     private var configuredWidth = -1f
@@ -313,6 +315,7 @@ class HalynRenderer(private val context: Context) {
     fun resetHardwareState() {
         smoothRenderer.resetHardwareState()
         glassOrbitRenderer.resetHardwareState()
+        auraCyberShaderRenderer.resetHardwareState()
         shader = null
         shaderFailed = false
         configuredWidth = -1f
@@ -431,9 +434,18 @@ class HalynRenderer(private val context: Context) {
             return
         }
         if (AuraCyberRenderer.isAuraCyber(state.preset)) {
-            auraCyberRenderer.draw(
-                canvas, state, elapsedSeconds, gyro, reactions, offsetX
-            )
+            val impact = auraCyberRenderer.sampleImpact(gyro, state)
+            // Completely different primary architecture from v0.25.0:
+            // optical AGSL volume/precision field, not flat Canvas lines.
+            // Keep Canvas only as a per-scene GPU failure recovery.
+            if (!auraCyberShaderRenderer.draw(
+                    canvas, state, elapsedSeconds, gyro,
+                    reactions, offsetX, impact
+                )) {
+                auraCyberRenderer.draw(
+                    canvas, state, elapsedSeconds, gyro, reactions, offsetX
+                )
+            }
             return
         }
         if (SmoothWallpaperRenderer.isSmooth(state.preset)) {

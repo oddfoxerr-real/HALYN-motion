@@ -1,5 +1,17 @@
 # HALYN Motion
 
+## v0.26.0 — Aura / Cyber rendering replacement (quality repair)
+
+The v0.25.0 Aura Battle / Cyber Systems collection used Android Canvas strokes, arcs and translucent flat gradients as its **primary** scene artwork. Although each preset had different motion curves, it did not provide the three-dimensional-feeling aura, filmic light or elegantly dense cyber surface the collection was supposed to deliver.
+
+**Architecture change:** All 12 existing wallpapers (IDs **156–167**) now use their own small, lazy-compiled **AGSL GPU shader**. The materials no longer depend on the same handful of Canvas line and arc primitives: Aura Strike has a warped noisy energy plume with layered glow, Nova Clash has colliding volumetric fronts, Impact Veil uses translucent optical folds, Void Rush uses a depth-compressed spatial tunnel, Energy Break flows along an elastic light membrane, and Pulse Slash uses luminous curved optical filaments. Cipher Veil adds quiet glass panels and sparse scan traces, Ghost Trace uses a signal graph, Vector Breach renders diagonal refractive seams, Packet Drift draws curved packet paths, Zero Grid uses a technical scan field, and Signal Intrusion uses granular low-contrast interference.
+
+The existing velocity-aware gesture detection and filtered tilt detection remain in place. The new GPU shader composites the actual swipe direction into brief optical slash trails or more subtle signal ripples rather than painting a pile of unshaded line segments over the image. A reusable filmic tone map and stable dither reduce washed-out light and gradient banding. Preset four-colour choices, intensity, flow, sensitivity and burst duration still work.
+
+Each GPU scene is independently cached and failure-isolated. On systems without Android 13+ RuntimeShader hardware support, the old Canvas renderer remains an explicit **fallback only**. Every existing 121 procedural wallpaper ID, including Glass Orbit, the live Material X range and Bubble Garden, is retained. No new permissions or background processes are needed.
+
+**Validation scope:** CI can compile Kotlin and the APK, and can verify uniform plumbing, scene coverage and fallback wiring. It cannot verify visual appearance or compile AGSL for the actual Samsung Galaxy A56 GPU driver. That visual check remains necessary; this update should not be described as visually proven until device testing.
+
 ## v0.25.0 — Aura Battle & Cyber Systems: 12 live wallpapers
 
 HALYN adds **12 fully animated, touch-reactive wallpapers** without modifying any of the original 109 procedural presets or their existing saved per-wallpaper four-colour settings. This extends HALYN to **121 procedural wallpapers** (plus the imported photograph slot), using new IDs **156–167**.

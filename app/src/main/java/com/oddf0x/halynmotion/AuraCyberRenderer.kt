@@ -144,6 +144,37 @@ class AuraCyberRenderer {
         burstPower = power
     }
 
+    /**
+     * Shared motion signal for the new dedicated GPU compositor. Reuse the
+     * proven timestamped touch logic instead of running duplicate detectors.
+     * This Canvas renderer is now the GPU-failure recovery path only.
+     */
+    data class Impact(
+        val age: Float,
+        val x: Float,
+        val y: Float,
+        val directionX: Float,
+        val directionY: Float,
+        val power: Float,
+        val pointerX: Float,
+        val pointerY: Float,
+        val pointerDown: Boolean
+    )
+
+    fun sampleImpact(pose: ParallaxPose, state: MotionState): Impact {
+        val now = SystemClock.uptimeMillis()
+        tiltBurst(pose, now, state)
+        val age = if (burstTime > 0L) {
+            ((now - burstTime) / (720f *
+                state.strikeDuration.coerceIn(.5f, 1.8f))).coerceIn(0f, 2f)
+        } else 2f
+        return Impact(
+            age, burstX, burstY,
+            burstDX, burstDY, burstPower,
+            touchX, touchY, pressed
+        )
+    }
+
     private fun mix(a: Int, b: Int, t: Float): Int {
         val f = t.coerceIn(0f,1f)
         return Color.rgb(
