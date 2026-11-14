@@ -156,7 +156,8 @@ class MotionPreferences(context: Context) {
     private fun sanitizePreset(value: Int): Int = when {
         value in 0..20 || value == PhotoWallpaperStore.SCENE_INDEX ||
             value in 52..63 || SmoothWallpaperRenderer.isSmooth(value) ||
-            MaterialXRenderer.isMaterial(value) -> value
+            MaterialXRenderer.isMaterial(value) ||
+            GlassOrbitCollectionRenderer.isGlassOrbit(value) -> value
         else -> 0 // The retired illustrated poster IDs 21–50 must never render.
     }
 
@@ -271,6 +272,7 @@ class HalynRenderer(private val context: Context) {
     private val photoRenderer = PhotoWallpaperStore(context.applicationContext)
     private val smoothRenderer = SmoothWallpaperRenderer()
     private val materialXRenderer = MaterialXRenderer()
+    private val glassOrbitRenderer = GlassOrbitCollectionRenderer()
     private var shaderFailed = false
     private var shader: RuntimeShader? = null
     private var configuredWidth = -1f
@@ -298,6 +300,7 @@ class HalynRenderer(private val context: Context) {
      */
     fun resetHardwareState() {
         smoothRenderer.resetHardwareState()
+        glassOrbitRenderer.resetHardwareState()
         shader = null
         shaderFailed = false
         configuredWidth = -1f
@@ -386,7 +389,16 @@ class HalynRenderer(private val context: Context) {
             return
         }
         if (MaterialXRenderer.isMaterial(state.preset)) {
-            materialXRenderer.draw(canvas, state, elapsedSeconds, gyro)
+            materialXRenderer.draw(
+                canvas, state, elapsedSeconds, gyro, touchForce, reactions
+            )
+            return
+        }
+        if (GlassOrbitCollectionRenderer.isGlassOrbit(state.preset)) {
+            glassOrbitRenderer.draw(
+                canvas, state, elapsedSeconds,
+                touchX, touchY, offsetX, gyro, touchForce, reactions
+            )
             return
         }
         if (SmoothWallpaperRenderer.isSmooth(state.preset)) {
@@ -489,7 +501,8 @@ class HalynRenderer(private val context: Context) {
             "Liquid Copper", "Polar Halo", "Prism Flow", "Voltage Bloom"
         ) + List(11) { "Retired material" } +
             SmoothWallpaperRenderer.SCENES.map { it.name } +
-            MaterialXRenderer.SCENES.map { it.name }
+            MaterialXRenderer.SCENES.map { it.name } +
+            GlassOrbitCollectionRenderer.SCENES.map { it.name }
         val PALETTES = listOf(
             "Arctic", "Ultraviolet", "Ember", "Rose", "Verdant"
         )
