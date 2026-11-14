@@ -128,7 +128,8 @@ class GlassOrbitCollectionRenderer {
                 float c1=exp(-107.0*abs(d1-.29));
                 float c2=exp(-97.0*abs(d2-.31));
                 float c3=exp(-112.0*abs(d3-.34));
-                float touchHighlight=exp(-7.0*length(q-u_touch))*(.10+.95*u_touchForce);
+                float2 touched=float2((u_touch.x-.5)*aspect,u_touch.y-.5);
+float touchHighlight=exp(-7.0*length(q-touched))*(.10+.95*u_touchForce);
                 energy=c1*.75+c2*.42+c3*.36+touchHighlight*.44;
                 glow=(exp(-13.0*abs(d1-.29))+exp(-12.0*abs(d3-.34)))*.14;
                 glass=touchHighlight*.17;
@@ -179,7 +180,6 @@ uniform float u_speed;
 uniform float u_intensity;
 uniform float u_palette;
 uniform float3 u_customColor;
-uniform float u_variant;
 uniform float u_offset;
 uniform float2 u_gyro;
 uniform float2 u_touch;
@@ -292,12 +292,13 @@ half4 main(float2 frag) {
                     Color.red(state.customColor)/255f,
                     Color.green(state.customColor)/255f,
                     Color.blue(state.customColor)/255f)
-                shader.setFloatUniform("u_variant", index.toFloat())
                 shader.setFloatUniform("u_offset", if (state.parallax) offsetX else .5f)
                 shader.setFloatUniform("u_gyro", gyro.x, gyro.y)
-                shader.setFloatUniform("u_touch",
-                    if (state.touch) touchX else .5f,
-                    if (state.touch) touchY else .5f)
+                if (index == 6) {
+                    shader.setFloatUniform("u_touch",
+                        if (state.touch) touchX else .5f,
+                        if (state.touch) touchY else .5f)
+                }
                 QuadColorSystem.setShaderUniforms(shader, state)
                 when (index) {
                     3 -> shader.setFloatUniform("u_charging", reactions.charging)
