@@ -23,6 +23,8 @@ data class MotionState(
     val colorFour: Int = 0xFF88D7C3.toInt(),
     val intensity: Float = 1.0f,
     val speed: Float = 1.0f,
+    val strikeSensitivity: Float = 1.0f,
+    val strikeDuration: Float = 1.0f,
     val fps: Int = 30,
     val shaderQuality: Int = 1,
     val shadesDepth: Float = 1.0f,
@@ -114,6 +116,8 @@ class MotionPreferences(context: Context) {
             customColor = preferences.getInt("custom_color", Color.rgb(185, 174, 255)) or -0x1000000,
             intensity = float("intensity", 1f, .35f, 2.3f),
             speed = float("speed", 1f, .25f, 2f),
+            strikeSensitivity = float("strike_sensitivity", 1f, .5f, 2f),
+            strikeDuration = float("strike_duration", 1f, .5f, 1.8f),
             fps = when (preferences.getInt("fps", 30)) {
                 60 -> 60
                 45 -> 45
@@ -158,7 +162,8 @@ class MotionPreferences(context: Context) {
             value in 52..63 || SmoothWallpaperRenderer.isSmooth(value) ||
             MaterialXRenderer.isMaterial(value) ||
             GlassOrbitCollectionRenderer.isGlassOrbit(value) ||
-            value == BubbleGardenRenderer.SCENE_INDEX -> value
+            value == BubbleGardenRenderer.SCENE_INDEX ||
+            AuraCyberRenderer.isAuraCyber(value) -> value
         else -> 0 // The retired illustrated poster IDs 21–50 must never render.
     }
 
@@ -173,6 +178,10 @@ class MotionPreferences(context: Context) {
         .apply()
     fun setIntensity(value: Float) = preferences.edit().putFloat("intensity", value.coerceIn(.35f, 2.3f)).apply()
     fun setSpeed(value: Float) = preferences.edit().putFloat("speed", value.coerceIn(.25f, 2f)).apply()
+    fun setStrikeSensitivity(value: Float) = preferences.edit()
+        .putFloat("strike_sensitivity", value.coerceIn(.5f, 2f)).apply()
+    fun setStrikeDuration(value: Float) = preferences.edit()
+        .putFloat("strike_duration", value.coerceIn(.5f, 1.8f)).apply()
     fun setFps(value: Int) = preferences.edit().putInt("fps", value).apply()
     fun setShaderQuality(value: Int) = preferences.edit().putInt("shader_quality", value.coerceIn(0, 2)).apply()
     fun setShadesDepth(value: Float) = preferences.edit().putFloat("shades_depth", value.coerceIn(.4f, 2f)).apply()
@@ -275,6 +284,7 @@ class HalynRenderer(private val context: Context) {
     private val materialXRenderer = MaterialXRenderer()
     private val glassOrbitRenderer = GlassOrbitCollectionRenderer()
     private val bubbleGardenRenderer = BubbleGardenRenderer()
+    private val auraCyberRenderer = AuraCyberRenderer()
     private var shaderFailed = false
     private var shader: RuntimeShader? = null
     private var configuredWidth = -1f
@@ -367,6 +377,15 @@ class HalynRenderer(private val context: Context) {
         bubbleGardenRenderer.onTouch(action, x, y)
     }
 
+    fun onAuraCyberTouch(
+        action: Int, xPx: Float, yPx: Float, eventMs: Long,
+        width: Float, height: Float, density: Float, sensitivity: Float
+    ) {
+        auraCyberRenderer.onTouch(
+            action, xPx, yPx, eventMs, width, height, density, sensitivity
+        )
+    }
+
     fun draw(
         canvas: Canvas,
         state: MotionState,
@@ -409,6 +428,12 @@ class HalynRenderer(private val context: Context) {
         }
         if (state.preset == BubbleGardenRenderer.SCENE_INDEX) {
             bubbleGardenRenderer.draw(canvas, state, elapsedSeconds)
+            return
+        }
+        if (AuraCyberRenderer.isAuraCyber(state.preset)) {
+            auraCyberRenderer.draw(
+                canvas, state, elapsedSeconds, gyro, reactions, offsetX
+            )
             return
         }
         if (SmoothWallpaperRenderer.isSmooth(state.preset)) {
@@ -513,7 +538,8 @@ class HalynRenderer(private val context: Context) {
             SmoothWallpaperRenderer.SCENES.map { it.name } +
             MaterialXRenderer.SCENES.map { it.name } +
             GlassOrbitCollectionRenderer.SCENES.map { it.name } +
-            listOf(BubbleGardenRenderer.SCENE_NAME)
+            listOf(BubbleGardenRenderer.SCENE_NAME) +
+            AuraCyberRenderer.SCENES.map { it.name }
         val PALETTES = listOf(
             "Arctic", "Ultraviolet", "Ember", "Rose", "Verdant"
         )
