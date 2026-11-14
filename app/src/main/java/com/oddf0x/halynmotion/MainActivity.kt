@@ -78,6 +78,8 @@ class MainActivity : Activity() {
     private lateinit var skyStatus: TextView
     private lateinit var skyToggle: TextView
     private lateinit var palettes: LinearLayout
+    private lateinit var fourColorSwatches: LinearLayout
+    private lateinit var fourColorToggle: Switch
     private lateinit var frameRates: LinearLayout
     private lateinit var qualityModes: LinearLayout
     private lateinit var activeSceneName: TextView
@@ -304,6 +306,11 @@ class MainActivity : Activity() {
         buildOriginalRail(root, "Dynamic waves & galaxy light", (127..131).toList())
         buildOriginalRail(root, "Edge light & energy", (132..136).toList())
 
+        root.addView(section("Material X · Minimal",
+            "Matte material layers, sculpted paper, smooth cutouts and subtle independent motion."))
+        buildOriginalRail(root, "Soft material & horizons", (137..140).toList())
+        buildOriginalRail(root, "Architectural motion", (141..144).toList())
+
         root.addView(section("Landscapes & exploration",
             "Minimalistic mountains and interactive Star Window."))
         buildOriginalRail(root, "Minimal landscapes", (17..20).toList())
@@ -405,7 +412,40 @@ class MainActivity : Activity() {
         }
         pickerRow.addView(edit, LinearLayout.LayoutParams(-2, dp(48)))
         panel.addView(pickerRow)
+
+        panel.addView(View(this).apply { setBackgroundColor(borderColor) },
+            LinearLayout.LayoutParams(-1, dp(1)).apply {
+                topMargin = dp(14)
+                bottomMargin = dp(14)
+            })
+        fourColorToggle = Switch(this).apply {
+            text = "Four-colour palette"
+            setTextColor(ink)
+            textSize = 15f
+            minHeight = dp(48)
+            isChecked = prefs.get().fourColorsEnabled
+            contentDescription = "Use four independently selected colours on this wallpaper"
+            setOnCheckedChangeListener { _, checked ->
+                if (checked != prefs.get().fourColorsEnabled) {
+                    prefs.setFourColorsEnabled(checked)
+                    refreshFourColors()
+                    preview.invalidate()
+                }
+            }
+        }
+        panel.addView(fourColorToggle, LinearLayout.LayoutParams(-1, dp(48)))
+        panel.addView(text(
+            "Each wallpaper remembers its four colours. Tap a swatch to edit it. " +
+                "Turn this off to restore the wallpaper's original palette.",
+            12f, secondary
+        ).apply { setPadding(0, dp(4), 0, dp(10)) })
+        fourColorSwatches = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        panel.addView(fourColorSwatches, LinearLayout.LayoutParams(-1, dp(65)))
         root.addView(panel)
+        refreshFourColors()
     }
 
     private fun buildClock(root: LinearLayout) {
@@ -1303,6 +1343,7 @@ class MainActivity : Activity() {
 
     private fun refreshScene() {
         val selected = prefs.get().preset
+        refreshFourColors()
         val source = prefs.raw.getString("online_source", null)
         val ownPhoto = PhotoWallpaperStore(this).available()
         activeSceneName.text = when {
@@ -1314,6 +1355,7 @@ class MainActivity : Activity() {
         if (::activeMechanicDescription.isInitialized) {
             activeMechanicDescription.text =
                 SmoothWallpaperRenderer.mechanicDescription(selected)
+                    ?: MaterialXRenderer.description(selected)
                     ?: "Live originals · 4K photography · Clock & motion"
         }
         if (::onlineCredit.isInitialized) {
@@ -1394,6 +1436,48 @@ class MainActivity : Activity() {
             refreshScene()
             preview.invalidate()
         }.show()
+    }
+
+    private fun refreshFourColors() {
+        if (!::fourColorSwatches.isInitialized) return
+        val state = prefs.get()
+        fourColorToggle.isChecked = state.fourColorsEnabled
+        fourColorSwatches.removeAllViews()
+        val slots = arrayOf("First", "Second", "Third", "Fourth")
+        for (index in 0..3) {
+            val color = QuadColorSystem.color(state, index)
+            val cell = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                isClickable = true
+                isFocusable = true
+                contentDescription = "${slots[index]} colour ${hex(color)}. Edit colour."
+                setOnClickListener {
+                    ColorPickerDialog(this@MainActivity, color) { chosen ->
+                        prefs.setFourColor(index, chosen)
+                        refreshFourColors()
+                        preview.invalidate()
+                        // Selection cards are static views; repaint to reflect new colours.
+                        originalCards.forEach { (_, card) ->
+                            (card.getChildAt(0) as? View)?.invalidate()
+                        }
+                    }.show()
+                }
+            }
+            val disc = View(this).apply {
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(color)
+                    setStroke(dp(2), if (state.fourColorsEnabled) ink else borderColor)
+                }
+            }
+            cell.addView(disc, LinearLayout.LayoutParams(dp(35), dp(35)))
+            cell.addView(text("${index+1} · ${hex(color)}", 10f, secondary).apply {
+                gravity = Gravity.CENTER
+                maxLines = 1
+            }, LinearLayout.LayoutParams(-1, dp(23)))
+            fourColorSwatches.addView(cell, LinearLayout.LayoutParams(0, dp(64), 1f))
+        }
     }
 
     private fun refreshFps() {
@@ -1573,7 +1657,7 @@ class MainActivity : Activity() {
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
-            val state = prefs.get().copy(preset = sceneIndex, clockStyle = 0, shaderQuality = 0)
+            val state = prefs.getForPreset(sceneIndex).copy(clockStyle = 0, shaderQuality = 0)
             // Static previews use the same full-resolution shader at Efficient
             // detail, so browsing the 30-scene collection remains responsive.
             renderer.draw(canvas, state, 7f + sceneIndex * 1.7f)

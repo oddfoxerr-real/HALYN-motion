@@ -810,6 +810,11 @@ uniform float u_time;
 uniform float u_variant;
 uniform float u_palette;
 uniform float3 u_customColor;
+uniform float u_quadEnabled;
+uniform float3 u_quadOne;
+uniform float3 u_quadTwo;
+uniform float3 u_quadThree;
+uniform float3 u_quadFour;
 uniform float u_intensity;
 uniform float u_speed;
 uniform float u_quality;
@@ -883,6 +888,13 @@ half4 main(float2 frag) {
         float hue = .5 + .5*cos(u_variant*1.47);
         accent = mix(float3(.25, .53, 1.0), float3(.26, .95, .79), hue);
     }
+    float3 quadGradient = mix(
+        mix(u_quadOne, u_quadTwo, clamp(uv.x,0.0,1.0)),
+        mix(u_quadThree,u_quadFour,clamp(uv.x,0.0,1.0)),
+        clamp(uv.y,0.0,1.0));
+    if (u_quadEnabled > 0.5) {
+        accent = quadGradient;
+    }
     float3 companion = mix(accent, accent.zxy, 0.46) * 0.72;
     float3 highlight = mix(accent, float3(0.97, 0.985, 1.0), 0.59);
     float r = length(p);
@@ -907,6 +919,9 @@ half4 main(float2 frag) {
     float3 inkBlack = float3(0.0035, 0.006, 0.014);
     float3 ambientTint = mix(companion, accent, .36) * (.065 + .045 * horizon);
     float3 col = inkBlack + ambientTint * (.5 + .5 * vignette);
+    if (u_quadEnabled > 0.5) {
+        col += quadGradient * (.075 + .035*vignette);
+    }
     // Apple-inspired optical glass uses broad, flowing pastel reflection.
     // Samsung-inspired scenes remain predominantly black for AMOLED contrast.
     if (u_variant > 41.5 && u_variant < 51.5) {
@@ -1023,6 +1038,7 @@ half4 main(float2 frag) {
                     if (state.touch) touchY else .5f)
                 active.setFloatUniform("u_offset", if (state.parallax) offsetX else .5f)
                 active.setFloatUniform("u_gyro", pose.x, pose.y)
+                QuadColorSystem.setShaderUniforms(active, state)
                 // Uniforms unused by the compiled scene may be optimized away;
                 // setting one of those on RuntimeShader can throw at runtime.
                 when (sceneIndex) {
@@ -1155,14 +1171,18 @@ half4 main(float2 frag) {
                 }
             }
             for (pass in 0..1) {
+                val strokeColor = if (state.fourColorsEnabled)
+                    QuadColorSystem.color(state, line % 4)
+                else accent
                 recoveryStroke.color = Color.argb(
                     if (pass == 0) 48 else 202,
-                    Color.red(accent), Color.green(accent), Color.blue(accent)
+                    Color.red(strokeColor), Color.green(strokeColor), Color.blue(strokeColor)
                 )
                 recoveryStroke.strokeWidth = minDimension *
                     (if (pass == 0) .023f else .0048f)
                 canvas.drawPath(outline, recoveryStroke)
             }
         }
+        QuadColorSystem.drawOverlay(canvas, state, .23f)
     }
 }

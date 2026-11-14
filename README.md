@@ -1,5 +1,15 @@
 # HALYN Motion
 
+## v0.22.0 — Four independent colours for every wallpaper + Material X minimalism
+
+**Four-colour palettes:** Every procedural wallpaper, Mountain landscape, Star Window and imported 4K photo now supports four editable colour swatches. Select a wallpaper, enable **Four-colour palette** in the Colour panel, then tap colour 1–4 to use the existing HEX/HSV picker. Each preset persists its own four opaque colour values in private shared preferences, with no upper limit on customization slots across the installed collection. Disabling the option restores the scene's previous native palette.
+
+AGSL-rendered HALYN Originals and the 62 original-style wallpapers blend all four chosen colours spatially into their actual shader emissions and soft ambient light. On non-AGSL wallpapers (Star Window, photograph and mountains), the four colours create a low-opacity gradient tint so the artwork remains visible. Wallpaper previews, gallery cards and the running wallpaper share the same per-scene settings. The Material X scenes use the four selected shades as the base background, midground, accent and foreground.
+
+**Material X · Minimal** adds eight independently animated original vector wallpapers: **Paper Horizon, Arc Stack, Soft Fold, Pebble Lines, Ribbon Cutout, Mono Dunes, Orbit Insets and Ceramic Waves**. Their smooth curves, matte material layers, sculpted inset shapes and subtle depth use Android Canvas rather than importing static wallpaper images or copying any proprietary Material visual assets. These scenes are lightweight and use no new system permissions. The existing HALYN visuals and scene IDs are preserved.
+
+Total: **98 selectable procedural wallpapers**, including the original 28, previous 30+12+20 additions, and 8 Material X scenes. Photograph imports remain a separate category. GitHub Actions validates compilation and package integrity; device-side visual quality still needs inspection on the Samsung Galaxy A56.
+
 ## v0.21.0 — Original Apple- and Samsung-inspired wallpaper collections
 
 HALYN now contains **90 original procedural wallpapers**: the existing 28 classic effects, 30 earlier original-style extras, 12 reactive originals, plus **20 new device-inspired designs**. None of the existing preset IDs or names changed.
