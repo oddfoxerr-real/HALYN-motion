@@ -1,5 +1,33 @@
 # HALYN Motion
 
+## v0.25.0 — Aura Battle & Cyber Systems: 12 live wallpapers
+
+HALYN adds **12 fully animated, touch-reactive wallpapers** without modifying any of the original 109 procedural presets or their existing saved per-wallpaper four-colour settings. This extends HALYN to **121 procedural wallpapers** (plus the imported photograph slot), using new IDs **156–167**.
+
+### Anime battle energy (156–161)
+| Scene | Distinct animated mechanism |
+| --- | --- |
+| Aura Strike | Flowing central aura, moving energy ribbons, floating particles, directional anime strike lines and a pressure wave when swiped fast |
+| Nova Clash | Independently moving opposing luminous energy fronts with a collision seam and expanding ring |
+| Impact Veil | Semi-transparent diagonal energy sheets with a quick slash and clean afterglow |
+| Void Rush | Receding optical tunnel rings and spatial speed trails converging on a tilting vanishing point |
+| Energy Break | Moving flexible membrane of light contours with a fast-gesture rupture |
+| Pulse Slash | Independent filament paths with staggered speed-driven slash afterimages |
+
+### Cyber Systems (162–167)
+| Scene | Distinct animated mechanism |
+| --- | --- |
+| Cipher Veil | Matte optical glass panels, travelling signal packets, a scan line and a subtle optional notification pulse |
+| Ghost Trace | Branching low-contrast network routes and travelling node signals that flare when swiped |
+| Vector Breach | Diagonal optical seams, panel drift and a temporary movement-driven breach; charging adds restrained illumination |
+| Packet Drift | Curved packet traffic, optional music-active density increase and gesture-proximate route deflection |
+| Zero Grid | A thin technical grid, scanning wave and slow-moving highlighted cells |
+| Signal Intrusion | Controlled fine signal bands, a narrow scan and brief velocity-triggered interference |
+
+**Interactive gesture physics:** HALYN uses ACTION_DOWN/MOVE/UP/CANCEL with event timestamps, calculating touch speed in **density-independent pixels per second**. A swipe around 1,200 dp/s activates the directional impact engine after a short travel threshold; ordinary taps remain calm. The controls offer **Swipe sensitivity (0.5–2.0×)**, **Burst duration (0.5–1.8×)**, **Aura / signal strength** and **Animation flow**. Fast changes to the existing filtered tilt pose can activate a smaller impact when gyro motion is enabled. Active home-screen swipe detection depends on whether the device's launcher forwards MOVE events to the live wallpaper; the in-app studio supports them directly.
+
+Each scene uses an original low-overhead Android Canvas renderer, not screenshots, static bitmaps or copied anime art. The visuals are black-first with controlled motion blur approximations, soft radial haze, precise strokes and no fake terminal dialogue, green falling code, skulls or four-spoke symbols. **Four-colour palettes** work throughout. Background rendering stops when the live wallpaper becomes hidden. No new microphone, notification-read, accessibility, screen-recording or network permissions were introduced. The optional signal response uses existing battery, Boolean music-active and opt-in notification timestamp sampling only. GitHub Actions validates APK compilation and structural coverage; appearance and Android launcher gesture forwarding still require an actual Galaxy A56 test.
+
 ## v0.24.0 — Bubble Garden interactive live wallpaper
 
 **Bubble Garden**, preset **155**, adds eleven carefully positioned translucent bubbles with soft glass reflections and nearly fixed positions. They are not procedurally rearranged or continuously floating upward: their coordinates remain anchored, with only tiny shimmer and gentle breathing.

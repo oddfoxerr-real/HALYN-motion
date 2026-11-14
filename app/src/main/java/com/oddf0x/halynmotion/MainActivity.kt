@@ -68,6 +68,7 @@ class MainActivity : Activity() {
     private val originalCards = mutableListOf<Pair<Int, LinearLayout>>()
     private val originalTileRenderer by lazy { HalynRenderer(this) }
     private lateinit var effectPanel: LinearLayout
+    private lateinit var auraCyberControls: LinearLayout
     private lateinit var gyroModes: LinearLayout
     private lateinit var gyroPanel: LinearLayout
     private lateinit var mountainDepthPanel: LinearLayout
@@ -232,6 +233,7 @@ class MainActivity : Activity() {
                     (SmoothWallpaperRenderer.mechanicDescription(index)
                         ?: MaterialXRenderer.description(index)
                         ?: GlassOrbitCollectionRenderer.description(index)
+                        ?: AuraCyberRenderer.description(index)
                         ?: "HALYN original effect")
                 setOnClickListener {
                     prefs.setPreset(index)
@@ -324,6 +326,42 @@ class MainActivity : Activity() {
             "Stationary soap-glass bubbles. Drag one to stretch and pop it, " +
                 "then watch the tiny droplets fade and the bubble grow back."))
         buildOriginalRail(root, "Touch & pop", listOf(BubbleGardenRenderer.SCENE_INDEX))
+
+        root.addView(section("Aura Battle · Live",
+            "Atmospheric energy with speed-sensitive anime strike lines and pressure waves."))
+        buildOriginalRail(root, "Aura & impact", (156..158).toList())
+        buildOriginalRail(root, "Speed & energy", (159..161).toList())
+
+        root.addView(section("Cyber Systems · Minimal",
+            "Quiet digital optics. No fake terminals, code rain or intrusive overlays."))
+        buildOriginalRail(root, "Trace & cipher", (162..164).toList())
+        buildOriginalRail(root, "Data & signal", (165..167).toList())
+
+        auraCyberControls = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(section("Strike & signal controls",
+                "Quick swipe for impact; gyro triggers lighter motion reactions."))
+        }
+        val auraPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = rounded(cardColor, 22, borderColor)
+            setPadding(dp(17), dp(14), dp(17), dp(12))
+        }
+        addSlider(auraPanel, "Aura / signal strength", prefs.get().intensity,
+            .35f, 2.3f, prefs::setIntensity)
+        addSlider(auraPanel, "Animation flow", prefs.get().speed,
+            .25f, 2f, prefs::setSpeed)
+        addSlider(auraPanel, "Swipe sensitivity", prefs.get().strikeSensitivity,
+            .5f, 2f, prefs::setStrikeSensitivity)
+        addSlider(auraPanel, "Burst duration", prefs.get().strikeDuration,
+            .5f, 1.8f, prefs::setStrikeDuration)
+        auraPanel.addView(text(
+            "Swipe speed is measured in dp/s. Fast swipes trigger crisp effects; " +
+                "regular taps stay calm. The launcher may reserve some swipes.",
+            12f, secondary
+        ).apply { setPadding(0, dp(6), 0, dp(3)) })
+        auraCyberControls.addView(auraPanel)
+        root.addView(auraCyberControls)
 
         root.addView(section("Landscapes & exploration",
             "Minimalistic mountains and interactive Star Window."))
@@ -1371,6 +1409,7 @@ class MainActivity : Activity() {
                 SmoothWallpaperRenderer.mechanicDescription(selected)
                     ?: MaterialXRenderer.description(selected)
                     ?: GlassOrbitCollectionRenderer.description(selected)
+                    ?: AuraCyberRenderer.description(selected)
                     ?: (if (selected == BubbleGardenRenderer.SCENE_INDEX)
                         BubbleGardenRenderer.DESCRIPTION else null)
                     ?: "Live originals · 4K photography · Clock & motion"
@@ -1385,6 +1424,10 @@ class MainActivity : Activity() {
                 (prefs.raw.getString("online_resolution", "") ?: "")
         }
         refreshOriginalCards()
+        if (::auraCyberControls.isInitialized) {
+            auraCyberControls.visibility = if (AuraCyberRenderer.isAuraCyber(selected))
+                View.VISIBLE else View.GONE
+        }
         if (::effectPanel.isInitialized) {
             effectPanel.visibility = if (
                 selected in 0..11 || selected in 13..16 ||
@@ -1675,6 +1718,7 @@ class MainActivity : Activity() {
         private val animationStart = SystemClock.uptimeMillis()
         private val animated = MaterialXRenderer.isMaterial(sceneIndex) ||
             GlassOrbitCollectionRenderer.isGlassOrbit(sceneIndex) ||
+            AuraCyberRenderer.isAuraCyber(sceneIndex) ||
             sceneIndex == BubbleGardenRenderer.SCENE_INDEX
 
         override fun onDraw(canvas: Canvas) {
@@ -1765,6 +1809,13 @@ class MainActivity : Activity() {
                     event.actionMasked,
                     (event.x / width.coerceAtLeast(1)).coerceIn(0f, 1f),
                     (event.y / height.coerceAtLeast(1)).coerceIn(0f, 1f)
+                )
+            }
+            if (AuraCyberRenderer.isAuraCyber(state.preset)) {
+                renderer.onAuraCyberTouch(
+                    event.actionMasked, event.x, event.y, event.eventTime,
+                    width.toFloat(), height.toFloat(),
+                    resources.displayMetrics.density, state.strikeSensitivity
                 )
             }
             when (event.actionMasked) {

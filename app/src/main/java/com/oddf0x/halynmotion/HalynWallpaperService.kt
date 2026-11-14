@@ -199,6 +199,15 @@ class HalynWallpaperService : WallpaperService() {
                     (event.y / surfaceHeight.coerceAtLeast(1)).coerceIn(0f, 1f)
                 )
             }
+            if (AuraCyberRenderer.isAuraCyber(settings.preset)) {
+                // Real pixel/time velocity; full MOVE events are required for
+                // directional anime strike lines and clean cyber disturbances.
+                renderer.onAuraCyberTouch(
+                    event.actionMasked, event.x, event.y, event.eventTime,
+                    surfaceWidth.toFloat(), surfaceHeight.toFloat(),
+                    resources.displayMetrics.density, settings.strikeSensitivity
+                )
+            }
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     touchDownX = event.x
