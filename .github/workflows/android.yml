@@ -52,11 +52,11 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='30'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='31'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.24.0-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.24.0-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.25.0-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.25.0-preview.apk > SHA256SUMS.txt)
 
       - name: Verify curated wallpaper collection
         shell: bash
@@ -96,6 +96,16 @@ jobs:
           grep -q 'renderer.onBubbleTouch(' app/src/main/java/com/oddf0x/halynmotion/HalynWallpaperService.kt
           grep -q 'renderer.onBubbleTouch(' app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
           grep -q 'buildOriginalRail(root, "Touch & pop"' app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
+          test -s app/src/main/java/com/oddf0x/halynmotion/AuraCyberRenderer.kt
+          grep -q 'AuraCyberRenderer.isAuraCyber(value)' app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
+          grep -q 'AuraCyberRenderer.SCENES.map { it.name }' app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
+          grep -q 'auraCyberRenderer.draw(' app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
+          grep -q 'renderer.onAuraCyberTouch(' app/src/main/java/com/oddf0x/halynmotion/HalynWallpaperService.kt
+          grep -q 'renderer.onAuraCyberTouch(' app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
+          grep -q 'buildOriginalRail(root, "Aura & impact"' app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
+          grep -q 'buildOriginalRail(root, "Data & signal"' app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
+          grep -q 'prefs::setStrikeSensitivity' app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
+          grep -q 'prefs::setStrikeDuration' app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
           grep -q 'materialXRenderer.draw(' app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
           grep -q 'val t = seconds\*(.78f + state.speed\*.24f)' app/src/main/java/com/oddf0x/halynmotion/MaterialXRenderer.kt
           test -s app/src/main/java/com/oddf0x/halynmotion/GlassOrbitCollectionRenderer.kt
@@ -167,6 +177,29 @@ jobs:
           assert 'state.fourColorsEnabled' in bubble_src
           assert 'BubbleGardenRenderer.SCENE_NAME' in renderer_src
           print("Bubble Garden preset 155: gesture, burst particles, regen and color integration verified")
+          pack_src = Path("app/src/main/java/com/oddf0x/halynmotion/AuraCyberRenderer.kt").read_text()
+          pack_block = pack_src.split("val SCENES = listOf(",1)[1].split("fun isAuraCyber",1)[0]
+          pack_names = re.findall(r'Scene\("([^"]+)",',pack_block)
+          assert len(pack_names) == 12 and len(set(pack_names)) == 12, pack_names
+          assert pack_names[0] == "Aura Strike" and pack_names[5] == "Pulse Slash"
+          assert pack_names[6] == "Cipher Veil" and pack_names[11] == "Signal Intrusion"
+          assert 'const val FIRST = 156' in pack_src
+          assert 'const val COUNT = 12' in pack_src
+          methods = ["auraStrike", "novaClash", "impactVeil", "voidRush", "energyBreak",
+              "pulseSlash", "cipherVeil", "ghostTrace", "vectorBreach",
+              "packetDrift", "zeroGrid", "signalIntrusion"]
+          for method in methods:
+              assert f"private fun {method}(" in pack_src, f"Missing independent {method} renderer"
+          assert 'speed >= threshold && travelledDp > 22f' in pack_src
+          assert '1200f/sensitivity.coerceIn(.5f,2f)' in pack_src
+          assert 'val speed=if (dt in .012f..0.20f)' in pack_src
+          assert 'state.fourColorsEnabled' in pack_src
+          assert 'val age=(now-burstTime).toFloat()/' in pack_src
+          assert 'drawBattleBurst(' in pack_src and 'drawCyberBurst(' in pack_src
+          assert 'HALYN-Motion-v0.25.0-preview.apk' in Path(".github/workflows/android.yml").read_text()
+          assert 'versionCode = 31' in Path("app/build.gradle.kts").read_text()
+          assert 'value == BubbleGardenRenderer.SCENE_INDEX' in renderer_src
+          print("12 unique animated Aura/Cyber scenes 156..167: gesture speed, motion, 4-color, all legacy IDs verified")
           PY
 
       - name: Verify clock font storage and preset recovery
@@ -212,42 +245,49 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.24.0 Bubble Garden
+      - name: Publish HALYN v0.25.0 Aura & Cyber
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.24.0-preview.1
+          TAG: v0.25.0-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.24.0-preview.apk
-          unzip -t dist/HALYN-Motion-v0.24.0-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.25.0-preview.apk
+          unzip -t dist/HALYN-Motion-v0.25.0-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN Motion v0.24.0 — Interactive Bubble Garden
+          # HALYN Motion v0.25.0 — Aura Battle & Cyber Systems
 
-          - Adds Bubble Garden at preset 155: eleven translucent, soft-glass
-            bubbles anchored to the same places instead of drifting offscreen.
-          - Touch and drag a bubble: it follows briefly, stretches and bursts
-            into seven small droplets and an outward ripple after it moves
-            beyond roughly half its radius.
-          - A burst bubble disappears then regrows at its original location;
-            single taps produce a soft wobble without an unwanted pop.
-          - Works in both the Android home-screen live wallpaper and studio
-            preview; Android launcher support for forwarding MOVE gestures
-            can vary, with no screen-recording or accessibility required.
-          - Supports the existing four individually editable colours as well
-            as all five HALYN palettes and custom tint.
-          - Maintains all prior 108 procedural wallpapers, the original
-            Glass Orbit, eight live Material X scenes and saved preset IDs.
-          - Built entirely using efficient Android Canvas gradients and
-            lightweight bubbles, without screenshots, microphone or sensors.
-          - Debug-signed preview; motion and drag handling still require
-            on-device visual verification on a Samsung Galaxy A56.
+          Six original, continuously animated anime-battle-energy wallpapers:
+          Aura Strike, Nova Clash, Impact Veil, Void Rush, Energy Break,
+          Pulse Slash. Distinct ambient shapes, luminous aura, shockwaves
+          and velocity-aligned slash afterimages.
+
+          Six original minimal cybersecurity-inspired wallpapers:
+          Cipher Veil, Ghost Trace, Vector Breach, Packet Drift,
+          Zero Grid, Signal Intrusion. Thin optical trace paths,
+          glass panels, moving packets and restrained scan highlights.
+          No fake terminal text, scrolling Matrix code or intrusive skulls.
+
+          - All 12 have independently authored live Canvas compositions.
+          - Fast swipes above approximately 1200 dp/s cause distinct battle
+            strike lines or cyber signal disruptions, following gesture
+            direction; adjustable sensitivity and duration controls.
+          - Optional rapid phone movements trigger lighter effects through
+            existing filtered tilt. No new sensor permissions.
+          - Four editable colours, original palettes and all prior 109
+            procedural wallpapers are retained: 121 total.
+          - System signal effects use only playback-active (boolean),
+            charging and opted-in notification-event timestamp.
+          - Real native wallpaper events plus in-app preview events.
+          - Hardware rendering is efficient and pauses with wallpaper visibility.
+          - Android launcher swipe delivery and actual on-device visuals
+            still need checking on Samsung Galaxy A56.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.24.0-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.25.0-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.24.0 — Interactive Bubble Garden" \
+            --title "HALYN Motion v0.25.0 — Aura & Cyber Live Pack" \
             --notes-file notes.md --prerelease
