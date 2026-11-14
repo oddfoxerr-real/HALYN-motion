@@ -229,7 +229,10 @@ class MainActivity : Activity() {
                 isClickable = true
                 isFocusable = true
                 contentDescription = "Select ${HalynRenderer.PRESETS[index]} animated wallpaper. " +
-                    (SmoothWallpaperRenderer.mechanicDescription(index) ?: "HALYN original effect")
+                    (SmoothWallpaperRenderer.mechanicDescription(index)
+                        ?: MaterialXRenderer.description(index)
+                        ?: GlassOrbitCollectionRenderer.description(index)
+                        ?: "HALYN original effect")
                 setOnClickListener {
                     prefs.setPreset(index)
                     refreshScene()
@@ -310,6 +313,12 @@ class MainActivity : Activity() {
             "Matte material layers, sculpted paper, smooth cutouts and subtle independent motion."))
         buildOriginalRail(root, "Soft material & horizons", (137..140).toList())
         buildOriginalRail(root, "Architectural motion", (141..144).toList())
+
+        root.addView(section("Glass Orbit Collection",
+            "Ten new living glass-ring scenes inspired by the original Glass Orbit. " +
+                "Different optical mechanics, no copied designs."))
+        buildOriginalRail(root, "Lenses & refraction", (145..149).toList())
+        buildOriginalRail(root, "Crystal depth & motion", (150..154).toList())
 
         root.addView(section("Landscapes & exploration",
             "Minimalistic mountains and interactive Star Window."))
@@ -1356,6 +1365,7 @@ class MainActivity : Activity() {
             activeMechanicDescription.text =
                 SmoothWallpaperRenderer.mechanicDescription(selected)
                     ?: MaterialXRenderer.description(selected)
+                    ?: GlassOrbitCollectionRenderer.description(selected)
                     ?: "Live originals · 4K photography · Clock & motion"
         }
         if (::onlineCredit.isInitialized) {
@@ -1371,7 +1381,8 @@ class MainActivity : Activity() {
         if (::effectPanel.isInitialized) {
             effectPanel.visibility = if (
                 selected in 0..11 || selected in 13..16 ||
-                selected in 52..63 || SmoothWallpaperRenderer.isSmooth(selected)
+                selected in 52..63 || SmoothWallpaperRenderer.isSmooth(selected) ||
+                GlassOrbitCollectionRenderer.isGlassOrbit(selected)
             ) View.VISIBLE else View.GONE
         }
         if (::starControls.isInitialized) starControls.visibility =
@@ -1654,15 +1665,32 @@ class MainActivity : Activity() {
 
     private inner class SceneTilePreview(private val sceneIndex: Int) : View(this@MainActivity) {
         private val renderer get() = originalTileRenderer
+        private val animationStart = SystemClock.uptimeMillis()
+        private val animated = MaterialXRenderer.isMaterial(sceneIndex) ||
+            GlassOrbitCollectionRenderer.isGlassOrbit(sceneIndex)
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
             val state = prefs.getForPreset(sceneIndex).copy(clockStyle = 0, shaderQuality = 0)
-            // Static previews use the same full-resolution shader at Efficient
-            // detail, so browsing the 30-scene collection remains responsive.
-            renderer.draw(canvas, state, 7f + sceneIndex * 1.7f)
+            val seconds = if (animated) {
+                (SystemClock.uptimeMillis() - animationStart) / 1000f +
+                    sceneIndex * .37f
+            } else {
+                7f + sceneIndex * 1.7f
+            }
+            renderer.draw(canvas, state, seconds)
             // Mountain cards previously omitted their foreground entirely.
             renderer.drawForeground(canvas, state)
+            // Gallery animations are intentionally capped to ~12fps and only
+            // scheduled while visible to avoid 18 hidden animations consuming
+            // battery or UI thread time on the Galaxy A56.
+            if (animated && isShown && hasWindowFocus()) {
+                val visibleBounds = android.graphics.Rect()
+                if (getGlobalVisibleRect(visibleBounds) &&
+                    visibleBounds.width() > 0 && visibleBounds.height() > 0) {
+                    postInvalidateDelayed(84L)
+                }
+            }
         }
     }
 
