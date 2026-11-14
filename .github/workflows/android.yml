@@ -52,11 +52,11 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='29'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='30'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.23.0-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.23.0-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.24.0-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.24.0-preview.apk > SHA256SUMS.txt)
 
       - name: Verify curated wallpaper collection
         shell: bash
@@ -90,6 +90,12 @@ jobs:
           grep -q 'postInvalidateDelayed(84L)' app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
           grep -q 'GlassOrbitCollectionRenderer.isGlassOrbit(value)' app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
           grep -q 'GlassOrbitCollectionRenderer.SCENES.map { it.name }' app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
+          test -s app/src/main/java/com/oddf0x/halynmotion/BubbleGardenRenderer.kt
+          grep -q 'value == BubbleGardenRenderer.SCENE_INDEX' app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
+          grep -q 'bubbleGardenRenderer.draw(canvas, state, elapsedSeconds)' app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
+          grep -q 'renderer.onBubbleTouch(' app/src/main/java/com/oddf0x/halynmotion/HalynWallpaperService.kt
+          grep -q 'renderer.onBubbleTouch(' app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
+          grep -q 'buildOriginalRail(root, "Touch & pop"' app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt
           grep -q 'materialXRenderer.draw(' app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt
           grep -q 'val t = seconds\*(.78f + state.speed\*.24f)' app/src/main/java/com/oddf0x/halynmotion/MaterialXRenderer.kt
           test -s app/src/main/java/com/oddf0x/halynmotion/GlassOrbitCollectionRenderer.kt
@@ -144,6 +150,23 @@ jobs:
           ui_src = Path("app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt").read_text()
           assert "postInvalidateDelayed(84L)" in ui_src
           print("10 Glass Orbit scenes + animated Material X verified, legacy IDs unchanged")
+          bubble_src = Path("app/src/main/java/com/oddf0x/halynmotion/BubbleGardenRenderer.kt").read_text()
+          renderer_src = Path("app/src/main/java/com/oddf0x/halynmotion/HalynRenderer.kt").read_text()
+          service_src = Path("app/src/main/java/com/oddf0x/halynmotion/HalynWallpaperService.kt").read_text()
+          studio_src = Path("app/src/main/java/com/oddf0x/halynmotion/MainActivity.kt").read_text()
+          assert 'const val SCENE_INDEX = 155' in bubble_src
+          assert 'const val SCENE_NAME = "Bubble Garden"' in bubble_src
+          assert 'bubbleGardenRenderer.onTouch(action, x, y)' in renderer_src
+          assert 'BubbleGardenRenderer.SCENE_INDEX' in renderer_src
+          assert 'renderer.onBubbleTouch(' in service_src
+          assert 'renderer.onBubbleTouch(' in studio_src
+          assert 'MotionEvent.ACTION_MOVE' in bubble_src
+          assert 'b.burstAt = now' in bubble_src
+          assert 'drawBurst(canvas, b, age' in bubble_src
+          assert 'val grow = rebuild * rebuild * (3f - 2f * rebuild)' in bubble_src
+          assert 'state.fourColorsEnabled' in bubble_src
+          assert 'BubbleGardenRenderer.SCENE_NAME' in renderer_src
+          print("Bubble Garden preset 155: gesture, burst particles, regen and color integration verified")
           PY
 
       - name: Verify clock font storage and preset recovery
@@ -189,44 +212,42 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.23.0 Glass Orbit Collection
+      - name: Publish HALYN v0.24.0 Bubble Garden
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.23.0-preview.1
+          TAG: v0.24.0-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.23.0-preview.apk
-          unzip -t dist/HALYN-Motion-v0.23.0-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.24.0-preview.apk
+          unzip -t dist/HALYN-Motion-v0.24.0-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN Motion v0.23.0 — Glass Orbit Collection & Living Material X
+          # HALYN Motion v0.24.0 — Interactive Bubble Garden
 
-          - Adds ten original Glass Orbit-style live wallpapers: Orbital Lens,
-            Refractive Orbit, Twin Glass Rings, Caustic Ring, Eclipse Lens,
-            Prism Orbit, Crystal Orbit, Orbital Bloom, Glass Nebula Ring,
-            and Luminous Orbit. These are new designs, not copied assets.
-          - Each wallpaper has independent geometry and motion, including
-            tilt/refraction, counter-orbits, charging glints, touch highlights,
-            day-phase wisps, music-active illumination and notification pulses.
-          - Preserves original Glass Orbit preset 7 and all prior 98 effects.
-          - Reworks every Material X scene to animate visibly and continuously:
-            travelling paper horizons, breathing arcs, sliding folds, drifting
-            pebbles, flowing ribbon cutouts, moving dunes, orbiting inset frames,
-            and rocking ceramic waves.
-          - Material X and Glass Orbit gallery cards now have low-rate live
-            previews only when visible, not static thumbnails.
-          - The new glass shaders compile separately and have animated Canvas
-            fallbacks instead of identical blank gradients.
-          - Four user-selected colour swatches work in the new glass shaders.
-          - No new permissions, microphone or screen capture.
-          - Debug-signed preview; physical device animation and GPU appearance
-            still need checking on the Samsung Galaxy A56.
+          - Adds Bubble Garden at preset 155: eleven translucent, soft-glass
+            bubbles anchored to the same places instead of drifting offscreen.
+          - Touch and drag a bubble: it follows briefly, stretches and bursts
+            into seven small droplets and an outward ripple after it moves
+            beyond roughly half its radius.
+          - A burst bubble disappears then regrows at its original location;
+            single taps produce a soft wobble without an unwanted pop.
+          - Works in both the Android home-screen live wallpaper and studio
+            preview; Android launcher support for forwarding MOVE gestures
+            can vary, with no screen-recording or accessibility required.
+          - Supports the existing four individually editable colours as well
+            as all five HALYN palettes and custom tint.
+          - Maintains all prior 108 procedural wallpapers, the original
+            Glass Orbit, eight live Material X scenes and saved preset IDs.
+          - Built entirely using efficient Android Canvas gradients and
+            lightweight bubbles, without screenshots, microphone or sensors.
+          - Debug-signed preview; motion and drag handling still require
+            on-device visual verification on a Samsung Galaxy A56.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.23.0-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.24.0-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.23.0 — Glass Orbit & Live Material X" \
+            --title "HALYN Motion v0.24.0 — Interactive Bubble Garden" \
             --notes-file notes.md --prerelease
