@@ -900,7 +900,10 @@ half4 main(float2 frag) {
     float r = length(p);
     float v = 0.0;
     float glow = 0.0;
-    /* HALYN_SCENE_EXPRESSION */
+    // Keep scene-local names separate from the shared lighting pipeline.
+    {
+        /* HALYN_SCENE_EXPRESSION */
+    }
     // Scene-dependent material response: reflections are not nebula light.
     float metal = 0.0;
     if ((u_variant > 5.5 && u_variant < 11.5) ||

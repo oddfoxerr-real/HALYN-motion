@@ -287,7 +287,10 @@ half4 main(float2 frag) {
     float filament=0.0;
     float fog=0.0;
     float spark=0.0;
-    /* AURA_CYBER_SCENE */
+    // Keep scene-local names separate from lighting and gesture composition.
+    {
+        /* AURA_CYBER_SCENE */
+    }
 
     float strength=u_intensity;
     float background=exp(-3.5*r);
