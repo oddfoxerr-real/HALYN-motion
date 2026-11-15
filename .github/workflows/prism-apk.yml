@@ -1,0 +1,46 @@
+name: Build PRISM APK
+on:
+  push:
+    branches:
+      - prism-apk-build
+    paths:
+      - prism_source_fixed.b64
+      - .github/workflows/prism-apk.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-prism-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout PRISM build branch
+        uses: actions/checkout@v4
+      - name: Decode standalone Android source
+        run: |
+          base64 --decode prism_source_fixed.b64 > PrismWidget-source.zip
+          unzip -q PrismWidget-source.zip
+          test -f PrismWidget/app/build.gradle.kts
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android API 37
+        run: sdkmanager 'platforms;android-37' 'build-tools;36.0.0'
+      - name: Set up Gradle 9.5
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+      - name: Assemble PRISM debug APK
+        working-directory: PrismWidget
+        run: gradle --no-daemon :app:assembleDebug --stacktrace
+      - name: Upload installable APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PRISM-v0.1.0-debug-apk
+          path: PrismWidget/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
