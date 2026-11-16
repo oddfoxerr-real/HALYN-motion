@@ -6,6 +6,12 @@ on:
     paths:
       - prism_source_fixed.b64
       - .github/workflows/prism-apk.yml
+  pull_request:
+    branches:
+      - prism-apk-build
+    paths:
+      - prism_source_fixed.b64
+      - .github/workflows/prism-apk.yml
   workflow_dispatch:
 permissions:
   contents: read
@@ -39,10 +45,39 @@ jobs:
       - name: Assemble PRISM debug APK
         working-directory: PrismWidget
         run: gradle --no-daemon :app:assembleDebug --stacktrace
+      - name: Verify and stage versioned APK
+        id: package
+        run: |
+          python3 - <<'PY'
+          import hashlib, os, re, shutil, subprocess, zipfile
+          from pathlib import Path
+          apk = Path('PrismWidget/app/build/outputs/apk/debug/app-debug.apk')
+          with zipfile.ZipFile(apk) as archive:
+              assert archive.testzip() is None, 'APK archive is corrupt'
+          aapt = Path(os.environ['ANDROID_HOME']) / 'build-tools/36.0.0/aapt'
+          metadata = subprocess.check_output([str(aapt), 'dump', 'badging', str(apk)], text=True)
+          package = re.search(r"^package: name='([^']+)' versionCode='(\d+)' versionName='([^']+)'", metadata, re.M)
+          assert package, 'Missing APK package metadata'
+          name, code, version = package.groups()
+          assert name == 'com.oddfox.prism', f'Unexpected package: {name}'
+          assert re.fullmatch(r'[0-9A-Za-z][0-9A-Za-z._+-]*', version), 'Unsafe artifact version'
+          source = Path('PrismWidget/app/build.gradle.kts').read_text()
+          assert re.search(r'versionCode\s*=\s*(\d+)', source).group(1) == code
+          assert re.search(r'versionName\s*=\s*"([^"]+)"', source).group(1) == version
+          output = Path('prism-dist')
+          output.mkdir(exist_ok=True)
+          target = output / f'PRISM-v{version}-debug.apk'
+          shutil.copyfile(apk, target)
+          digest = hashlib.sha256(target.read_bytes()).hexdigest()
+          (output / 'SHA256SUMS.txt').write_text(f'{digest}  {target.name}\n')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as handle:
+              handle.write(f'version={version}\n')
+          print(f'Verified {name} {version} ({code}); staged {target.name}')
+          PY
       - name: Upload installable APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PRISM-v0.1.0-debug-apk
-          path: PrismWidget/app/build/outputs/apk/debug/*.apk
+          name: PRISM-v${{ steps.package.outputs.version }}-debug-apk
+          path: prism-dist/
           if-no-files-found: error
