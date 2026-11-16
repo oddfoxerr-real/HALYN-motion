@@ -1,5 +1,23 @@
 # HALYN Motion
 
+## v0.26.1 — Restore five failing shader scenes
+
+Velvet Horizon, Midnight Wave, Aura Strike, Pulse Slash and Signal Intrusion
+declared local variables that collided with the shared lighting/gesture code.
+Android compiles these shader strings at runtime, so a successful APK build
+still allowed those scenes to show their fallback artwork.
+
+Both shader templates now isolate each scene's local variables in a block.
+The formulas, preset IDs, gestures and colour controls are unchanged. CI now
+compiles all 74 Smooth and Aura/Cyber shader programs with desktop Skia and
+raster-renders portrait/landscape frames with default, custom and four-colour
+palettes, checking for non-finite, transparent or blank output. Rendered frames
+and results are available in the shader-check artifact.
+
+This is desktop compiler/raster validation, not a Samsung GPU or device test.
+To run locally: install `skia-python==144.1` in a Python 3.12 environment, then
+run `python scripts/check_wallpaper_shaders.py --output shader-check`.
+
 ## v0.26.0 — Aura / Cyber rendering replacement (quality repair)
 
 The v0.25.0 Aura Battle / Cyber Systems collection used Android Canvas strokes, arcs and translucent flat gradients as its **primary** scene artwork. Although each preset had different motion curves, it did not provide the three-dimensional-feeling aura, filmic light or elegantly dense cyber surface the collection was supposed to deliver.
