@@ -43,6 +43,6 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PRISM-v0.7.0-debug-apk
+          name: PRISM-v0.8.0-debug-apk
           path: PrismWidget/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
