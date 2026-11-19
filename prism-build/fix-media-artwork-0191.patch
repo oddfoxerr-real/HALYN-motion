@@ -1,0 +1,347 @@
+--- PrismWidget/app/build.gradle.kts
++++ PrismWidget/app/build.gradle.kts
+@@ -11,8 +11,8 @@
+         applicationId = "com.oddfox.prism"
+         minSdk = 26
+         targetSdk = 36
+-        versionCode = 19
+-        versionName = "0.19.0-chunk1"
++        versionCode = 20
++        versionName = "0.19.1-media-stability"
+     }
+ 
+     buildFeatures { compose = true }
+--- PrismWidget/app/src/main/java/com/oddfox/prism/PrismMediaArtwork.kt
++++ PrismWidget/app/src/main/java/com/oddfox/prism/PrismMediaArtwork.kt
+@@ -5,80 +5,149 @@
+ import android.graphics.BitmapFactory
+ import android.graphics.Color
+ import android.net.Uri
++import android.os.Handler
++import android.os.Looper
++import android.util.Log
++import androidx.compose.runtime.mutableIntStateOf
+ import java.util.Locale
++import java.util.concurrent.Executors
+ import kotlin.math.abs
+ import kotlin.math.max
+ 
+-/** Media artwork belongs to the system's current session, not to a hard-coded player. */
++/**
++ * Album art and palette extraction run off the editor/drawing thread. The renderer only
++ * reads a small immutable-in-practice cache and can always draw a placeholder instead.
++ * A damaged media URI or unsupported hardware bitmap must never crash the widget editor.
++ */
+ object PrismMediaArtwork {
+-    private var cachedArtworkKey = ""
+-    private var cachedArtwork: Bitmap? = null
+-    private var cachedPaletteKey = ""
+-    private var cachedPalette: Map<String, String> = emptyMap()
+-
+-    fun bitmap(context: Context, track: MusicBridge.Track = MusicBridge.snapshot(context)): Bitmap? = synchronized(this) {
+-        val key = listOf(track.packageName, track.title, track.artist, track.album, track.cover).joinToString("|")
+-        if (key == cachedArtworkKey && ((cachedArtwork != null && !cachedArtwork!!.isRecycled) ||
+-                    MusicBridge.artworkBitmap() == null)) return@synchronized cachedArtwork
+-        if (key.isBlank() || (track.title.isBlank() && track.cover.isBlank() && MusicBridge.artworkBitmap() == null)) {
+-            cachedArtworkKey = key
+-            cachedArtwork = null
+-            return@synchronized null
+-        }
+-        val fromSession = MusicBridge.artworkBitmap()?.takeIf { !it.isRecycled }
+-        val image = fromSession ?: readUri(context, track.cover)
+-        cachedArtworkKey = key
+-        cachedArtwork = image?.let { bounded(it, 768) }
+-        cachedArtwork
+-    }
+-
+-    private fun bounded(bitmap: Bitmap, maxDimension: Int): Bitmap {
+-        val software = if (bitmap.config == Bitmap.Config.HARDWARE)
+-            bitmap.copy(Bitmap.Config.ARGB_8888, false) ?: return bitmap
+-        else bitmap
+-        if (max(software.width, software.height) <= maxDimension) return software
+-        val ratio = maxDimension.toFloat() / max(software.width, software.height)
+-        return Bitmap.createScaledBitmap(software, (software.width * ratio).toInt().coerceAtLeast(1),
+-            (software.height * ratio).toInt().coerceAtLeast(1), true)
++    private const val TAG = "PrismArtwork"
++    private const val MAX_ART_SIDE = 768
++    private val lock = Any()
++    private val main = Handler(Looper.getMainLooper())
++    private val worker = Executors.newSingleThreadExecutor { task ->
++        Thread(task, "prism-media-artwork").apply { isDaemon = true }
++    }
++
++    private var requestedKey = ""
++    @Volatile private var loadedKey = ""
++    @Volatile private var loadedArtwork: Bitmap? = null
++    @Volatile private var loadedPalette: Map<String, String> = emptyMap()
++
++    /** Observed by Compose previews: a completed background load invalidates the canvas. */
++    val revision = mutableIntStateOf(0)
++
++    private fun trackKey(track: MusicBridge.Track): String = listOf(
++        track.packageName, track.title, track.artist, track.album, track.cover
++    ).joinToString("\u0001")
++
++    fun bitmap(context: Context, track: MusicBridge.Track = MusicBridge.snapshot()): Bitmap? {
++        val key = trackKey(track)
++        schedule(context, track, key)
++        return if (key == loadedKey) loadedArtwork?.takeUnless { it.isRecycled } else null
++    }
++
++    fun palette(context: Context, track: MusicBridge.Track = MusicBridge.snapshot()): Map<String, String> {
++        val key = trackKey(track)
++        schedule(context, track, key)
++        return if (key == loadedKey) loadedPalette else emptyMap()
++    }
++
++    private fun schedule(context: Context, track: MusicBridge.Track, key: String) {
++        if (key == loadedKey) return
++        val application = context.applicationContext
++        synchronized(lock) {
++            if (key == loadedKey || key == requestedKey) return
++            requestedKey = key
++        }
++        worker.execute {
++            var result: Bitmap? = null
++            var colors: Map<String, String> = emptyMap()
++            try {
++                val sessionArt = MusicBridge.artworkBitmap()?.takeUnless { it.isRecycled }
++                if (track.cover.isNotBlank() || sessionArt != null) {
++                    result = safeSoftwareBitmap(sessionArt ?: readUri(application, track.cover))
++                    if (result != null) colors = extractPalette(result)
++                }
++            } catch (error: RuntimeException) {
++                Log.w(TAG, "Could not load album artwork; using an empty placeholder", error)
++            } catch (error: OutOfMemoryError) {
++                Log.e(TAG, "Album artwork exceeded available memory; skipping image", error)
++                result = null
++                colors = emptyMap()
++            }
++            synchronized(lock) {
++                if (requestedKey != key) return@execute
++                loadedArtwork = result
++                loadedPalette = colors
++                loadedKey = key
++            }
++            main.post {
++                revision.intValue += 1
++                // The remote home-screen widget needs a one-time refresh once artwork is ready.
++                // The loaded key prevents this refresh from scheduling itself again.
++                if (result != null) {
++                    runCatching { PrismWidgetProvider.updateAll(application, "Album artwork loaded") }
++                        .onFailure { Log.w(TAG, "Launcher redraw failed", it) }
++                }
++            }
++        }
++    }
++
++    private fun safeSoftwareBitmap(source: Bitmap?): Bitmap? {
++        if (source == null || source.isRecycled) return null
++        if (source.width !in 1..4096 || source.height !in 1..4096) return null
++        val software = if (source.config == Bitmap.Config.HARDWARE) {
++            source.copy(Bitmap.Config.ARGB_8888, false) ?: return null
++        } else source
++        if (max(software.width, software.height) <= MAX_ART_SIDE) return software
++        val factor = MAX_ART_SIDE.toFloat() / max(software.width, software.height)
++        return Bitmap.createScaledBitmap(software,
++            (software.width * factor).toInt().coerceAtLeast(1),
++            (software.height * factor).toInt().coerceAtLeast(1), true)
+     }
+ 
+     private fun readUri(context: Context, raw: String): Bitmap? {
+-        val uri = runCatching { Uri.parse(raw) }.getOrNull() ?: return null
+-        if (uri.scheme !in setOf("content", "android.resource")) return null
+-        return runCatching {
+-            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+-            context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+-            if (options.outWidth < 1 || options.outHeight < 1) return@runCatching null
+-            val sample = generateSequence(1) { it * 2 }.takeWhile { it <= 128 }
+-                .lastOrNull { max(options.outWidth, options.outHeight) / it > 768 } ?: 1
++        val uri = Uri.parse(raw)
++        if (uri.scheme != "content" && uri.scheme != "android.resource") return null
++        return try {
++            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
++            context.contentResolver.openInputStream(uri)?.use {
++                BitmapFactory.decodeStream(it, null, bounds)
++            }
++            if (bounds.outWidth <= 0 || bounds.outHeight <= 0 ||
++                bounds.outWidth > 16000 || bounds.outHeight > 16000) return null
++            var sample = 1
++            while (max(bounds.outWidth / sample, bounds.outHeight / sample) > MAX_ART_SIDE * 2 && sample < 128) {
++                sample *= 2
++            }
+             context.contentResolver.openInputStream(uri)?.use {
+                 BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply {
+                     inSampleSize = sample
+                     inPreferredConfig = Bitmap.Config.ARGB_8888
+                 })
+             }
+-        }.getOrNull()
++        } catch (error: Exception) {
++            Log.w(TAG, "Album URI unavailable", error)
++            null
++        }
+     }
+ 
+-    /** Opaque hex colours, computed once per track and reused by *all* matching property bindings. */
+-    fun palette(context: Context, track: MusicBridge.Track = MusicBridge.snapshot(context)): Map<String, String> = synchronized(this) {
+-        val artwork = bitmap(context, track) ?: return@synchronized emptyMap()
+-        val key = listOf(track.packageName, track.title, track.artist, track.album, track.cover,
+-            artwork.width.toString(), artwork.height.toString()).joinToString("|")
+-        if (key == cachedPaletteKey) return@synchronized cachedPalette
+-        val preview = bounded(artwork, 48)
++    private fun extractPalette(bitmap: Bitmap): Map<String, String> {
++        val preview = if (max(bitmap.width, bitmap.height) <= 48) bitmap else {
++            val factor = 48f / max(bitmap.width, bitmap.height)
++            Bitmap.createScaledBitmap(bitmap, (bitmap.width * factor).toInt().coerceAtLeast(1),
++                (bitmap.height * factor).toInt().coerceAtLeast(1), true)
++        }
+         val pixels = IntArray(preview.width * preview.height)
+-        if (runCatching { preview.getPixels(pixels, 0, preview.width, 0, 0,
+-                preview.width, preview.height) }.isFailure) return@synchronized emptyMap()
++        preview.getPixels(pixels, 0, preview.width, 0, 0, preview.width, preview.height)
+         val histogram = HashMap<Int, Int>()
+         pixels.forEach { pixel ->
+             if (Color.alpha(pixel) < 144) return@forEach
+-            val r = Color.red(pixel) / 32
+-            val g = Color.green(pixel) / 32
+-            val b = Color.blue(pixel) / 32
+-            val bucket = (r shl 6) or (g shl 3) or b
++            val bucket = ((Color.red(pixel) / 32) shl 6) or
++                ((Color.green(pixel) / 32) shl 3) or (Color.blue(pixel) / 32)
+             histogram[bucket] = (histogram[bucket] ?: 0) + 1
+         }
++        if (histogram.isEmpty()) return emptyMap()
+         data class Candidate(val color: Int, val count: Int, val saturation: Float, val brightness: Float)
+         val hsv = FloatArray(3)
+         val candidates = histogram.map { (bucket, count) ->
+@@ -87,29 +156,28 @@
+             Color.colorToHSV(color, hsv)
+             Candidate(color, count, hsv[1], hsv[2])
+         }
+-        fun choose(targetSaturation: Float, targetBrightness: Float): Int = candidates.maxByOrNull { p ->
+-            p.count.toDouble() * (1.0 - abs(p.saturation - targetSaturation) * 0.80).coerceAtLeast(0.1) *
+-                (1.0 - abs(p.brightness - targetBrightness) * 0.45).coerceAtLeast(0.1)
++        fun choose(saturation: Float, brightness: Float): Int = candidates.maxByOrNull { c ->
++            c.count.toDouble() * (1.0 - abs(c.saturation - saturation) * 0.8).coerceAtLeast(0.1) *
++                (1.0 - abs(c.brightness - brightness) * 0.45).coerceAtLeast(0.1)
+         }?.color ?: Color.TRANSPARENT
+         fun hex(c: Int) = String.format(Locale.US, "#%08X", c)
+-        val dominant = candidates.maxByOrNull { it.count }?.color ?: Color.TRANSPARENT
+-        cachedPalette = mapOf(
+-            "dominant" to hex(dominant),
+-            "vibrant" to hex(choose(0.92f, 0.70f)),
+-            "muted" to hex(choose(0.25f, 0.50f)),
+-            "lightvibrant" to hex(choose(0.90f, 0.85f)),
+-            "darkvibrant" to hex(choose(0.90f, 0.30f)),
+-            "lightmuted" to hex(choose(0.25f, 0.80f)),
+-            "darkmuted" to hex(choose(0.25f, 0.25f))
++        return mapOf(
++            "dominant" to hex(candidates.maxByOrNull { it.count }?.color ?: Color.TRANSPARENT),
++            "vibrant" to hex(choose(.92f, .7f)),
++            "muted" to hex(choose(.25f, .5f)),
++            "lightvibrant" to hex(choose(.9f, .85f)),
++            "darkvibrant" to hex(choose(.9f, .3f)),
++            "lightmuted" to hex(choose(.25f, .8f)),
++            "darkmuted" to hex(choose(.25f, .25f))
+         )
+-        cachedPaletteKey = key
+-        cachedPalette
+     }
+ 
+     fun read(context: Context, source: String): Bitmap? = when {
+         source == "music:cover" -> bitmap(context)
+-        source.startsWith("local:") -> PrismImageAssets.read(context, source.removePrefix("local:"))
+-        source.isNotBlank() -> PrismImageAssets.read(context, source)
++        source.startsWith("local:") -> runCatching {
++            PrismImageAssets.read(context, source.removePrefix("local:"))
++        }.getOrNull()
++        source.isNotBlank() -> runCatching { PrismImageAssets.read(context, source) }.getOrNull()
+         else -> null
+     }
+ }
+--- PrismWidget/app/src/main/java/com/oddfox/prism/FormulaEngine.kt
++++ PrismWidget/app/src/main/java/com/oddfox/prism/FormulaEngine.kt
+@@ -111,7 +111,7 @@
+             manufacturer = Build.MANUFACTURER,
+             device = Build.DEVICE,
+             darkMode = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES,
+-            music = MusicBridge.snapshot(context),
++            music = MusicBridge.snapshot(),
+             musicPalette = PrismMediaArtwork.palette(context),
+             model = Build.MODEL,
+             brand = Build.BRAND,
+--- PrismWidget/app/src/main/java/com/oddfox/prism/CanvasEditor.kt
++++ PrismWidget/app/src/main/java/com/oddfox/prism/CanvasEditor.kt
+@@ -55,6 +55,7 @@
+     onCommit: () -> Unit
+ ) {
+     val context = LocalContext.current
++    val artworkRevision = PrismMediaArtwork.revision.intValue
+     val freshDesign by rememberUpdatedState(design)
+     val freshSelected by rememberUpdatedState(selectedId)
+     val freshOnSelect by rememberUpdatedState(onSelect)
+@@ -117,8 +118,17 @@
+     ) {
+         Canvas(Modifier.fillMaxSize()) {
+             drawPrismPreviewBackdrop(design)
++            if (artworkRevision < 0) return@Canvas
+             drawIntoCanvas { native ->
+-                WidgetRenderer.draw(context, design, native.nativeCanvas, size.width, size.height, includeClocks = true, editorPreview = true, textFrames = textFrames)
++                val nativeCanvas = native.nativeCanvas
++                val checkpoint = nativeCanvas.save()
++                try {
++                    WidgetRenderer.draw(context, design, nativeCanvas, size.width, size.height, includeClocks = true, editorPreview = true, textFrames = textFrames)
++                } catch (failure: RuntimeException) {
++                    android.util.Log.e("PrismPreview", "A saved widget layer failed to render; the editor remains available", failure)
++                } finally {
++                    nativeCanvas.restoreToCount(checkpoint)
++                }
+             }
+             val vp = WidgetRenderer.viewport(design, size.width, size.height)
+             val cols = gridColumns.coerceIn(4, 48)
+--- PrismWidget/app/src/main/java/com/oddfox/prism/MainActivity.kt
++++ PrismWidget/app/src/main/java/com/oddfox/prism/MainActivity.kt
+@@ -1277,6 +1277,7 @@
+     onDragCommit: () -> Unit = {}
+ ) {
+     val context = LocalContext.current
++    val artworkRevision = PrismMediaArtwork.revision.intValue
+     val latestDesign by rememberUpdatedState(design)
+     val latestOnChange by rememberUpdatedState(onChange)
+     val latestOnSelect by rememberUpdatedState(onSelect)
+@@ -1320,8 +1321,17 @@
+         .semantics { if (interactive) contentDescription = "Editable widget preview. Tap a layer to select it; drag it to reposition." }) {
+         Canvas(Modifier.fillMaxSize()) {
+             drawPrismPreviewBackdrop(design)
++            if (artworkRevision < 0) return@Canvas
+             drawIntoCanvas { native ->
+-                WidgetRenderer.draw(context, design, native.nativeCanvas, size.width, size.height, includeClocks = true, editorPreview = interactive)
++                val nativeCanvas = native.nativeCanvas
++                val checkpoint = nativeCanvas.save()
++                try {
++                    WidgetRenderer.draw(context, design, nativeCanvas, size.width, size.height, includeClocks = true, editorPreview = interactive)
++                } catch (failure: RuntimeException) {
++                    android.util.Log.e("PrismPreview", "A saved widget layer failed to render; the editor remains available", failure)
++                } finally {
++                    nativeCanvas.restoreToCount(checkpoint)
++                }
+             }
+             if (interactive && selectedId != null) {
+                 val layer = design.layers.find { it.id == selectedId }
+--- PrismWidget/app/src/main/java/com/oddfox/prism/WidgetRenderer.kt
++++ PrismWidget/app/src/main/java/com/oddfox/prism/WidgetRenderer.kt
+@@ -65,7 +65,12 @@
+         val w = width.coerceIn(64, 1500)
+         val h = height.coerceIn(40, 1200)
+         val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+-        draw(context, design, Canvas(bitmap), w.toFloat(), h.toFloat(), includeClocks, textFrames = textFrames)
++        try {
++            draw(context, design, Canvas(bitmap), w.toFloat(), h.toFloat(), includeClocks, textFrames = textFrames)
++        } catch (failure: RuntimeException) {
++            android.util.Log.e("PrismWidgetRenderer", "Skipping an invalid widget frame", failure)
++            bitmap.eraseColor(Color.TRANSPARENT)
++        }
+         return bitmap
+     }
+ 
