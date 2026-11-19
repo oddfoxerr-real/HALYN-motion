@@ -1,0 +1,227 @@
+--- PrismWidget/CHUNK_1_TESTING.md
++++ PrismWidget/CHUNK_1_TESTING.md
+@@ -0,0 +1,22 @@
++# Prism v0.19 chunk 1 — isolated binding target and honest colour preview
++
++This is an independent implementation using KWGT workflow as a user-provided reference. No KWGT proprietary bytecode/resources are included.
++
++## What changed
++- Formula sheets now bind to an immutable target (widget background or the original layer UUID + property key); the target is visible in the sheet.
++- Deleting or switching the selected item cannot silently retarget a formula.
++- Formula-bearing Paint rows show the live resolved colour and swatch, not just the original manual fallback.
++- Canvas selection no longer overlays semi-transparent accent fill on the selected shape, which had made the shape seem to change the entire backdrop.
++- Manual values remain saved. Switching to manual removes only the chosen binding.
++
++## A56 acceptance checks
++1. Make a transparent widget and TWO round rectangles with different fixed colours.
++2. Select the first rectangle > Paint > formula > Bitmap palette > Vibrant > Apply to item.
++3. Verify only first shape changes when the playing song/cover changes. Check the Paint row's Live value.
++4. Select the second shape, verify it retains its manual colour.
++5. Select no layer and edit Background independently. Neither shape should change.
++6. Disable the first binding using Use manual; first shape must return to previous fixed colour.
++7. Remove media permission or stop playback; valid manual fallback must remain visible.
++8. Repeat with FX > shadow colour and gradient end colour.
++
++Future chunks: richer text FX and music palette source selection; shared preview/launcher rendering tests; advanced group compositing.
+--- PrismWidget/app/build.gradle.kts
++++ PrismWidget/app/build.gradle.kts
+@@ -11,8 +11,8 @@
+         applicationId = "com.oddfox.prism"
+         minSdk = 26
+         targetSdk = 36
+-        versionCode = 18
+-        versionName = "0.18.0-dev"
++        versionCode = 19
++        versionName = "0.19.0-chunk1"
+     }
+ 
+     buildFeatures { compose = true }
+--- PrismWidget/app/src/main/java/com/oddfox/prism/CanvasEditor.kt
++++ PrismWidget/app/src/main/java/com/oddfox/prism/CanvasEditor.kt
+@@ -138,11 +138,7 @@
+             val selected = design.layers.firstOrNull { it.id == selectedId }
+             if (selected != null && selected.editorVisible && !selected.editorLocked) {
+                 val r = layerRect(context, design, selected, vp)
+-                drawRect(
+-                    color = accent.copy(alpha = .12f),
+-                    topLeft = Offset(r.left, r.top),
+-                    size = Size(r.width(), r.height())
+-                )
++                // Selection must not alter the perceived fill colour. Selection is outline + handles only.
+                 drawRect(
+                     color = accent,
+                     topLeft = Offset(r.left, r.top),
+--- PrismWidget/app/src/main/java/com/oddfox/prism/PrismBindingTarget.kt
++++ PrismWidget/app/src/main/java/com/oddfox/prism/PrismBindingTarget.kt
+@@ -0,0 +1,37 @@
++package com.oddfox.prism
++
++/** The destination of a value edit is immutable while the picker is open.
++ * A layer formula can never silently become a root/background formula. */
++data class PrismBindingTarget(
++    val property: String,
++    val layerId: String? = null
++) {
++    val isRoot: Boolean get() = layerId == null
++
++    init {
++        require(property in (if (isRoot) PrismPropertyBindings.designKeys else PrismPropertyBindings.keys)) {
++            "Unsupported formula target: $property"
++        }
++        require(layerId == null || layerId.isNotBlank()) { "A layer target needs a stable layer ID" }
++    }
++
++    fun belongsTo(design: WidgetDesign): Boolean =
++        isRoot || design.layers.any { it.id == layerId }
++
++    fun formula(design: WidgetDesign): String? =
++        if (isRoot) design.propertyFormulas[property]
++        else design.layers.firstOrNull { it.id == layerId }?.propertyFormulas?.get(property)
++
++    /** Apply only to the originally selected layer; if it was deleted, do nothing. */
++    fun apply(design: WidgetDesign, value: String?): WidgetDesign {
++        if (!belongsTo(design)) return design
++        val updated = if (value.isNullOrBlank()) null else value.trim().take(1024)
++        fun mapFormula(previous: Map<String, String>): Map<String, String> =
++            if (updated == null) previous - property else previous + (property to updated)
++        if (isRoot) return design.copy(propertyFormulas = mapFormula(design.propertyFormulas),
++            background = if (property == "backgroundImageAsset" && updated != null) "IMAGE" else design.background)
++        return design.copy(layers = design.layers.map { layer ->
++            if (layer.id == layerId) layer.copy(propertyFormulas = mapFormula(layer.propertyFormulas)) else layer
++        })
++    }
++}
+--- PrismWidget/app/src/main/java/com/oddfox/prism/PrismDesignWorkspace.kt
++++ PrismWidget/app/src/main/java/com/oddfox/prism/PrismDesignWorkspace.kt
+@@ -140,7 +140,7 @@
+     val context = LocalContext.current
+     var pickerOpen by remember { mutableStateOf(false) }
+     var pickerTarget by remember { mutableStateOf("LAYER") }
+-    var formulaKey by remember { mutableStateOf<String?>(null) }
++    var formulaTarget by remember { mutableStateOf<PrismBindingTarget?>(null) }
+     var formulaDraft by remember { mutableStateOf("") }
+     var imagePickMode by remember { mutableStateOf("BACKGROUND") }
+     val imageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+@@ -270,9 +270,14 @@
+         onUpdate(LayerHierarchy.edit(design, id, change))
+     }
+     fun openFormula(key: String) {
+-        formulaKey = key
+-        formulaDraft = if (key in PrismPropertyBindings.designKeys) design.propertyFormulas[key].orEmpty()
+-            else selected?.propertyFormulas?.get(key).orEmpty()
++        // Capture the destination when the property button was pressed, not when Apply is tapped.
++        val target = when {
++            key in PrismPropertyBindings.designKeys -> PrismBindingTarget(key)
++            selected != null -> PrismBindingTarget(key, selected.id)
++            else -> return
++        }
++        formulaTarget = target
++        formulaDraft = target.formula(design).orEmpty()
+     }
+     fun addLayer(kind: String) {
+         if (design.layers.size >= MAX_LAYERS) return
+@@ -834,6 +839,8 @@
+                     if (selected != null) PrismColorProperty(
+                         label = if (selected.kind in setOf("TEXT", "DATE", "BATTERY")) "Text colour" else "Paint colour",
+                         value = selected.color,
++                        resolvedValue = PrismPropertyBindings.resolve(context, selected,
++                            FormulaEngine.capture(context, design.globals, design.animations)).color,
+                         formula = selected.propertyFormulas["color"],
+                         onChoose = { pickerTarget = "LAYER"; pickerOpen = true },
+                         onFormula = { openFormula("color") }
+@@ -1328,17 +1335,23 @@
+             Spacer(Modifier.height(18.dp))
+         }
+     }
+-    if (formulaKey != null) ModalBottomSheet(onDismissRequest = { formulaKey = null }) {
+-        val key = formulaKey ?: "color"
++    if (formulaTarget != null) ModalBottomSheet(onDismissRequest = { formulaTarget = null }) {
++        val destination = formulaTarget ?: return@ModalBottomSheet
++        val key = destination.property
+         val data = remember(design.globals, design.animations, MusicBridge.snapshot()) {
+             FormulaEngine.capture(context, design.globals, design.animations)
+         }
+         val live = PrismPropertyBindings.evaluate(formulaDraft, data)
++        val destinationName = if (destination.isRoot) "Widget background" else
++            design.layers.firstOrNull { it.id == destination.layerId }?.let { it.editorName.ifBlank { it.kind.replace('_', ' ') } }
++                ?: "Deleted item"
+         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+             .padding(horizontal = 16.dp, vertical = 12.dp),
+             verticalArrangement = Arrangement.spacedBy(12.dp)) {
+             Text("Value picker · ${key.replace(Regex("([a-z])([A-Z])"), "$1 $2")}", style = MaterialTheme.typography.headlineSmall)
+-            Text("Pick a value like KWGT or enter a formula. This controls only the selected property's output; its manual value stays saved.",
++            Text("Target: $destinationName · $key", style = MaterialTheme.typography.labelMedium,
++                color = MaterialTheme.colorScheme.primary)
++            Text("Only this item's property changes. The saved manual value remains available when the formula is turned off.",
+                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+             val categories = PrismValueCatalog.categories(key)
+             var category by remember(key) { mutableStateOf(categories.first()) }
+@@ -1356,7 +1369,7 @@
+                         "textureAsset" -> "TEXTURE"
+                         else -> "LAYER"
+                     }
+-                    formulaKey = null
++                    formulaTarget = null
+                     imageLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                 }, modifier = Modifier.fillMaxWidth()) {
+                     Icon(Icons.Rounded.Image, contentDescription = null)
+@@ -1394,22 +1407,16 @@
+                 color = if (live.startsWith("Error:")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                 OutlinedButton(onClick = {
+-                    if (key in PrismPropertyBindings.designKeys)
+-                        onUpdate(design.copy(propertyFormulas = design.propertyFormulas - key))
+-                    else editLayer { it.copy(propertyFormulas = it.propertyFormulas - key) }
+-                    formulaKey = null
+-                }, modifier = Modifier.weight(1f)) { Text("Use manual") }
++                    onUpdate(destination.apply(design, null))
++                    formulaTarget = null
++                }, enabled = destination.belongsTo(design), modifier = Modifier.weight(1f)) { Text("Use manual") }
+                 Button(onClick = {
+-                    val formula = formulaDraft.trim()
+-                    if (formula.isNotBlank() && !live.startsWith("Error:")) {
+-                        if (key in PrismPropertyBindings.designKeys) {
+-                            onUpdate(design.copy(propertyFormulas = design.propertyFormulas + (key to formula),
+-                                background = if (key == "backgroundImageAsset") "IMAGE" else design.background))
+-                        } else editLayer { it.copy(propertyFormulas = it.propertyFormulas + (key to formula)) }
+-                        formulaKey = null
+-                    }
+-                }, enabled = formulaDraft.isNotBlank() && !live.startsWith("Error:"),
+-                    modifier = Modifier.weight(1f)) { Text("Apply") }
++                    if (formulaDraft.isNotBlank() && !live.startsWith("Error:") && destination.belongsTo(design)) {
++                        onUpdate(destination.apply(design, formulaDraft))
++                        formulaTarget = null
++                    }
++                }, enabled = destination.belongsTo(design) && formulaDraft.isNotBlank() && !live.startsWith("Error:"),
++                    modifier = Modifier.weight(1f)) { Text("Apply to item") }
+             }
+             Spacer(Modifier.height(12.dp))
+         }
+--- PrismWidget/app/src/main/java/com/oddfox/prism/PrismInspectorControls.kt
++++ PrismWidget/app/src/main/java/com/oddfox/prism/PrismInspectorControls.kt
+@@ -119,12 +119,14 @@
+ fun PrismColorProperty(
+     label: String,
+     value: String,
++    resolvedValue: String = value,
+     formula: String? = null,
+     onChoose: () -> Unit,
+     onFormula: () -> Unit
+ ) {
+-    val swatch = remember(value) {
+-        val resolved = runCatching { AndroidColor.parseColor(value) }.getOrElse { AndroidColor.GRAY }
++    val swatch = remember(value, resolvedValue) {
++        val resolved = runCatching { AndroidColor.parseColor(resolvedValue) }
++            .getOrElse { runCatching { AndroidColor.parseColor(value) }.getOrElse { AndroidColor.GRAY } }
+         Color(resolved)
+     }
+     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+@@ -138,6 +140,8 @@
+             Text(formula ?: value, style = MaterialTheme.typography.labelSmall,
+                 color = if (formula != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                 maxLines = 1)
++            if (formula != null) Text("Live: $resolvedValue", style = MaterialTheme.typography.labelSmall,
++                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+         }
+         IconButton(onClick = onFormula, modifier = Modifier.size(40.dp)) {
+             Icon(Icons.Rounded.Functions, contentDescription = "Formula for $label",

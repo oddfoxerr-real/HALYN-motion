@@ -1,0 +1,15 @@
+--- PrismWidget/app/src/main/java/com/oddfox/prism/PrismInspectorControls.kt
++++ PrismWidget/app/src/main/java/com/oddfox/prism/PrismInspectorControls.kt
+@@ -119,10 +119,10 @@
+ fun PrismColorProperty(
+     label: String,
+     value: String,
+-    resolvedValue: String = value,
+     formula: String? = null,
+     onChoose: () -> Unit,
+-    onFormula: () -> Unit
++    onFormula: () -> Unit,
++    resolvedValue: String = value
+ ) {
+     val swatch = remember(value, resolvedValue) {
+         val resolved = runCatching { AndroidColor.parseColor(resolvedValue) }
