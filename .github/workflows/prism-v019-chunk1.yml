@@ -26,6 +26,7 @@ jobs:
           echo "8912c9aeb7b92fc7f9974a37008769e77644f3bb376e57a8cbcd1caa6cb8b344  prism-source.tar.xz" | sha256sum --check
           tar -xJf prism-source.tar.xz -C prism-workspace
           patch -p0 -d prism-workspace < prism-build/chunk1-v019.patch
+          patch --batch -p0 -d prism-workspace < prism-build/v019-color-signature-fix.patch
           test -f prism-workspace/PrismWidget/app/build.gradle.kts
           grep -F 'versionName = "0.19.0-chunk1"' prism-workspace/PrismWidget/app/build.gradle.kts
 
@@ -62,7 +63,7 @@ jobs:
         with:
           gradle-version: '9.5.0'
 
-      - name: Compile and package Prism 0.17 APK
+      - name: Compile and package Prism 0.19 APK
         working-directory: prism-workspace/PrismWidget
         run: gradle --no-daemon :app:assembleDebug
 
