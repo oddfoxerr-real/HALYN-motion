@@ -1,0 +1,18 @@
+--- PrismWidget/app/src/main/java/com/oddfox/prism/PrismDesignWorkspace.kt
++++ PrismWidget/app/src/main/java/com/oddfox/prism/PrismDesignWorkspace.kt
+@@ -13,7 +13,6 @@
+ import androidx.compose.foundation.layout.height
+ import androidx.compose.foundation.layout.Box
+ import androidx.compose.foundation.layout.BoxWithConstraints
+-import androidx.compose.foundation.layout.matchParentSize
+ import androidx.compose.foundation.layout.size
+ import androidx.compose.foundation.layout.width
+ import androidx.compose.foundation.layout.Column
+@@ -1113,6 +1112,7 @@
+             }
+         }
+     }
++    }
+     if (adding) {
+         ModalBottomSheet(onDismissRequest = { adding = false }) {
+             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
