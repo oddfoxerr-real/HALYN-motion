@@ -6,7 +6,10 @@ android {
     namespace = "com.oddf0x.halynmotion"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.oddf0x.halynmotion"
+        val previewBuild = project.findProperty("quietPreview")?.toString() == "true"
+        applicationId = if (previewBuild) "com.oddf0x.halynmotion.quietpreview" else "com.oddf0x.halynmotion"
+        manifestPlaceholders["appTitle"] = if (previewBuild) "HALYN Quiet Preview" else "@string/app_name"
+        manifestPlaceholders["wallpaperTitle"] = if (previewBuild) "HALYN Quiet Preview Wallpaper" else "@string/wallpaper_name"
         minSdk = 33
         targetSdk = 35
         versionCode = 33
