@@ -163,7 +163,8 @@ class MotionPreferences(context: Context) {
             MaterialXRenderer.isMaterial(value) ||
             GlassOrbitCollectionRenderer.isGlassOrbit(value) ||
             value == BubbleGardenRenderer.SCENE_INDEX ||
-            AuraCyberRenderer.isAuraCyber(value) -> value
+            AuraCyberRenderer.isAuraCyber(value) ||
+            CalmSlateRenderer.isCalm(value) -> value
         else -> 0 // The retired illustrated poster IDs 21–50 must never render.
     }
 
@@ -282,6 +283,7 @@ class HalynRenderer(private val context: Context) {
     private val photoRenderer = PhotoWallpaperStore(context.applicationContext)
     private val smoothRenderer = SmoothWallpaperRenderer()
     private val materialXRenderer = MaterialXRenderer()
+    private val calmSlateRenderer = CalmSlateRenderer()
     private val glassOrbitRenderer = GlassOrbitCollectionRenderer()
     private val bubbleGardenRenderer = BubbleGardenRenderer()
     // Gesture state and recoverable Canvas renderer are separate from GPU art.
@@ -414,6 +416,10 @@ class HalynRenderer(private val context: Context) {
         if (state.preset == PhotoWallpaperStore.SCENE_INDEX) {
             photoRenderer.draw(canvas, gyro)
             QuadColorSystem.drawOverlay(canvas, state, .20f)
+            return
+        }
+        if (CalmSlateRenderer.isCalm(state.preset)) {
+            calmSlateRenderer.draw(canvas, state, elapsedSeconds, gyro)
             return
         }
         if (MaterialXRenderer.isMaterial(state.preset)) {
@@ -551,7 +557,8 @@ class HalynRenderer(private val context: Context) {
             MaterialXRenderer.SCENES.map { it.name } +
             GlassOrbitCollectionRenderer.SCENES.map { it.name } +
             listOf(BubbleGardenRenderer.SCENE_NAME) +
-            AuraCyberRenderer.SCENES.map { it.name }
+            AuraCyberRenderer.SCENES.map { it.name } +
+            CalmSlateRenderer.SCENES.map { it.name }
         val PALETTES = listOf(
             "Arctic", "Ultraviolet", "Ember", "Rose", "Verdant"
         )

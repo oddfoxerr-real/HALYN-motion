@@ -24,6 +24,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
 import android.widget.ArrayAdapter
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
@@ -44,6 +45,7 @@ import kotlin.math.roundToInt
  */
 class MainActivity : Activity() {
     private val prefs by lazy { MotionPreferences(this) }
+    private val savedPalettes by lazy { SavedPalettes(this) }
     private val previewTracker by lazy { SpatialTracker(this) }
     private val previewGyro by lazy { GyroParallax(this) }
     private val previewSignals by lazy { SceneSignalSampler(this, prefs.raw) }
@@ -280,6 +282,10 @@ class MainActivity : Activity() {
     }
 
     private fun buildScenes(root: LinearLayout) {
+        root.addView(section("Quiet Collection · Matte Grey",
+            "Eight original layered wallpapers, designed to leave room for your clock and dock. No glass."))
+        buildOriginalRail(root, "Slate, paper & horizon", (CalmSlateRenderer.FIRST..CalmSlateRenderer.LAST).toList())
+
         root.addView(section("HALYN Originals",
             "All 28 original animated shaders, restored exactly as before."))
         buildOriginalRail(root, "The classics", (0..11).toList())
@@ -496,8 +502,112 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
         }
         panel.addView(fourColorSwatches, LinearLayout.LayoutParams(-1, dp(65)))
+        panel.addView(text("SAVE & REUSE", 10f, subtle, Typeface.BOLD).apply {
+            letterSpacing = .13f
+            setPadding(0, dp(15), 0, dp(10))
+        })
+        val savedRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val saveButton = text("Save these colours", 13f, ink, Typeface.BOLD).apply {
+            gravity = Gravity.CENTER
+            background = rounded(Color.rgb(39, 40, 44), 13, borderColor)
+            isClickable = true
+            isFocusable = true
+            minHeight = dp(48)
+            contentDescription = "Save the current colour settings under a reusable name"
+            setOnClickListener { saveCurrentPaletteDialog() }
+        }
+        savedRow.addView(saveButton, LinearLayout.LayoutParams(0, dp(48), 1f))
+        val chooseButton = text("Saved presets", 13f, backgroundColor, Typeface.BOLD).apply {
+            gravity = Gravity.CENTER
+            background = rounded(ink, 13)
+            isClickable = true
+            isFocusable = true
+            minHeight = dp(48)
+            contentDescription = "Choose a saved colour palette or a built-in calm preset"
+            setOnClickListener { showSavedPaletteDialog() }
+        }
+        savedRow.addView(chooseButton, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
+            marginStart = dp(8)
+        })
+        panel.addView(savedRow)
         root.addView(panel)
         refreshFourColors()
+    }
+
+    private fun saveCurrentPaletteDialog() {
+        val nameField = EditText(this).apply {
+            hint = "e.g. Quiet charcoal"
+            isSingleLine = true
+            setTextColor(ink)
+            setHintTextColor(secondary)
+            contentDescription = "Name for saved colour preset"
+            filters = arrayOf(android.text.InputFilter.LengthFilter(32))
+            setPadding(dp(20), dp(12), dp(20), dp(12))
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Save colour preset")
+            .setMessage("Remember this shade and four-colour settings for other wallpapers.")
+            .setView(nameField)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Save") { _, _ ->
+                val ok = savedPalettes.save(nameField.text.toString(), prefs.get())
+                Toast.makeText(this,
+                    if (ok) "Colour preset saved" else "Enter a name first",
+                    Toast.LENGTH_SHORT).show()
+            }
+            .show()
+    }
+
+    private fun showSavedPaletteDialog() {
+        val builtIns = SavedPalettes.CALM_SETS
+        val personal = savedPalettes.list()
+        val all = builtIns + personal
+        val options = all.mapIndexed { index, item ->
+            (if (index < builtIns.size) "CALM  ·  " else "SAVED  ·  ") + item.name
+        }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Colour presets")
+            .setItems(options) { _, selected ->
+                savedPalettes.apply(all[selected], prefs)
+                refreshPalette()
+                refreshFourColors()
+                refreshScene()
+                preview.invalidate()
+                originalCards.forEach { (_, card) ->
+                    (card.getChildAt(0) as? View)?.invalidate()
+                }
+                Toast.makeText(this, "Colours applied", Toast.LENGTH_SHORT).show()
+            }
+            .setNeutralButton("Delete saved") { _, _ -> showDeletePaletteDialog() }
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
+    private fun showDeletePaletteDialog() {
+        val personal = savedPalettes.list()
+        if (personal.isEmpty()) {
+            Toast.makeText(this, "No saved presets yet", Toast.LENGTH_SHORT).show()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Delete saved preset")
+            .setItems(personal.map { it.name }.toTypedArray()) { _, index ->
+                val chosen = personal[index]
+                AlertDialog.Builder(this)
+                    .setTitle("Delete " + chosen.name + "?")
+                    .setMessage("Other wallpapers and their saved colours stay unchanged.")
+                    .setPositiveButton("Delete") { _, _ ->
+                        savedPalettes.remove(chosen.name)
+                        Toast.makeText(this, "Preset deleted", Toast.LENGTH_SHORT).show()
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun buildClock(root: LinearLayout) {
@@ -1406,7 +1516,8 @@ class MainActivity : Activity() {
         }
         if (::activeMechanicDescription.isInitialized) {
             activeMechanicDescription.text =
-                SmoothWallpaperRenderer.mechanicDescription(selected)
+                CalmSlateRenderer.description(selected)
+                    ?: SmoothWallpaperRenderer.mechanicDescription(selected)
                     ?: MaterialXRenderer.description(selected)
                     ?: GlassOrbitCollectionRenderer.description(selected)
                     ?: AuraCyberRenderer.description(selected)
