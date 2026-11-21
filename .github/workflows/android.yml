@@ -52,11 +52,11 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='32'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='33'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.26.0-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.26.0-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.27.0-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.27.0-preview.apk > SHA256SUMS.txt)
 
       - name: Verify curated wallpaper collection
         shell: bash
@@ -200,8 +200,8 @@ jobs:
           assert 'state.fourColorsEnabled' in pack_src
           assert 'val age=(now-burstTime).toFloat()/' in pack_src
           assert 'drawBattleBurst(' in pack_src and 'drawCyberBurst(' in pack_src
-          assert 'HALYN-Motion-v0.26.0-preview.apk' in Path(".github/workflows/android.yml").read_text()
-          assert 'versionCode = 32' in Path("app/build.gradle.kts").read_text()
+          assert 'HALYN-Motion-v0.27.0-preview.apk' in Path(".github/workflows/android.yml").read_text()
+          assert 'versionCode = 33' in Path("app/build.gradle.kts").read_text()
           assert 'value == BubbleGardenRenderer.SCENE_INDEX' in renderer_src
           print("12 unique animated Aura/Cyber scenes 156..167: gesture speed, motion, 4-color, all legacy IDs verified")
           gpu_src = Path("app/src/main/java/com/oddf0x/halynmotion/AuraCyberShaderRenderer.kt").read_text()
@@ -218,7 +218,7 @@ jobs:
           assert 'auraCyberShaderRenderer.resetHardwareState()' in renderer_src
           assert 'if (!auraCyberShaderRenderer.draw(' in renderer_src
           assert "AuraCyberRenderer.SCENES.map { it.name }" in renderer_src
-          assert "versionCode = 32" in Path("app/build.gradle.kts").read_text()
+          assert "versionCode = 33" in Path("app/build.gradle.kts").read_text()
           print("12 short independent AGSL optical programs, fallback and lifecycle tested structurally")
           PY
 
@@ -265,44 +265,37 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.26.0 Visual Rework
+      - name: Publish HALYN v0.27.0 Visual Rework
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.26.0-preview.1
+          TAG: v0.27.0-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.26.0-preview.apk
-          unzip -t dist/HALYN-Motion-v0.26.0-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.27.0-preview.apk
+          unzip -t dist/HALYN-Motion-v0.27.0-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN Motion v0.26.0 — Aura & Cyber GPU Visual Rework
+          # HALYN Motion v0.27.0 — Quiet Collection & Saved Palettes
 
-          Replaces the flat v0.25.0 Canvas-first visuals of Aura Strike,
-          Nova Clash, Impact Veil, Void Rush, Energy Break, Pulse Slash,
-          Cipher Veil, Ghost Trace, Vector Breach, Packet Drift,
-          Zero Grid and Signal Intrusion.
+          Eight original matte graphite wallpapers: Still Horizon, Stonefold,
+          Quiet Dunes, Halo Outline, Folded Night, Drift Contour, Monolith,
+          and Low Tide. Made for a charcoal home-screen clock and music dock.
+          Their Android Canvas curves render at actual screen resolution.
 
-          - 12 separate optical AGSL programs are now the primary artwork.
-            They render layered flowing energy, fog, refraction-like bands,
-            precise cyber surfaces, and short streaks at GPU pixel resolution.
-          - Keeps the real-time gesture state and adjustable velocity/
-            sensitivity controls, with actual directional hit response.
-          - Lightweight stable dithering and filmic highlight mapping reduce
-            banding and blown-out neon colours on AMOLED.
-          - Each shader is cached and isolated. Android Canvas artwork is
-            now used strictly if a shader fails or hardware canvas is absent.
-          - Four custom colours remain supported by every GPU scene.
-          - Existing Glass Orbit, Material X, Bubble Garden, clocks, photos
-            and all 121 scene IDs are retained. No new permissions.
-          - Android compile and package validation passed; actual GPU visual
-            output still requires a physical Galaxy A56 review. Not a
-            guarantee of subjective visual quality.
+          Five calm palette schemes: Graphite, Fog, Warm Stone, Slate Blue,
+          and Soft Sage. Save, reuse, overwrite, and delete personal palettes
+          without re-entering colours on each wallpaper. The primary shade,
+          four custom colours, and override toggle are preserved.
+
+          All previous wallpaper scenes, online 4K galleries, clocks, fonts,
+          parallax and motion settings are retained. No new permissions.
+          Android CI passed; visual quality still needs device testing.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.26.0-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.27.0-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.26.0 — GPU Aura & Cyber Visual Rework" \
+            --title "HALYN Motion v0.27.0 — GPU Aura & Cyber Visual Rework" \
             --notes-file notes.md --prerelease
