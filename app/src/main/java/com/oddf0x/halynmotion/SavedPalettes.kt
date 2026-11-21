@@ -11,7 +11,7 @@ class SavedPalettes(context: Context) {
         .getSharedPreferences("halyn_motion_settings", Context.MODE_PRIVATE)
     private val key = "halyn_palette_library_v1"
 
-    data class Palette(val name: String, val primary: Int, val quad: IntArray)
+    data class Palette(val name: String, val primary: Int, val quad: IntArray, val enabled: Boolean = true)
 
     private fun decode(): JSONArray = try {
         JSONArray(store.getString(key, "[]") ?: "[]")
@@ -29,7 +29,8 @@ class SavedPalettes(context: Context) {
             entries.add(Palette(
                 name.take(32),
                 entry.optInt("primary", Color.rgb(180, 181, 184)) or -0x1000000,
-                IntArray(4) { index -> four.optInt(index, Color.GRAY) or -0x1000000 }
+                IntArray(4) { index -> four.optInt(index, Color.GRAY) or -0x1000000 },
+                entry.optBoolean("enabled", true)
             ))
         }
         return entries
@@ -42,7 +43,7 @@ class SavedPalettes(context: Context) {
         val current = list().filterNot { it.name.equals(cleaned, ignoreCase = true) }
         val primary = if (state.palette == 5) state.customColor
             else HalynRenderer.PALETTE_COLORS[state.palette.coerceIn(0, 4)]
-        persist((current + Palette(cleaned, primary, QuadColorSystem.colors(state))).takeLast(24))
+        persist((current + Palette(cleaned, primary, QuadColorSystem.colors(state), state.fourColorsEnabled)).takeLast(24))
         return true
     }
 
@@ -55,7 +56,7 @@ class SavedPalettes(context: Context) {
         val edit = prefs.raw.edit()
             .putInt("palette", 5)
             .putInt("custom_color", palette.primary or -0x1000000)
-            .putBoolean("quad_enabled_" + id, true)
+            .putBoolean("quad_enabled_" + id, palette.enabled)
         for (i in 0..3) {
             edit.putInt("quad_color_" + id + "_" + i, palette.quad[i] or -0x1000000)
         }
@@ -70,7 +71,8 @@ class SavedPalettes(context: Context) {
             entries.put(JSONObject()
                 .put("name", palette.name)
                 .put("primary", palette.primary)
-                .put("quad", quad))
+                .put("quad", quad)
+                .put("enabled", palette.enabled))
         }
         store.edit().putString(key, entries.toString()).apply()
     }
