@@ -1,0 +1,48 @@
+name: HALYN Quiet Preview APK
+
+on:
+  push:
+    branches: [build/quiet-preview-install-alongside]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
+      - name: Android SDK 35
+        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+      - name: Compile isolated HALYN preview
+        run: gradle --no-daemon --stacktrace :app:assembleDebug -PquietPreview=true
+      - name: Validate standalone package and live wallpaper
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$apk"
+          unzip -t "$apk" > /dev/null
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion.quietpreview'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q 'android.service.wallpaper.WallpaperService'
+          mkdir -p dist
+          cp "$apk" "dist/HALYN-Quiet-Animated-Preview.apk"
+          (cd dist && sha256sum "HALYN-Quiet-Animated-Preview.apk" > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HALYN-Quiet-Animated-Preview
+          path: dist/
+          retention-days: 30
+          if-no-files-found: error

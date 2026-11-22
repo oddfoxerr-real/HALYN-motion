@@ -75,11 +75,11 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='33'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='34'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.26.1-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.26.1-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.27.1-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.27.1-preview.apk > SHA256SUMS.txt)
 
       - name: Verify curated wallpaper collection
         shell: bash
@@ -223,8 +223,8 @@ jobs:
           assert 'state.fourColorsEnabled' in pack_src
           assert 'val age=(now-burstTime).toFloat()/' in pack_src
           assert 'drawBattleBurst(' in pack_src and 'drawCyberBurst(' in pack_src
-          assert 'HALYN-Motion-v0.26.1-preview.apk' in Path(".github/workflows/android.yml").read_text()
-          assert 'versionCode = 33' in Path("app/build.gradle.kts").read_text()
+          assert 'HALYN-Motion-v0.27.1-preview.apk' in Path(".github/workflows/android.yml").read_text()
+          assert 'versionCode = 34' in Path("app/build.gradle.kts").read_text()
           assert 'value == BubbleGardenRenderer.SCENE_INDEX' in renderer_src
           print("12 unique animated Aura/Cyber scenes 156..167: gesture speed, motion, 4-color, all legacy IDs verified")
           gpu_src = Path("app/src/main/java/com/oddf0x/halynmotion/AuraCyberShaderRenderer.kt").read_text()
@@ -241,7 +241,7 @@ jobs:
           assert 'auraCyberShaderRenderer.resetHardwareState()' in renderer_src
           assert 'if (!auraCyberShaderRenderer.draw(' in renderer_src
           assert "AuraCyberRenderer.SCENES.map { it.name }" in renderer_src
-          assert "versionCode = 33" in Path("app/build.gradle.kts").read_text()
+          assert "versionCode = 34" in Path("app/build.gradle.kts").read_text()
           print("12 short independent AGSL optical programs, fallback and lifecycle tested structurally")
           PY
 
@@ -288,33 +288,38 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.26.1 Shader Repair
+      - name: Publish HALYN v0.27.1 shader recovery
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.26.1-preview.1
+          TAG: v0.27.1-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.26.1-preview.apk
-          unzip -t dist/HALYN-Motion-v0.26.1-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.27.1-preview.apk
+          unzip -t dist/HALYN-Motion-v0.27.1-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN Motion v0.26.1 — Shader Scope Repair
+          # HALYN Motion v0.27.1 — Shader recovery & animated Quiet Collection
 
-          - Fixes shader compilation for Velvet Horizon, Midnight Wave,
-            Aura Strike, Pulse Slash and Signal Intrusion. Scene-local
-            variables no longer collide with shared lighting/gesture code.
-          - Preserves all 121 wallpapers, artwork equations, IDs, clock/font
-            features, gesture controls and per-scene four-colour choices.
-          - Adds desktop Skia compile/raster checks for all 74 Smooth and
-            Aura/Cyber shaders, with rendered-frame evidence in CI artifacts.
-          - Debug-signed preview using the existing build convention.
-            Desktop checks do not replace Galaxy A56 GPU/device testing.
+          Restores Velvet Horizon, Midnight Wave, Aura Strike, Pulse Slash and
+          Signal Intrusion. Their local shader variables collided with shared
+          lighting/gesture variables; individual lexical scopes now prevent
+          those runtime compilation failures without changing scene formulas.
+
+          Includes the latest animated Quiet Collection and saved palettes,
+          preserving all existing scenes, controls, clocks and preferences.
+          The optional separately installable Quiet Preview identity is retained.
+
+          Validation: all 74 Smooth and Aura/Cyber shaders compiled and rendered
+          222 desktop Skia frames; Android APK and collection checks passed.
+          Desktop CPU rendering does not validate the Samsung A56 GPU or launcher.
+          This is a debug-signed preview using the existing build configuration;
+          Android may refuse an in-place update if the installed signer differs.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.26.1-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.27.1-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.26.1 — Shader Scope Repair" \
+            --title "HALYN Motion v0.27.1 — Shader recovery" \
             --notes-file notes.md --prerelease

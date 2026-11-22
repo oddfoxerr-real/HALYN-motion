@@ -1,11 +1,14 @@
 # HALYN Motion
 
-## v0.26.1 — Restore five failing shader scenes
+## v0.27.1 — Restore five failing shader scenes
 
 Velvet Horizon, Midnight Wave, Aura Strike, Pulse Slash and Signal Intrusion
 declared local variables that collided with the shared lighting/gesture code.
 Android compiles these shader strings at runtime, so a successful APK build
 still allowed those scenes to show their fallback artwork.
+
+The latest animated Quiet Collection, saved palettes and optional separately
+installable Quiet Preview build remain intact.
 
 Both shader templates now isolate each scene's local variables in a block.
 The formulas, preset IDs, gestures and colour controls are unchanged. CI now
