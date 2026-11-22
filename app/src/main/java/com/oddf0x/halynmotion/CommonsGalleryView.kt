@@ -40,7 +40,7 @@ class CommonsGalleryView(
     private var nextOffset: Int? = null
     private var requestId = 0
     private var displayed = 0
-    private var activeQuery = "black and white photography"
+    private var activeQuery = ""
     private var pending = false
     private var destroyed = false
 
@@ -68,12 +68,12 @@ class CommonsGalleryView(
 
     init {
         orientation = VERTICAL
-        addView(label("Explore online · 4K+", 21f, ink, true).apply {
+        addView(label("Selected photographs", 21f, ink, true).apply {
             setPadding(0, dp(8), 0, dp(7))
         })
         addView(label(
-            "Real photographs and art from Wikimedia Commons. " +
-                "4K+ originals only · Source, artist and license displayed.",
+            "Real 4K–6K work from independent photographers. " +
+                "Nothing AI-generated or bundled. Credits stay with each image.",
             12f, muted
         ).apply { setPadding(0, 0, 0, dp(15)) })
 
@@ -175,7 +175,42 @@ class CommonsGalleryView(
         ).apply { setPadding(0, dp(15), 0, dp(12)) })
     }
 
-    fun loadInitial() = search(reset = true)
+    fun loadInitial() = loadFeatured()
+
+    fun loadFeatured() {
+        if (destroyed || pending) return
+        requestId++
+        val token = requestId
+        displayed = 0
+        activeQuery = ""
+        nextOffset = null
+        query.setText("")
+        results.removeAllViews()
+        pending = true
+        more.visibility = View.GONE
+        status.text = "Loading six researched, licensed photographs…"
+        io.execute {
+            try {
+                val page = source.featured()
+                onUi {
+                    if (token != requestId) return@onUi
+                    page.images.forEach { addCard(it, token) }
+                    status.text = if (displayed == 0)
+                        "Featured images unavailable. Search Commons or check your connection."
+                    else "$displayed researched 4K+ originals · source-verified"
+                    pending = false
+                    more.visibility = View.GONE
+                }
+            } catch (error: Exception) {
+                onUi {
+                    if (token != requestId) return@onUi
+                    pending = false
+                    status.text = "Featured sources could not load: " +
+                        (error.message?.take(110) ?: "check your connection")
+                }
+            }
+        }
+    }
 
     private fun search(reset: Boolean) {
         if (destroyed || pending) return
