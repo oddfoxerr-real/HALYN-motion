@@ -7,9 +7,22 @@ android {
     compileSdk = 35
     defaultConfig {
         val previewBuild = project.findProperty("quietPreview")?.toString() == "true"
-        applicationId = if (previewBuild) "com.oddf0x.halynmotion.quietpreview" else "com.oddf0x.halynmotion"
-        manifestPlaceholders["appTitle"] = if (previewBuild) "HALYN Quiet Preview" else "@string/app_name"
-        manifestPlaceholders["wallpaperTitle"] = if (previewBuild) "HALYN Quiet Preview Wallpaper" else "@string/wallpaper_name"
+        val livingPreview = project.findProperty("livingPreview")?.toString() == "true"
+        applicationId = when {
+            livingPreview -> "com.oddf0x.halynmotion.livingpreview"
+            previewBuild -> "com.oddf0x.halynmotion.quietpreview"
+            else -> "com.oddf0x.halynmotion"
+        }
+        manifestPlaceholders["appTitle"] = when {
+            livingPreview -> "HALYN Living Preview"
+            previewBuild -> "HALYN Quiet Preview"
+            else -> "@string/app_name"
+        }
+        manifestPlaceholders["wallpaperTitle"] = when {
+            livingPreview -> "HALYN Living Wallpaper"
+            previewBuild -> "HALYN Quiet Preview Wallpaper"
+            else -> "@string/wallpaper_name"
+        }
         minSdk = 33
         targetSdk = 35
         versionCode = 34
