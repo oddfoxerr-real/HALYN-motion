@@ -331,6 +331,7 @@ class HalynRenderer(private val context: Context) {
     fun resetHardwareState() {
         smoothRenderer.resetHardwareState()
         fluidRenderer.reset()
+        minimalArchitectureRenderer.resetHardwareState()
         glassOrbitRenderer.resetHardwareState()
         auraCyberShaderRenderer.resetHardwareState()
         shader = null
