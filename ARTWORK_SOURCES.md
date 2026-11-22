@@ -11,6 +11,9 @@ allowlist, 4K check or secure-host check are omitted.
 
 | Artwork | Photographer | Source | Original | License |
 |---|---|---|---|---|
+| Portrait of Adolescence | Anton Darius / Sollers | [Commons](https://commons.wikimedia.org/wiki/File:Portrait_of_Adolescence_(Unsplash).jpg) | 6,144 × 4,096 | CC0 1.0 (archived pre-June 2017 Unsplash license) |
+| Man in hat facing away | Craig Whitehead | [Commons](https://commons.wikimedia.org/wiki/File:Man_in_hat_facing_away_(Unsplash).jpg) | 4,000 × 6,000 | CC0 1.0 (archived pre-June 2017 Unsplash license) |
+| Hooded man near green thicket | Eddy Lackmann | [Commons](https://commons.wikimedia.org/wiki/File:Hooded_man_near_green_thicket_(Unsplash).jpg) | 4,912 × 3,264 | CC0 1.0 (archived pre-June 2017 Unsplash license) |
 | Spiral architecture and light | Ian Keefe | [Commons](https://commons.wikimedia.org/wiki/File:Spiral_architecture_and_light_(Unsplash).jpg) | 4,000 × 6,000 | CC0 1.0 (archived pre-June 2017 Unsplash license) |
 | Glass building wall in Soho | Alessio Lin | [Commons](https://commons.wikimedia.org/wiki/File:Glass_building_wall_in_soho_(Unsplash).jpg) | 6,000 × 4,000 | CC0 1.0 (archived pre-June 2017 Unsplash license) |
 | Faber-Hochhaus, Magdeburg | Ajepbah | [Commons](https://commons.wikimedia.org/wiki/File:Faber-Hochhaus_(Magdeburg-Altstadt).09.ajb.jpg) | 4,000 × 6,000 | CC BY-SA 3.0 Germany |
