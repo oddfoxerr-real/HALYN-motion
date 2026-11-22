@@ -1321,6 +1321,9 @@ class MainActivity : Activity() {
         // is enabled for photo mode, even if a previous procedural preset
         // stored touch interaction = true.
         panel.addView(View(this).apply { setBackgroundColor(borderColor) }, LinearLayout.LayoutParams(-1, dp(1)))
+        addToggle(panel, "Fluid touch gestures", "Allow recorded finger motions to trigger fluid effects when delivered by One UI", prefs.get().touch) {
+            prefs.setTouch(it)
+        }
         addToggle(panel, "Home-screen swipe", "Horizontal parallax when changing launcher pages", prefs.get().parallax) {
             prefs.setParallax(it)
         }
