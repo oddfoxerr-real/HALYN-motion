@@ -188,7 +188,7 @@ class CommonsGalleryView(
         results.removeAllViews()
         pending = true
         more.visibility = View.GONE
-        status.text = "Loading six researched, licensed photographs…"
+        status.text = "Loading nine researched, licensed photographs…"
         io.execute {
             try {
                 val page = source.featured()
