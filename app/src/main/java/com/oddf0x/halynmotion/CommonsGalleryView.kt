@@ -40,7 +40,7 @@ class CommonsGalleryView(
     private var nextOffset: Int? = null
     private var requestId = 0
     private var displayed = 0
-    private var activeQuery = "landscape photography"
+    private var activeQuery = "black and white photography"
     private var pending = false
     private var destroyed = false
 
@@ -78,13 +78,13 @@ class CommonsGalleryView(
         ).apply { setPadding(0, 0, 0, dp(15)) })
 
         val categories = listOf(
-            "Nature" to "landscape photography",
-            "Cars" to "sports car photograph",
-            "Flowers" to "rose flower photography",
+            "Portrait" to "black and white portrait",
+            "Architecture" to "modern architecture photography",
+            "Monochrome" to "black and white photography",
             "Space" to "nebula NASA photograph",
-            "City" to "city skyline night",
-            "Art" to "illustration digital art",
-            "Mountains" to "mountain photography"
+            "Stone" to "sculpture stone photograph",
+            "Nature" to "black and white photography",
+            "Abstract" to "abstract art photography"
         )
         val chips = LinearLayout(host).apply { orientation = HORIZONTAL }
         categories.forEach { (name, term) ->
@@ -114,7 +114,7 @@ class CommonsGalleryView(
         }
         query.apply {
             setSingleLine(true)
-            setText("landscape photography")
+            setText("black and white photography")
             hint = "Search real 4K images"
             setTextColor(ink)
             setHintTextColor(muted)
@@ -179,7 +179,7 @@ class CommonsGalleryView(
 
     private fun search(reset: Boolean) {
         if (destroyed || pending) return
-        val term = query.text.toString().trim().ifBlank { "landscape photography" }
+        val term = query.text.toString().trim().ifBlank { "black and white photography" }
         if (reset) {
             requestId++
             displayed = 0
