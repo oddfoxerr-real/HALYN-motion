@@ -1,0 +1,48 @@
+name: HALYN Living Scenes APK
+
+on:
+  push:
+    branches: [feature/halyn-living-scenes-core]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  living_preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
+      - name: Android SDK
+        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+      - name: Compile separately installable living preview
+        run: gradle --no-daemon --stacktrace :app:assembleDebug -PlivingPreview=true
+      - name: Verify HALYN Living APK identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$apk"
+          unzip -t "$apk" >/dev/null
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion.livingpreview'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q 'android.service.wallpaper.WallpaperService'
+          mkdir -p dist
+          cp "$apk" dist/HALYN-Living-v0.28.0-Standalone.apk
+          (cd dist && sha256sum HALYN-Living-v0.28.0-Standalone.apk > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HALYN-Living-v0.28.0-Standalone
+          path: dist/
+          retention-days: 30
+          if-no-files-found: error
