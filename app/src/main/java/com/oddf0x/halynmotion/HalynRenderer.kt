@@ -135,7 +135,7 @@ class MotionPreferences(context: Context) {
             gyroMode = preferences.getInt("gyro_mode", 1).coerceIn(0, 3),
             gyroStrength = float("gyro_strength", 1f, .5f, 1.8f),
             mountainDepth = float("mountain_depth", 1f, .5f, 1.6f),
-            clockStyle = preferences.getInt("clock_style", 0).coerceIn(0, 5),
+            clockStyle = preferences.getInt("clock_style", 0).coerceIn(0, 6),
             clockPosition = preferences.getInt("clock_position", 1).coerceIn(0, 2),
             clock24h = preferences.getBoolean("clock_24h", true),
             clockDate = preferences.getBoolean("clock_date", true),
@@ -200,7 +200,7 @@ class MotionPreferences(context: Context) {
     fun setGyroMode(value: Int) = preferences.edit().putInt("gyro_mode", value.coerceIn(0, 3)).apply()
     fun setGyroStrength(value: Float) = preferences.edit().putFloat("gyro_strength", value.coerceIn(.5f, 1.8f)).apply()
     fun setMountainDepth(value: Float) = preferences.edit().putFloat("mountain_depth", value.coerceIn(.5f, 1.6f)).apply()
-    fun setClockStyle(value: Int) = preferences.edit().putInt("clock_style", value.coerceIn(0, 5)).apply()
+    fun setClockStyle(value: Int) = preferences.edit().putInt("clock_style", value.coerceIn(0, 6)).apply()
     fun setClockPosition(value: Int) = preferences.edit()
         .putInt("clock_position", value.coerceIn(0, 2))
         .putBoolean("clock_custom_placement", false).apply()
