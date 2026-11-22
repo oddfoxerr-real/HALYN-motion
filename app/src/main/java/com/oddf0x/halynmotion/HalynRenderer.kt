@@ -13,7 +13,7 @@ import android.os.Build
  * All values are sanitized when read so old preferences cannot break the shader.
  */
 data class MotionState(
-    val preset: Int = CalmSlateRenderer.FIRST,
+    val preset: Int = FluidMotionRenderer.FIRST,
     val palette: Int = 0,
     val customColor: Int = Color.rgb(185, 174, 255),
     val fourColorsEnabled: Boolean = false,
@@ -106,12 +106,12 @@ class MotionPreferences(context: Context) {
             return if (result.isFinite()) result.coerceIn(min, max) else default
         }
         return MotionState(
-            preset = sanitizePreset(preferences.getInt("preset", CalmSlateRenderer.FIRST)),
-            fourColorsEnabled = enabledFor(sanitizePreset(preferences.getInt("preset", CalmSlateRenderer.FIRST))),
-            colorOne = colorFor(sanitizePreset(preferences.getInt("preset", CalmSlateRenderer.FIRST)), 0),
-            colorTwo = colorFor(sanitizePreset(preferences.getInt("preset", CalmSlateRenderer.FIRST)), 1),
-            colorThree = colorFor(sanitizePreset(preferences.getInt("preset", 0)), 2),
-            colorFour = colorFor(sanitizePreset(preferences.getInt("preset", 0)), 3),
+            preset = sanitizePreset(preferences.getInt("preset", FluidMotionRenderer.FIRST)),
+            fourColorsEnabled = enabledFor(sanitizePreset(preferences.getInt("preset", FluidMotionRenderer.FIRST))),
+            colorOne = colorFor(sanitizePreset(preferences.getInt("preset", FluidMotionRenderer.FIRST)), 0),
+            colorTwo = colorFor(sanitizePreset(preferences.getInt("preset", FluidMotionRenderer.FIRST)), 1),
+            colorThree = colorFor(sanitizePreset(preferences.getInt("preset", FluidMotionRenderer.FIRST)), 2),
+            colorFour = colorFor(sanitizePreset(preferences.getInt("preset", FluidMotionRenderer.FIRST)), 3),
             palette = preferences.getInt("palette", 0).coerceIn(0, 5),
             customColor = preferences.getInt("custom_color", Color.rgb(185, 174, 255)) or -0x1000000,
             intensity = float("intensity", 1f, .35f, 2.3f),
@@ -157,12 +157,12 @@ class MotionPreferences(context: Context) {
         )
     }
 
-    // Retire old abstract and glass wallpaper IDs without deleting saved colours.
-    // Keep our extensively developed interactive Star Window unmodified.
+    // Limit new selections to fluid scenes and the carefully developed space simulation.
+    // Preserve stored palettes for retired landscape, shader and photo IDs.
     private fun sanitizePreset(value: Int): Int = when {
         value == StarWindowRenderer.SCENE_INDEX -> value
-        CalmSlateRenderer.isCalm(value) -> value
-        else -> CalmSlateRenderer.FIRST
+        FluidMotionRenderer.isFluid(value) -> value
+        else -> FluidMotionRenderer.FIRST
     }
 
     fun setPreset(value: Int) = preferences.edit().putInt("preset", sanitizePreset(value)).apply()
@@ -281,6 +281,11 @@ class HalynRenderer(private val context: Context) {
     private val smoothRenderer = SmoothWallpaperRenderer()
     private val materialXRenderer = MaterialXRenderer()
     private val calmSlateRenderer = CalmSlateRenderer()
+    private val fluidRenderer = FluidMotionRenderer()
+
+    fun triggerFluidGesture(action: Int, x: Float, y: Float) {
+        fluidRenderer.trigger(action, x, y)
+    }
     private val glassOrbitRenderer = GlassOrbitCollectionRenderer()
     private val bubbleGardenRenderer = BubbleGardenRenderer()
     // Gesture state and recoverable Canvas renderer are separate from GPU art.
@@ -413,6 +418,10 @@ class HalynRenderer(private val context: Context) {
         if (state.preset == PhotoWallpaperStore.SCENE_INDEX) {
             photoRenderer.draw(canvas, gyro)
             QuadColorSystem.drawOverlay(canvas, state, .20f)
+            return
+        }
+        if (FluidMotionRenderer.isFluid(state.preset)) {
+            fluidRenderer.draw(canvas, state, elapsedSeconds)
             return
         }
         if (CalmSlateRenderer.isCalm(state.preset)) {
@@ -555,7 +564,8 @@ class HalynRenderer(private val context: Context) {
             GlassOrbitCollectionRenderer.SCENES.map { it.name } +
             listOf(BubbleGardenRenderer.SCENE_NAME) +
             AuraCyberRenderer.SCENES.map { it.name } +
-            CalmSlateRenderer.SCENES.map { it.name }
+            CalmSlateRenderer.SCENES.map { it.name } +
+            FluidMotionRenderer.SCENES.map { it.name }
         val PALETTES = listOf(
             "Arctic", "Ultraviolet", "Ember", "Rose", "Verdant"
         )
