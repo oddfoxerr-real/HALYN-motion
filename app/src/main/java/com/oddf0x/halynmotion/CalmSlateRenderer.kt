@@ -179,11 +179,64 @@ class CalmSlateRenderer {
         fill.shader = null
     }
 
+
+    /**
+     * Analytic surface movement, regenerated from elapsed time on each frame.
+     * Unlike static line overlays, the complete wave silhouette actually travels.
+     */
+    private fun swell(canvas: Canvas, y: Float, amplitude: Float, phase: Float,
+                      ink: Int, wavelength: Float = 165f) {
+        path.reset()
+        var x = -90f
+        while (x <= 1100f) {
+            val yy = y +
+                sin(x / wavelength + phase).toFloat() * amplitude +
+                sin(x / (wavelength * .43f) - phase * .74f).toFloat() * amplitude * .24f
+            if (x == -90f) path.moveTo(x, yy) else path.lineTo(x, yy)
+            x += 22f
+        }
+        path.lineTo(1100f, 2120f)
+        path.lineTo(-90f, 2120f)
+        path.close()
+        color(ink)
+        canvas.drawPath(path, fill)
+    }
+
+    private fun driftingFog(canvas: Canvas, time: Float, y: Float, velocity: Float,
+                            ink: Int, alpha: Int, scale: Float) {
+        // Multiple translucent banks form one coherent fog stream.
+        val displacement = ((time * velocity) % 1700f + 1700f) % 1700f
+        for (i in -1..1) {
+            val x = i * 820f + displacement - 300f
+            oval(canvas, x, y + i * 16f, 550f * scale, 78f * scale, ink, alpha)
+            oval(canvas, x + 155f, y + 20f, 430f * scale, 54f * scale, ink, alpha / 2)
+        }
+    }
+
+    private fun speckle(canvas: Canvas, count: Int, time: Float,
+                        drift: Float, fallSpeed: Float, colorValue: Int,
+                        maxSize: Float, maxAlpha: Int, seed: Int) {
+        for (i in 0 until count) {
+            val layer = .45f + hash(i * 29 + seed) * .90f
+            val initialX = hash(i * 19 + seed + 14) * 1110f - 55f
+            val x = initialX +
+                sin(time * .32f + i * .61f).toFloat() * drift * layer +
+                time * drift * .27f * layer
+            val wrappedX = ((x % 1110f) + 1110f) % 1110f - 55f
+            val y = ((hash(i * 41 + seed + 7) * 2170f +
+                time * fallSpeed * layer) % 2170f + 2170f) % 2170f - 90f
+            circle(canvas, wrappedX, y,
+                (.85f + layer * maxSize).coerceAtMost(maxSize * 1.7f),
+                colorValue, (maxAlpha * layer).toInt().coerceIn(0, 255))
+        }
+    }
+
     fun draw(canvas: Canvas, state: MotionState, seconds: Float, gyro: ParallaxPose) {
         val index = state.preset - FIRST
         if (index !in 0 until COUNT) return
 
         val t = seconds.coerceAtLeast(0f) * state.speed.coerceIn(.25f, 2f)
+        val strength = state.intensity.coerceIn(.35f, 2.3f)
         val sky = palette(state, 0, Color.rgb(22, 23, 25))
         val mist = palette(state, 1, Color.rgb(45, 47, 50))
         val far = palette(state, 1, Color.rgb(58, 60, 64))
@@ -196,117 +249,119 @@ class CalmSlateRenderer {
         canvas.save()
         canvas.scale(w / 1000f, h / 2000f)
         if (state.parallax) {
-            canvas.translate(gyro.x.coerceIn(-1f, 1f) * 9f, gyro.y.coerceIn(-1f, 1f) * 7f)
+            canvas.translate(gyro.x.coerceIn(-1f, 1f) * 19f, gyro.y.coerceIn(-1f, 1f) * 14f)
         }
         drawNight(canvas, sky, blend(sky, far, .40f))
 
         when (index) {
-            0 -> { // Mountain valley, atmospheric haze moving through two ridgelines.
+            0 -> { // Valley: fog banks travel visibly between distinct depth planes.
                 ridge(canvas, far, floatArrayOf(
                     -90f, 1380f, 90f, 1180f, 225f, 1278f, 385f, 990f,
                     505f, 1128f, 660f, 945f, 810f, 1190f, 1090f, 1020f
                 ))
-                val drift = sin(t * .12f).toFloat() * 46f
-                for (layer in 0..3) {
-                    val y = 1280f + layer * 165f
-                    oval(canvas, 290f + drift + layer * 75f, y, 480f, 48f, mist, 38 + layer * 9)
-                    oval(canvas, 770f + drift * .6f, y + 38f, 450f, 39f, pale, 9)
-                }
+                driftingFog(canvas, t, 1230f, 13f * strength, mist, 53, 1.0f)
+                driftingFog(canvas, -t, 1420f, 9f * strength, pale, 17, .84f)
                 ridge(canvas, near, floatArrayOf(
                     -80f, 1780f, 180f, 1530f, 315f, 1670f,
                     515f, 1450f, 710f, 1580f, 970f, 1435f, 1080f, 1535f
                 ))
-                oval(canvas, 460f + drift * .9f, 1840f, 600f, 40f, mist, 32)
+                driftingFog(canvas, t, 1785f, 21f * strength, mist, 40, .86f)
+                cloud(canvas, 530f + sin(t * .22f).toFloat() * 80f * strength,
+                    830f, .74f, mist, 61)
             }
-
-            1 -> { // Moonrise is continuous, not a random decorative circle.
-                val rise = sin(t * .025f).toFloat() * 80f
-                moon(canvas, 760f, 1020f - rise, 113f, pale)
+            1 -> { // Moonrise: strong atmospheric cloud movement and evolving moon position.
+                val rise = sin(t * .18f).toFloat() * 92f * strength
+                moon(canvas, 740f, 1020f - rise, 112f, pale)
+                cloud(canvas, ((-280f + t * 24f * strength) % 1450f) + 110f,
+                    945f, .95f, mist, 110)
+                cloud(canvas, 820f - ((t * 12f * strength) % 1600f),
+                    1150f, .60f, far, 82)
                 ridge(canvas, far, floatArrayOf(
                     -80f, 1500f, 130f, 1390f, 280f, 1460f,
                     470f, 1220f, 575f, 1340f, 780f, 1250f, 1080f, 1440f
                 ))
+                driftingFog(canvas, t, 1480f, 9f * strength, pale, 27, .80f)
                 ridge(canvas, near, floatArrayOf(
                     -80f, 1840f, 200f, 1680f, 360f, 1760f,
                     570f, 1565f, 730f, 1640f, 950f, 1570f, 1080f, 1700f
                 ))
-                oval(canvas, 570f, 1545f, 500f, 36f, mist, 42)
             }
-
-            2 -> { // Ocean surface: layered swells and moving broken moon reflection.
+            2 -> { // Ocean: animated waves change shape, not only small reflective lines.
                 moon(canvas, 773f, 1020f, 83f, pale)
-                color(far, 195)
-                canvas.drawRect(-80f, 1240f, 1080f, 2120f, fill)
-                for (n in 0 until 25) {
-                    val y = 1250f + n * 33f
-                    val phase = t * (.14f + n * .007f)
-                    val waveX = sin(phase + n * .85f).toFloat() * 50f
-                    val width = 150f + (n % 5) * 50f
-                    val x = 260f + (n * 79 % 590) + waveX
-                    line(canvas, x - width * .5f, y, x + width * .5f, y + 1f,
-                        if (n % 3 == 0) mist else near, 2.6f, 130)
-                }
-                for (n in 0 until 12) {
-                    val y = 1280f + n * 54f
-                    val shimmer = sin(t * .52f + n * 1.3f).toFloat() * 32f
-                    val spread = n * 4.7f + 11f
-                    line(canvas, 770f - spread + shimmer, y, 770f + spread + shimmer, y,
-                        pale, 2.8f, (80 - n * 4).coerceAtLeast(20))
+                swell(canvas, 1210f, 24f * strength, t * .55f, far, 160f)
+                swell(canvas, 1305f, 31f * strength, -t * .75f + 2f, near, 140f)
+                swell(canvas, 1480f, 38f * strength, t * .9f + 2.4f, mist, 190f)
+                swell(canvas, 1660f, 41f * strength, -t * .8f, ground, 168f)
+                for (n in 0 until 22) {
+                    val y = 1215f + n * 33f
+                    val waveX = sin(t * .85f + n * .72f).toFloat() * 76f * strength
+                    val shimmer = .52f + .48f * abs(sin(t * 1.3f + n * .9f).toFloat())
+                    val spread = 18f + n * 4.9f
+                    line(canvas, 773f - spread + waveX, y,
+                        773f + spread + waveX, y + 2f,
+                        pale, 2.3f + shimmer * 1.8f,
+                        (105f * shimmer).toInt().coerceIn(22, 106))
                 }
             }
-
-            3 -> { // Two depth planes of conifers, wind-driven canopy sway.
+            3 -> { // Pine forest: wind moves full canopies and carries valley fog.
                 ridge(canvas, far, floatArrayOf(
                     -80f, 1510f, 165f, 1340f, 345f, 1515f,
                     510f, 1290f, 740f, 1450f, 1080f, 1370f
                 ))
-                for (n in 0 until 14) {
-                    val x = -40f + n * 83f
-                    val ht = 285f + hash(n * 19 + 2) * 220f
-                    val lean = sin(t * .31f + n * .68f).toFloat() * 4.0f
-                    pine(canvas, x, 1700f + hash(n * 29) * 55f, ht, mist, lean, 210)
+                for (n in 0 until 16) {
+                    val x = -40f + n * 78f
+                    val height = 285f + hash(n * 19 + 2) * 220f
+                    val lean = sin(t * .38f + n * .31f).toFloat() * 18f * strength
+                    pine(canvas, x, 1700f + hash(n * 29) * 55f,
+                        height, mist, lean, 210)
                 }
+                driftingFog(canvas, t, 1570f, 15f * strength, pale, 31, .7f)
                 color(ground)
-                canvas.drawRect(-80f, 1675f, 1080f, 2120f, fill)
-                for (n in 0 until 10) {
-                    val x = -40f + n * 115f
-                    val ht = 350f + hash(n * 29 + 6) * 285f
-                    val lean = sin(t * .20f + n * .52f).toFloat() * 6.5f
-                    pine(canvas, x, 1955f + hash(n * 13) * 80f, ht, near, lean)
+                canvas.drawRect(-80f, 1740f, 1080f, 2120f, fill)
+                for (n in 0 until 11) {
+                    val x = -40f + n * 108f
+                    val height = 350f + hash(n * 29 + 6) * 285f
+                    val lean = sin(t * .33f + n * .43f).toFloat() * 30f * strength
+                    pine(canvas, x, 1965f + hash(n * 13) * 80f,
+                        height, near, lean)
                 }
-                oval(canvas, 550f + sin(t * .09f).toFloat() * 25f,
-                    1530f, 530f, 43f, far, 21)
+                driftingFog(canvas, -t, 1890f, 9f * strength, far, 25, .58f)
             }
-
-            4 -> { // Cloud front, downward rainfall, and concentric pond ripples.
-                cloud(canvas, 230f + sin(t * .05f).toFloat() * 40f, 940f, 1.65f, far, 170)
-                cloud(canvas, 840f - t * .45f % 300f, 1050f, 1.5f, mist, 180)
+            4 -> { // Rain: clearly falling streaks, moving clouds and expanding water rings.
+                cloud(canvas, 150f + ((t * 19f * strength) % 1400f) - 250f,
+                    900f, 1.6f, far, 204)
+                cloud(canvas, 900f - ((t * 23f * strength) % 1580f),
+                    1110f, 1.52f, mist, 202)
                 ridge(canvas, near, floatArrayOf(
                     -80f, 1610f, 200f, 1550f, 430f, 1635f,
                     650f, 1540f, 900f, 1590f, 1080f, 1570f
                 ))
                 color(ground)
                 canvas.drawRect(-80f, 1700f, 1080f, 2120f, fill)
-                for (n in 0 until 80) {
-                    val speed = .17f + hash(n * 31 + 4) * .13f
-                    val y = 900f + ((hash(n * 7 + 30) * 1180f + t * speed * 115f) % 1200f)
-                    val x = hash(n * 17 + 11) * 1060f - 25f + y * .018f
-                    line(canvas, x, y, x - 6f, y + 19f, pale, 1.3f, 55)
+                for (n in 0 until 160) {
+                    val speed = 390f + hash(n * 31 + 4) * 250f
+                    val y = 780f + ((hash(n * 7 + 30) * 1420f +
+                        t * speed * strength) % 1420f)
+                    val x = hash(n * 17 + 11) * 1100f - 55f +
+                        sin(t * .41f + n).toFloat() * 25f * strength
+                    val length = 23f + hash(n + 4) * 27f
+                    line(canvas, x, y, x - length * .25f, y + length,
+                        pale, 1.7f, 60 + (n % 3) * 19)
                 }
-                for (n in 0..4) {
-                    val age = ((t * .28f + n * .213f) % 1f)
-                    val cx = 130f + n * 180f
-                    val rr = 15f + age * 64f
+                for (n in 0 until 9) {
+                    val age = ((t * .63f * strength + n * .123f) % 1f)
+                    val cx = 75f + n * 119f
+                    val rr = 11f + age * 82f
                     detail.color = pale
-                    detail.alpha = ((1f - age) * 65f).toInt()
-                    detail.strokeWidth = 1.7f
-                    bounds.set(cx - rr, 1800f - rr * .23f, cx + rr, 1800f + rr * .23f)
+                    detail.alpha = ((1f - age) * 111f).toInt()
+                    detail.strokeWidth = 2.4f
+                    bounds.set(cx - rr, 1800f - rr * .22f,
+                        cx + rr, 1800f + rr * .22f)
                     canvas.drawOval(bounds, detail)
                 }
                 detail.alpha = 255
             }
-
-            5 -> { // Alpine snowfall, gentle deterministic flakes at two speeds.
+            5 -> { // Snow: multiple depth planes with visible wind and downward drift.
                 moon(canvas, 840f, 780f, 67f, mist)
                 ridge(canvas, far, floatArrayOf(
                     -80f, 1390f, 125f, 1270f, 275f, 1360f,
@@ -316,39 +371,50 @@ class CalmSlateRenderer {
                     -80f, 1770f, 160f, 1645f, 340f, 1730f,
                     580f, 1490f, 720f, 1610f, 950f, 1525f, 1080f, 1660f
                 ))
-                for (n in 0 until 70) {
-                    val parallax = if (n % 3 == 0) .54f else .27f
-                    val x = hash(n * 17 + 4) * 1080f - 40f +
-                        sin(t * .19f + n * .4f).toFloat() * (8f + n % 7)
-                    val y = (hash(n * 41 + 9) * 2170f + t * (20f + n % 8) * parallax) % 2200f
-                    star(canvas, x, y, if (n % 3 == 0) 2.5f else 1.5f,
-                        if (n % 3 == 0) 130 else 82, pale)
-                }
+                speckle(canvas, 105, t, 56f * strength, 73f * strength,
+                    pale, 2.1f, 125, 9)
+                speckle(canvas, 56, t, 82f * strength, 115f * strength,
+                    pale, 3.6f, 175, 38)
+                driftingFog(canvas, t, 1680f, 9f * strength, mist, 25, .66f)
             }
-
-            6 -> { // Wind-driven cloud banks crossing a naturally lit moon.
+            6 -> { // Clouds: independent near/far banks travel across the moon.
                 moon(canvas, 742f, 1040f, 117f, pale)
-                val scroll = t * .45f
-                for (n in 0..5) {
-                    val scale = .8f + (n % 3) * .25f
-                    val x = ((n * 290f + 100f + scroll * (1f + n % 2)) % 1700f) - 350f
-                    val y = 930f + n * 100f
-                    cloud(canvas, x, y, scale, if (n % 2 == 0) far else mist, 183)
+                val scroll = t * 31f * strength
+                for (n in 0..7) {
+                    val scale = .70f + (n % 3) * .23f
+                    val dir = if (n % 2 == 0) 1f else -1f
+                    val x = ((n * 330f + scroll * dir * (.65f + n % 3 * .2f) +
+                        3000f) % 1850f) - 420f
+                    val y = 820f + n * 113f
+                    cloud(canvas, x, y, scale,
+                        if (n % 2 == 0) far else mist,
+                        if (n % 2 == 0) 183 else 225)
                 }
                 ridge(canvas, near, floatArrayOf(
                     -80f, 1790f, 140f, 1590f, 330f, 1670f,
                     575f, 1500f, 760f, 1600f, 1080f, 1550f
                 ))
-                oval(canvas, 500f, 1605f, 530f, 30f, mist, 30)
+                driftingFog(canvas, -t, 1640f, 12f * strength, mist, 28, .76f)
             }
-
-            7 -> { // Starfield twinkling over a physically recognizable V-shaped valley.
-                for (n in 0 until 85) {
+            7 -> { // Night sky: stars twinkle, occasional shooting star crosses valley.
+                for (n in 0 until 96) {
                     val x = hash(n * 37 + 8) * 1000f
                     val y = 160f + hash(n * 97 + 17) * 1150f
-                    val twinkle = .60f + .40f * sin(t * (.28f + hash(n + 21) * .3f) + n).toFloat()
+                    val twinkle = .45f + .55f *
+                        sin(t * (.42f + hash(n + 21) * .35f) + n).toFloat() *
+                        sin(t * (.42f + hash(n + 21) * .35f) + n).toFloat()
                     star(canvas, x, y, if (n % 9 == 0) 2.5f else 1.2f,
-                        (42f + 105f * twinkle).toInt(), pale)
+                        (45f + 112f * twinkle).toInt(), pale)
+                }
+                val meteorPeriod = 23f
+                val meteorPhase = ((t * strength) % meteorPeriod) / meteorPeriod
+                if (meteorPhase < .12f) {
+                    val u = meteorPhase / .12f
+                    val startX = 850f - u * 520f
+                    val startY = 430f + u * 190f
+                    line(canvas, startX, startY, startX + 95f, startY - 35f,
+                        pale, 3.1f, ((1f - u) * 148f).toInt())
+                    circle(canvas, startX, startY, 3.5f, pale, 165)
                 }
                 ridge(canvas, far, floatArrayOf(
                     -80f, 1325f, 120f, 1125f, 240f, 1320f,
@@ -358,7 +424,7 @@ class CalmSlateRenderer {
                     -80f, 1510f, 170f, 1430f, 355f, 1780f,
                     535f, 1860f, 695f, 1660f, 920f, 1450f, 1080f, 1520f
                 ))
-                oval(canvas, 520f, 1915f, 300f, 45f, mist, 32)
+                driftingFog(canvas, t, 1880f, 7f * strength, mist, 26, .6f)
             }
         }
         canvas.restore()

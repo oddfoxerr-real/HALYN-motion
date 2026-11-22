@@ -141,7 +141,6 @@ class MainActivity : Activity() {
         refreshGyroModes()
         refreshSkyUi()
         syncStarTracking()
-        onlineGallery.loadInitial()
     }
 
     private fun buildHeader(root: LinearLayout) {
@@ -157,11 +156,11 @@ class MainActivity : Activity() {
         })
         root.addView(top)
 
-        root.addView(text("Motion. Made original.", 32f, ink, Typeface.BOLD).apply {
+        root.addView(text("Motion that feels alive.", 32f, ink, Typeface.BOLD).apply {
             setPadding(0, dp(20), 0, 0)
             letterSpacing = -.035f
         })
-        root.addView(text("Original animated wallpapers, real 4K photography and your clock.", 14f, secondary).apply {
+        root.addView(text("Living landscapes, interactive space and your clock. No abstract effects.", 14f, secondary).apply {
             setPadding(0, dp(5), 0, dp(24))
         })
     }
@@ -232,7 +231,8 @@ class MainActivity : Activity() {
                 isClickable = true
                 isFocusable = true
                 contentDescription = "Select ${HalynRenderer.PRESETS[index]} animated wallpaper. " +
-                    (SmoothWallpaperRenderer.mechanicDescription(index)
+                    (CalmSlateRenderer.description(index)
+                        ?: SmoothWallpaperRenderer.mechanicDescription(index)
                         ?: MaterialXRenderer.description(index)
                         ?: GlassOrbitCollectionRenderer.description(index)
                         ?: AuraCyberRenderer.description(index)
@@ -282,144 +282,13 @@ class MainActivity : Activity() {
     }
 
     private fun buildScenes(root: LinearLayout) {
-        root.addView(section("Quiet Collection · Matte Grey",
-            "Eight original layered wallpapers, designed to leave room for your clock and dock. No glass."))
-        buildOriginalRail(root, "Slate, paper & horizon", (CalmSlateRenderer.FIRST..CalmSlateRenderer.LAST).toList())
-
-        root.addView(section("HALYN Originals",
-            "All 28 original animated shaders, restored exactly as before."))
-        buildOriginalRail(root, "The classics", (0..11).toList())
-        buildOriginalRail(root, "Original atmospheres", (13..16).toList())
-        buildOriginalRail(root, "Original motion collection", (52..63).toList())
-
-        root.addView(section("30 More HALYN Originals",
-            "Same signature luminous style as the originals, with thirty new shapes and motions."))
-        buildOriginalRail(root, "Fluid ribbons", (75..80).toList())
-        buildOriginalRail(root, "Optical light", (81..86).toList())
-        buildOriginalRail(root, "Cosmic formations", (87..92).toList())
-        buildOriginalRail(root, "Energy fields", (93..98).toList())
-        buildOriginalRail(root, "Geometry & motion", (99..104).toList())
-
-        root.addView(section("12 Reactive Originals",
-            "Signature HALYN optical style, with a different live device interaction in each scene."))
-        buildOriginalRail(root, "Music & motion", (105..107).toList())
-        buildOriginalRail(root, "Energy & battery", (108..109).toList())
-        buildOriginalRail(root, "Time & atmosphere", (110..111).toList())
-        buildOriginalRail(root, "Signals & touch", (112..116).toList())
-
-        root.addView(section("Apple-inspired originals",
-            "Ten original soft-glass, silky, layered wallpapers. Inspired by modern Apple aesthetics; no official artwork."))
-        buildOriginalRail(root, "Soft glass & flowing silk", (117..121).toList())
-        buildOriginalRail(root, "Dreamlike depth & light", (122..126).toList())
-
-        root.addView(section("Samsung-inspired originals",
-            "Ten unique deep-black AMOLED wallpapers with bold luminous motion. Not official Samsung artwork."))
-        buildOriginalRail(root, "Dynamic waves & galaxy light", (127..131).toList())
-        buildOriginalRail(root, "Edge light & energy", (132..136).toList())
-
-        root.addView(section("Material X · Minimal",
-            "Matte material layers, sculpted paper, smooth cutouts and subtle independent motion."))
-        buildOriginalRail(root, "Soft material & horizons", (137..140).toList())
-        buildOriginalRail(root, "Architectural motion", (141..144).toList())
-
-        root.addView(section("Glass Orbit Collection",
-            "Ten new living glass-ring scenes inspired by the original Glass Orbit. " +
-                "Different optical mechanics, no copied designs."))
-        buildOriginalRail(root, "Lenses & refraction", (145..149).toList())
-        buildOriginalRail(root, "Crystal depth & motion", (150..154).toList())
-
-        root.addView(section("Bubble Garden · Interactive",
-            "Stationary soap-glass bubbles. Drag one to stretch and pop it, " +
-                "then watch the tiny droplets fade and the bubble grow back."))
-        buildOriginalRail(root, "Touch & pop", listOf(BubbleGardenRenderer.SCENE_INDEX))
-
-        root.addView(section("Aura Battle · Live",
-            "Atmospheric energy with speed-sensitive anime strike lines and pressure waves."))
-        buildOriginalRail(root, "Aura & impact", (156..158).toList())
-        buildOriginalRail(root, "Speed & energy", (159..161).toList())
-
-        root.addView(section("Cyber Systems · Minimal",
-            "Quiet digital optics. No fake terminals, code rain or intrusive overlays."))
-        buildOriginalRail(root, "Trace & cipher", (162..164).toList())
-        buildOriginalRail(root, "Data & signal", (165..167).toList())
-
-        auraCyberControls = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(section("Strike & signal controls",
-                "Quick swipe for impact; gyro triggers lighter motion reactions."))
-        }
-        val auraPanel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = rounded(cardColor, 22, borderColor)
-            setPadding(dp(17), dp(14), dp(17), dp(12))
-        }
-        addSlider(auraPanel, "Aura / signal strength", prefs.get().intensity,
-            .35f, 2.3f, prefs::setIntensity)
-        addSlider(auraPanel, "Animation flow", prefs.get().speed,
-            .25f, 2f, prefs::setSpeed)
-        addSlider(auraPanel, "Swipe sensitivity", prefs.get().strikeSensitivity,
-            .5f, 2f, prefs::setStrikeSensitivity)
-        addSlider(auraPanel, "Burst duration", prefs.get().strikeDuration,
-            .5f, 1.8f, prefs::setStrikeDuration)
-        auraPanel.addView(text(
-            "Swipe speed is measured in dp/s. Fast swipes trigger crisp effects; " +
-                "regular taps stay calm. The launcher may reserve some swipes.",
-            12f, secondary
-        ).apply { setPadding(0, dp(6), 0, dp(3)) })
-        auraCyberControls.addView(auraPanel)
-        root.addView(auraCyberControls)
-
-        root.addView(section("Landscapes & exploration",
-            "Minimalistic mountains and interactive Star Window."))
-        buildOriginalRail(root, "Minimal landscapes", (17..20).toList())
+        root.addView(section("Living Landscapes",
+            "Eight recognizable environments, continuously animated without touching the screen."))
+        buildOriginalRail(root, "Nature in motion",
+            (CalmSlateRenderer.FIRST..CalmSlateRenderer.LAST).toList())
+        root.addView(section("Space Exploration",
+            "The original interactive Star Window, preserved with its navigation engine."))
         buildOriginalRail(root, "Star Window", listOf(StarWindowRenderer.SCENE_INDEX))
-
-        root.addView(section("Explore online · 4K+", "Real, licensed images from independent creators."))
-        onlineGallery = CommonsGalleryView(this) { image ->
-            prefs.raw.edit()
-                .putString("online_title", image.name)
-                .putString("online_artist", image.artist)
-                .putString("online_license", image.license)
-                .putString("online_source", image.sourcePage)
-                .putString("online_license_url", image.licenseUrl)
-                .putString("online_resolution", image.dimensionLabel)
-                .apply()
-            prefs.photoImported()
-            refreshScene()
-            syncStarTracking()
-            syncMotionTracking()
-            preview.invalidate()
-        }
-        root.addView(onlineGallery, LinearLayout.LayoutParams(-1, -2))
-
-        root.addView(section("From your phone", "Use a photo or image you already have."))
-        root.addView(text("Choose a local image  ↗", 14f, ink, Typeface.BOLD).apply {
-            background = rounded(cardColor, 16, borderColor)
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(16), dp(14), dp(16), dp(14))
-            minHeight = dp(54)
-            isClickable = true
-            isFocusable = true
-            contentDescription = "Choose an existing picture from your phone"
-            setOnClickListener { chooseWallpaperPhoto() }
-        })
-        onlineCredit = text("", 12f, secondary).apply {
-            setPadding(dp(2), dp(13), dp(2), dp(7))
-            isClickable = true
-            isFocusable = true
-            contentDescription = "View source and creator attribution of the active wallpaper"
-            setOnClickListener {
-                val source = prefs.raw.getString("online_source", null)
-                if (!source.isNullOrBlank()) {
-                    try {
-                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(source)))
-                    } catch (_: Exception) {
-                        Toast.makeText(this@MainActivity, "Source link unavailable", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
-        }
-        root.addView(onlineCredit)
     }
 
     private fun chooseWallpaperPhoto() {
@@ -1308,43 +1177,28 @@ class MainActivity : Activity() {
     }
 
     private fun buildMotion(root: LinearLayout) {
-        root.addView(section("Motion", "Quiet, or full of life."))
-        val panel = LinearLayout(this).apply {
+        root.addView(section("Motion", "Visible movement, adjustable without sacrificing calm."))
+        effectPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = rounded(cardColor, 22, borderColor)
-            setPadding(dp(17), dp(15), dp(17), dp(11))
+            setPadding(dp(17), dp(16), dp(17), dp(12))
         }
-        effectPanel = panel
-        addSlider(
-            panel, "Strength", prefs.get().intensity,
-            min = .35f, max = 2.3f, prefs::setIntensity
-        )
-        addSlider(
-            panel, "Flow", prefs.get().speed,
-            min = .25f, max = 2.0f, prefs::setSpeed
-        )
-        panel.addView(text("SHADER DETAIL", 10f, subtle, Typeface.BOLD).apply {
-            letterSpacing = .12f
-            setPadding(0, dp(15), 0, dp(9))
-        })
-        qualityModes = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        panel.addView(qualityModes, LinearLayout.LayoutParams(-1, dp(45)))
-        panel.addView(text(
-            "Efficient minimizes shader work; Balanced adds light depth; Cinematic adds drifting haze.",
-            11f, secondary
-        ).apply { setPadding(0, dp(9), 0, dp(4)) })
-        root.addView(panel)
-        // Show intensity and flow only where an AGSL shader actually uses them.
-
+        addSlider(effectPanel, "Movement strength", prefs.get().intensity,
+            min = .35f, max = 2.3f, prefs::setIntensity)
+        addSlider(effectPanel, "Motion speed", prefs.get().speed,
+            min = .25f, max = 2.0f, prefs::setSpeed)
+        effectPanel.addView(text(
+            "Landscape animation continues even when the phone is resting. " +
+                "Strength adjusts displacement; speed controls timing.",
+            12f, secondary
+        ).apply { setPadding(0, dp(4), 0, dp(4)) })
+        root.addView(effectPanel)
         gyroPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = rounded(cardColor, 22, borderColor)
             setPadding(dp(17), dp(15), dp(17), dp(13))
         }
-        gyroPanel.addView(text("GYRO DEPTH", 10f, subtle, Typeface.BOLD).apply {
+        gyroPanel.addView(text("OPTIONAL PARALLAX", 10f, subtle, Typeface.BOLD).apply {
             letterSpacing = .14f
             setPadding(0, 0, 0, dp(12))
         })
@@ -1354,18 +1208,15 @@ class MainActivity : Activity() {
         }
         gyroPanel.addView(gyroModes, LinearLayout.LayoutParams(-1, dp(44)))
         gyroPanel.addView(text(
-            "Calibrates when the wallpaper becomes visible. Smooth, bounded movement; no drifting.",
+            "Parallax is separate from animation. Your landscapes still move when gyroscope is off.",
             12f, secondary
         ).apply { setPadding(0, dp(13), 0, dp(3)) })
         addSlider(gyroPanel, "Gyro intensity", prefs.get().gyroStrength,
             min = .5f, max = 1.8f, prefs::setGyroStrength)
-
         mountainDepthPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
         }
-        addSlider(mountainDepthPanel, "Mountain depth", prefs.get().mountainDepth,
-            min = .5f, max = 1.6f, prefs::setMountainDepth)
-        gyroPanel.addView(mountainDepthPanel)
         root.addView(gyroPanel, LinearLayout.LayoutParams(-1, -2).apply {
             topMargin = dp(12)
         })
@@ -1467,15 +1318,14 @@ class MainActivity : Activity() {
             }
         })
         panel.addView(text(
-            "Optional. HALYN saves only the time of a notification event, never its sender or text. " +
-                "Music playback detection, battery, time, and touch need no microphone or screen capture.",
+            "Animations simulate weather and motion locally. Existing space, clock and colour controls remain available.",
             12f, secondary
         ))
         root.addView(panel)
     }
 
     private fun buildFooter(root: LinearLayout) {
-        root.addView(text("Photographs from their original creators · Use with attribution.", 12f, subtle).apply {
+        root.addView(text("Eight living environments · Star Window · Saved colours.", 12f, subtle).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(28), 0, 0)
         })
@@ -1540,11 +1390,7 @@ class MainActivity : Activity() {
                 View.VISIBLE else View.GONE
         }
         if (::effectPanel.isInitialized) {
-            effectPanel.visibility = if (
-                selected in 0..11 || selected in 13..16 ||
-                selected in 52..63 || SmoothWallpaperRenderer.isSmooth(selected) ||
-                GlassOrbitCollectionRenderer.isGlassOrbit(selected)
-            ) View.VISIBLE else View.GONE
+            effectPanel.visibility = if (CalmSlateRenderer.isCalm(selected)) View.VISIBLE else View.GONE
         }
         if (::starControls.isInitialized) starControls.visibility =
             if (selected == StarWindowRenderer.SCENE_INDEX) View.VISIBLE else View.GONE
