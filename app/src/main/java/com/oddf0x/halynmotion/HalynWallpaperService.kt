@@ -34,6 +34,8 @@ class HalynWallpaperService : WallpaperService() {
         private var slowFrames = 0
         private var fastFrames = 0
         private var settings = preferences.get()
+        private val fluidGestures = FluidGestures(this@HalynWallpaperService)
+        private val fluidStroke = FluidStroke()
         private var visible = false
         private var surfaceReady = false
         private var surfaceWidth = 1
@@ -190,6 +192,29 @@ class HalynWallpaperService : WallpaperService() {
             super.onTouchEvent(event)
             // The star scene must not hijack home-screen taps unless opted in.
             if (!acceptsTouch(settings)) return
+            if (FluidMotionRenderer.isFluid(settings.preset)) {
+                if (event.actionMasked == MotionEvent.ACTION_MOVE) {
+                    for (i in 0 until event.historySize) {
+                        fluidStroke.handle(MotionEvent.ACTION_MOVE,
+                            event.getHistoricalX(i) / surfaceWidth.coerceAtLeast(1),
+                            event.getHistoricalY(i) / surfaceHeight.coerceAtLeast(1))
+                    }
+                }
+                val complete = fluidStroke.handle(event.actionMasked,
+                    event.x / surfaceWidth.coerceAtLeast(1),
+                    event.y / surfaceHeight.coerceAtLeast(1))
+                if (complete) {
+                    val matched = fluidGestures.match(fluidStroke.points())
+                    if (matched != null) {
+                        renderer.triggerFluidGesture(
+                            matched.action,
+                            event.x / surfaceWidth.coerceAtLeast(1),
+                            event.y / surfaceHeight.coerceAtLeast(1)
+                        )
+                        scheduleFrame(immediate = true)
+                    }
+                }
+            }
             if (settings.preset == BubbleGardenRenderer.SCENE_INDEX) {
                 // Send complete DOWN/MOVE/UP/CANCEL gestures. A one-shot touch
                 // pulse cannot distinguish wobbling from a real drag-to-pop.
