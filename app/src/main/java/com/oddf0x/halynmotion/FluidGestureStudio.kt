@@ -138,6 +138,7 @@ class FluidGestureStudio(
         row.addView(button("Try effect") {
             val matched = gestures.match(pad.points())
             previewEffect(matched?.action ?: action, .5f, .5f)
+            dialog.dismiss()
             Toast.makeText(activity,
                 if (matched != null) "Matched " + matched.name else "Preview: " +
                     FluidGestures.ACTIONS[action], Toast.LENGTH_SHORT).show()
