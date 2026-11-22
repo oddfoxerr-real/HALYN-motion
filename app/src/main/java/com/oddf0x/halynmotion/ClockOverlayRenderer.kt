@@ -82,8 +82,9 @@ class ClockOverlayRenderer(private val context: Context) {
         val centerY = if (state.clockCustomPlacement) h * state.clockY else when (state.clockPosition) {
             0 -> h * .265f
             2 -> h * .71f
-            // Landscapes place the default clock near the foreground ridge.
-            else -> h * if (MountainSceneRenderer.isMountain(state.preset)) .71f else .49f
+            // Portrait depth puts type behind the top of the subject, not over the dock.
+            else -> h * if (state.clockStyle == 6) .36f
+                else if (MountainSceneRenderer.isMountain(state.preset)) .71f else .49f
         }
         val size = min(w, h * .74f)
         val white = Color.rgb(252, 251, 253)
@@ -100,8 +101,32 @@ class ClockOverlayRenderer(private val context: Context) {
             3 -> mono(canvas, centerX, centerY, size, tint, showDate, progress)
             4 -> analog(canvas, centerX, centerY, size, tint, showDate, progress, state.clockSeconds)
             5 -> orbit(canvas, centerX, centerY, size, tint, showDate, progress)
+            6 -> monumental(canvas, centerX, centerY, size, tint, showDate)
         }
         canvas.restore()
+    }
+
+    /**
+     * Minimal Depth: oversized condensed hour/minute numerals behind an actual
+     * transparent foreground subject. No screenshot, red brand graphics, or
+     * launcher imitation. Date uses the system locale above the numerals.
+     */
+    private fun monumental(
+        canvas: Canvas, x: Float, y: Float, size: Float, tint: Int, showDate: Boolean
+    ) {
+        val numbers = hours + minutes
+        val font = Typeface.create("sans-serif-condensed-black", Typeface.BOLD)
+        ink(tint, 242, size * .55f, font)
+        labelPaint.typeface = selectedFont ?: font
+        val measured = labelPaint.measureText(numbers)
+        if (measured > canvas.width * .94f && measured > 0f) {
+            labelPaint.textSize *= canvas.width * .94f / measured
+        }
+        canvas.drawText(numbers, x, y + size * .19f, labelPaint)
+        if (showDate) {
+            ink(tint, 230, size * .050f, typefaceMedium)
+            fittedText(canvas, date, x, y - size * .30f, canvas.width * .84f)
+        }
     }
 
     private fun ink(color: Int, alpha: Int, size: Float, font: Typeface) {
