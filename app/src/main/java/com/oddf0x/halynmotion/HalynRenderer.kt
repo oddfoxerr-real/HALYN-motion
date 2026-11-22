@@ -13,7 +13,7 @@ import android.os.Build
  * All values are sanitized when read so old preferences cannot break the shader.
  */
 data class MotionState(
-    val preset: Int = 0,
+    val preset: Int = CalmSlateRenderer.FIRST,
     val palette: Int = 0,
     val customColor: Int = Color.rgb(185, 174, 255),
     val fourColorsEnabled: Boolean = false,
@@ -106,10 +106,10 @@ class MotionPreferences(context: Context) {
             return if (result.isFinite()) result.coerceIn(min, max) else default
         }
         return MotionState(
-            preset = sanitizePreset(preferences.getInt("preset", 0)),
-            fourColorsEnabled = enabledFor(sanitizePreset(preferences.getInt("preset", 0))),
-            colorOne = colorFor(sanitizePreset(preferences.getInt("preset", 0)), 0),
-            colorTwo = colorFor(sanitizePreset(preferences.getInt("preset", 0)), 1),
+            preset = sanitizePreset(preferences.getInt("preset", CalmSlateRenderer.FIRST)),
+            fourColorsEnabled = enabledFor(sanitizePreset(preferences.getInt("preset", CalmSlateRenderer.FIRST))),
+            colorOne = colorFor(sanitizePreset(preferences.getInt("preset", CalmSlateRenderer.FIRST)), 0),
+            colorTwo = colorFor(sanitizePreset(preferences.getInt("preset", CalmSlateRenderer.FIRST)), 1),
             colorThree = colorFor(sanitizePreset(preferences.getInt("preset", 0)), 2),
             colorFour = colorFor(sanitizePreset(preferences.getInt("preset", 0)), 3),
             palette = preferences.getInt("palette", 0).coerceIn(0, 5),
@@ -157,15 +157,12 @@ class MotionPreferences(context: Context) {
         )
     }
 
+    // Retire old abstract and glass wallpaper IDs without deleting saved colours.
+    // Keep our extensively developed interactive Star Window unmodified.
     private fun sanitizePreset(value: Int): Int = when {
-        value in 0..20 || value == PhotoWallpaperStore.SCENE_INDEX ||
-            value in 52..63 || SmoothWallpaperRenderer.isSmooth(value) ||
-            MaterialXRenderer.isMaterial(value) ||
-            GlassOrbitCollectionRenderer.isGlassOrbit(value) ||
-            value == BubbleGardenRenderer.SCENE_INDEX ||
-            AuraCyberRenderer.isAuraCyber(value) ||
-            CalmSlateRenderer.isCalm(value) -> value
-        else -> 0 // The retired illustrated poster IDs 21–50 must never render.
+        value == StarWindowRenderer.SCENE_INDEX -> value
+        CalmSlateRenderer.isCalm(value) -> value
+        else -> CalmSlateRenderer.FIRST
     }
 
     fun setPreset(value: Int) = preferences.edit().putInt("preset", sanitizePreset(value)).apply()
