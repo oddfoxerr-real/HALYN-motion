@@ -12,8 +12,8 @@ android {
         manifestPlaceholders["wallpaperTitle"] = if (previewBuild) "HALYN Quiet Preview Wallpaper" else "@string/wallpaper_name"
         minSdk = 33
         targetSdk = 35
-        versionCode = 33
-        versionName = "0.27.0"
+        versionCode = 34
+        versionName = "0.28.0"
     }
     buildTypes {
         release {
