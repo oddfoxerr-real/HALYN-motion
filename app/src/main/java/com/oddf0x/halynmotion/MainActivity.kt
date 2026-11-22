@@ -119,30 +119,16 @@ class MainActivity : Activity() {
 
         buildHeader(column)
         buildPreview(column)
-        buildScenes(column)
         buildDepthStudio(column)
-        buildFluidGestures(column)
-        buildColours(column)
         buildClock(column)
-        buildStarWindow(column)
-        buildMotion(column)
-        buildBehavior(column)
-        buildFooter(column)
         buildApplyBar(frame)
 
         setContentView(frame)
         refreshScene()
-        refreshPalette()
-        refreshFps()
-        refreshShaderQuality()
         refreshClockStyles()
         refreshClockPositions()
         refreshClockFonts()
-        refreshStarDensity()
-        refreshStarEffects()
-        refreshGyroModes()
-        refreshSkyUi()
-        syncStarTracking()
+        syncMotionTracking()
     }
 
     private fun buildHeader(root: LinearLayout) {
@@ -158,11 +144,11 @@ class MainActivity : Activity() {
         })
         root.addView(top)
 
-        root.addView(text("Motion. With depth.", 32f, ink, Typeface.BOLD).apply {
+        root.addView(text("Real art. Your way.", 32f, ink, Typeface.BOLD).apply {
             setPadding(0, dp(20), 0, 0)
             letterSpacing = -.035f
         })
-        root.addView(text("Cinematic subjects, fluid materials and the original Space.", 14f, secondary).apply {
+        root.addView(text("High-resolution photography from real creators, carefully sourced.", 14f, secondary).apply {
             setPadding(0, dp(5), 0, dp(24))
         })
     }
@@ -184,7 +170,7 @@ class MainActivity : Activity() {
         }
         shell.addView(preview, FrameLayout.LayoutParams(-1, -1))
 
-        val chip = text("●  LIVE WALLPAPER", 10f, ink, Typeface.BOLD).apply {
+        val chip = text("WALLPAPER PREVIEW", 10f, ink, Typeface.BOLD).apply {
             letterSpacing = .1f
             background = rounded(Color.argb(175, 13, 14, 20), 16)
             setPadding(dp(14), dp(9), dp(14), dp(9))
@@ -213,7 +199,7 @@ class MainActivity : Activity() {
         val density = resources.displayMetrics
         val availableWidth = (density.widthPixels / density.density).toInt() - 44
         // Keeps a phone-like canvas while avoiding an overwhelming preview on small devices.
-        val heightDp = (availableWidth * 1.08f).roundToInt().coerceIn(290, 378)
+        val heightDp = (availableWidth * 1.50f).roundToInt().coerceIn(375, 550)
         root.addView(shell, LinearLayout.LayoutParams(-1, dp(heightDp)))
     }
 
@@ -1547,7 +1533,7 @@ class MainActivity : Activity() {
 
     private fun refreshScene() {
         val selected = prefs.get().preset
-        refreshFourColors()
+        if (::fourColorSwatches.isInitialized) refreshFourColors()
         val source = prefs.raw.getString("online_source", null)
         val ownPhoto = PhotoWallpaperStore(this).available()
         activeSceneName.text = when {
@@ -1792,6 +1778,10 @@ class MainActivity : Activity() {
         }
 
     private fun openWallpaperPicker() {
+        if (!PhotoWallpaperStore(this).available()) {
+            Toast.makeText(this, "Select a real photograph first", Toast.LENGTH_LONG).show()
+            return
+        }
         val component = ComponentName(this, HalynWallpaperService::class.java)
         try {
             startActivity(Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
