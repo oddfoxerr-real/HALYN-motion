@@ -80,7 +80,11 @@ jobs:
           assert "value == StarWindowRenderer.SCENE_INDEX -> value" not in prefs
           assert "value == MinimalArchitectureRenderer.SCENE_INDEX -> value" not in prefs
           assert "fun featured(): Page" in commons
-          assert len(commons.split('val FEATURED_TITLES = listOf(',1)[1].split(')',1)[0].split('.jpg"')) >= 6
+          assert 'val FEATURED_TITLES = listOf(' in commons
+          assert 'Spiral architecture and light (Unsplash).jpg' in commons
+          assert 'Glass building wall in soho (Unsplash).jpg' in commons
+          assert 'Silhouettes In Black and White.jpg' in commons
+          assert 'Faber-Hochhaus (Magdeburg-Altstadt).09.ajb.jpg' in commons
           assert "acceptedLicense(license)" in commons
           assert "trustedUpload(original)" in commons
           assert "metadata(meta, \"Artist\")" in commons
