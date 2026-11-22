@@ -98,6 +98,88 @@ class Commons4kCatalog {
         }
     }
 
+    /**
+     * Actual externally authored photography, chosen from independently inspected
+     * Commons file pages. Nothing is bundled or represented as HALYN-made.
+     * Resolve each exact title live to retrieve its CURRENT license and file URL.
+     * An asset whose license changed, dimensions fell or original disappeared
+     * will simply be excluded rather than shown with invented metadata.
+     */
+    fun featured(): Page {
+        val titles = FEATURED_TITLES
+        val uri = Uri.Builder()
+            .scheme("https").authority("commons.wikimedia.org")
+            .appendPath("w").appendPath("api.php")
+            .appendQueryParameter("action", "query")
+            .appendQueryParameter("titles", titles.joinToString("|") { "File:" + it })
+            .appendQueryParameter("prop", "imageinfo")
+            .appendQueryParameter("iiprop", "url|size|mime|extmetadata")
+            .appendQueryParameter("iiurlwidth", "500")
+            .appendQueryParameter("iiextmetadatafilter",
+                "LicenseShortName|LicenseUrl|Artist|AttributionRequired")
+            .appendQueryParameter("format", "json")
+            .appendQueryParameter("formatversion", "2")
+            .build().toString()
+        val connection = openHttps(uri)
+        return try {
+            if (connection.responseCode != 200) {
+                throw IOException("Commons returned HTTP " + connection.responseCode)
+            }
+            val root = JSONObject(connection.inputStream.bufferedReader(Charsets.UTF_8).use {
+                it.readText()
+            })
+            val apiError = root.optJSONObject("error")?.optString("info")
+            if (!apiError.isNullOrBlank()) throw IOException(apiError.take(140))
+            val pages = root.optJSONObject("query")?.optJSONArray("pages")
+            val found = LinkedHashMap<String, Image>()
+            if (pages != null) for (i in 0 until pages.length()) {
+                val page = pages.optJSONObject(i) ?: continue
+                val exactTitle = page.optString("title").removePrefix("File:")
+                val info = page.optJSONArray("imageinfo")?.optJSONObject(0) ?: continue
+                val width = info.optInt("width")
+                val height = info.optInt("height")
+                if (minOf(width, height) < 2160 || maxOf(width, height) < 3840) continue
+                if (info.optString("mime") !in setOf("image/jpeg", "image/png", "image/webp")) continue
+                val meta = info.optJSONObject("extmetadata") ?: continue
+                val license = metadata(meta, "LicenseShortName")
+                if (!acceptedLicense(license)) continue
+                val original = info.optString("url")
+                val thumbnail = info.optString("thumburl")
+                val source = info.optString("descriptionurl")
+                if (!trustedUpload(original) || !trustedUpload(thumbnail) ||
+                    !source.startsWith("https://commons.wikimedia.org/wiki/File:")) continue
+                val licenseUrl = metadata(meta, "LicenseUrl")
+                found[exactTitle.replace('_', ' ')] = Image(
+                    exactTitle.substringBeforeLast(".").replace('_', ' ').take(100),
+                    metadata(meta, "Artist").ifBlank { "See creator on source page" }.take(140),
+                    license, if (licenseUrl.startsWith("https://")) licenseUrl else "",
+                    source, thumbnail, original, width, height
+                )
+            }
+            Page(titles.mapNotNull { found[it.replace('_', ' ')] }, null)
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    companion object {
+        /**
+         * 4K+ originals with recorded provenance:
+         * Ian Keefe (CC0); Alessio Lin (CC0); Ajepbah (CC BY-SA 3.0 DE);
+         * Rich Lemonie (CC BY-SA 4.0); Rodrigo Argenton (CC BY-SA 4.0).
+         *
+         * License verification happens again at selection time via Commons API.
+         */
+        val FEATURED_TITLES = listOf(
+            "Spiral architecture and light (Unsplash).jpg",
+            "Glass building wall in soho (Unsplash).jpg",
+            "Faber-Hochhaus (Magdeburg-Altstadt).09.ajb.jpg",
+            "Sprinkenhof (Hamburg-Altstadt).Eingang Burchardstraße 14.3.29135.ajb.jpg",
+            "Silhouettes In Black and White.jpg",
+            "Westmount Public Library by Rodrigo Tetsuo Argenton (03).jpg"
+        )
+    }
+
     fun thumbnail(image: Image): Bitmap? {
         thumbnails.get(image.thumbnailUrl)?.let { return it }
         val connection = openHttps(image.thumbnailUrl)
