@@ -56,7 +56,9 @@ data class MotionState(
     val clockCustomPlacement: Boolean = false,
     val clockX: Float = .5f,
     val clockY: Float = .68f,
-    val photoRevision: Int = 0
+    val photoRevision: Int = 0,
+    val depthEnabled: Boolean = true,
+    val depthStrength: Float = 1f
 )
 
 class MotionPreferences(context: Context) {
@@ -153,14 +155,17 @@ class MotionPreferences(context: Context) {
             clockCustomPlacement = preferences.getBoolean("clock_custom_placement", false),
             clockX = float("clock_x", .5f, .08f, .92f),
             clockY = float("clock_y", .68f, .14f, .88f),
-            photoRevision = preferences.getInt("photo_revision", 0)
+            photoRevision = preferences.getInt("photo_revision", 0),
+            depthEnabled = preferences.getBoolean("depth_enabled", true),
+            depthStrength = float("depth_strength", 1f, 0f, 2f)
         )
     }
 
-    // Limit new selections to fluid scenes and the carefully developed space simulation.
+    // The focused gallery retains Fluid and Space, plus a real photographic depth studio.
     // Preserve stored palettes for retired landscape, shader and photo IDs.
     private fun sanitizePreset(value: Int): Int = when {
         value == StarWindowRenderer.SCENE_INDEX -> value
+        value == PhotoWallpaperStore.SCENE_INDEX -> value
         FluidMotionRenderer.isFluid(value) -> value
         else -> FluidMotionRenderer.FIRST
     }
@@ -169,6 +174,10 @@ class MotionPreferences(context: Context) {
     fun photoImported() = preferences.edit()
         .putInt("photo_revision", preferences.getInt("photo_revision", 0) + 1)
         .putInt("preset", PhotoWallpaperStore.SCENE_INDEX).apply()
+    fun setDepthEnabled(value: Boolean) =
+        preferences.edit().putBoolean("depth_enabled", value).apply()
+    fun setDepthStrength(value: Float) =
+        preferences.edit().putFloat("depth_strength", value.coerceIn(0f, 2f)).apply()
     fun setPalette(value: Int) = preferences.edit().putInt("palette", value.coerceIn(0, 5)).apply()
     fun setCustomColor(color: Int) = preferences.edit()
         .putInt("custom_color", color or -0x1000000)
@@ -278,6 +287,7 @@ class HalynRenderer(private val context: Context) {
     private val starRenderer by lazy { StarWindowRenderer(context) }
     private val mountainRenderer = MountainSceneRenderer()
     private val photoRenderer = PhotoWallpaperStore(context.applicationContext)
+    private val depthLayerStore by lazy { DepthLayerStore(context.applicationContext) }
     private val smoothRenderer = SmoothWallpaperRenderer()
     private val materialXRenderer = MaterialXRenderer()
     private val calmSlateRenderer = CalmSlateRenderer()
@@ -538,6 +548,9 @@ class HalynRenderer(private val context: Context) {
     ) {
         if (MountainSceneRenderer.isMountain(state.preset)) {
             mountainRenderer.drawForeground(canvas, state, mountainPose(state, gyro, offsetX))
+        }
+        if (state.preset == PhotoWallpaperStore.SCENE_INDEX) {
+            depthLayerStore.draw(canvas, state, gyro, photoRenderer)
         }
     }
 
