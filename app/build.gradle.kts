@@ -8,25 +8,29 @@ android {
     defaultConfig {
         val previewBuild = project.findProperty("quietPreview")?.toString() == "true"
         val livingPreview = project.findProperty("livingPreview")?.toString() == "true"
+        val fluidPreview = project.findProperty("fluidPreview")?.toString() == "true"
         applicationId = when {
+            fluidPreview -> "com.oddf0x.halynmotion.fluidpreview"
             livingPreview -> "com.oddf0x.halynmotion.livingpreview"
             previewBuild -> "com.oddf0x.halynmotion.quietpreview"
             else -> "com.oddf0x.halynmotion"
         }
         manifestPlaceholders["appTitle"] = when {
+            fluidPreview -> "HALYN Fluid Preview"
             livingPreview -> "HALYN Living Preview"
             previewBuild -> "HALYN Quiet Preview"
             else -> "@string/app_name"
         }
         manifestPlaceholders["wallpaperTitle"] = when {
+            fluidPreview -> "HALYN Fluid Wallpaper"
             livingPreview -> "HALYN Living Wallpaper"
             previewBuild -> "HALYN Quiet Preview Wallpaper"
             else -> "@string/wallpaper_name"
         }
         minSdk = 33
         targetSdk = 35
-        versionCode = 34
-        versionName = "0.28.0"
+        versionCode = 35
+        versionName = "0.29.0"
     }
     buildTypes {
         release {

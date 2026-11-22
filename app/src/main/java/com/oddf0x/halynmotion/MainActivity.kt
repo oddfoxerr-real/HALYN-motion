@@ -120,6 +120,7 @@ class MainActivity : Activity() {
         buildHeader(column)
         buildPreview(column)
         buildScenes(column)
+        buildFluidGestures(column)
         buildColours(column)
         buildClock(column)
         buildStarWindow(column)
@@ -156,11 +157,11 @@ class MainActivity : Activity() {
         })
         root.addView(top)
 
-        root.addView(text("Motion that feels alive.", 32f, ink, Typeface.BOLD).apply {
+        root.addView(text("Fluid. Made personal.", 32f, ink, Typeface.BOLD).apply {
             setPadding(0, dp(20), 0, 0)
             letterSpacing = -.035f
         })
-        root.addView(text("Living landscapes, interactive space and your clock. No abstract effects.", 14f, secondary).apply {
+        root.addView(text("Fluid wallpapers you can shape with your own gestures. Space stays.", 14f, secondary).apply {
             setPadding(0, dp(5), 0, dp(24))
         })
     }
@@ -231,7 +232,8 @@ class MainActivity : Activity() {
                 isClickable = true
                 isFocusable = true
                 contentDescription = "Select ${HalynRenderer.PRESETS[index]} animated wallpaper. " +
-                    (CalmSlateRenderer.description(index)
+                    (FluidMotionRenderer.description(index)
+                        ?: CalmSlateRenderer.description(index)
                         ?: SmoothWallpaperRenderer.mechanicDescription(index)
                         ?: MaterialXRenderer.description(index)
                         ?: GlassOrbitCollectionRenderer.description(index)
@@ -282,13 +284,42 @@ class MainActivity : Activity() {
     }
 
     private fun buildScenes(root: LinearLayout) {
-        root.addView(section("Living Landscapes",
-            "Eight recognizable environments, continuously animated without touching the screen."))
-        buildOriginalRail(root, "Nature in motion",
-            (CalmSlateRenderer.FIRST..CalmSlateRenderer.LAST).toList())
+        root.addView(section("Fluid Motion",
+            "Six smooth, continuously moving liquid wallpapers. No landscapes or decorative shapes."))
+        buildOriginalRail(root, "Liquid, satin & ink",
+            (FluidMotionRenderer.FIRST..FluidMotionRenderer.LAST).toList())
         root.addView(section("Space Exploration",
-            "The original interactive Star Window, preserved with its navigation engine."))
+            "The original interactive Star Window remains unchanged."))
         buildOriginalRail(root, "Star Window", listOf(StarWindowRenderer.SCENE_INDEX))
+    }
+
+    private fun buildFluidGestures(root: LinearLayout) {
+        root.addView(section("Gesture Studio",
+            "Record a finger motion and choose the effect it triggers."))
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = rounded(cardColor, 22, borderColor)
+            setPadding(dp(17), dp(16), dp(17), dp(16))
+        }
+        panel.addView(text("Assign a ripple, whirlpool, current push, light bloom, calm or surge to any recorded path.", 13f, secondary))
+        panel.addView(text("Record and manage gestures  ›", 14f, ink, Typeface.BOLD).apply {
+            gravity = Gravity.CENTER
+            background = rounded(Color.rgb(40, 42, 47), 13, borderColor)
+            minHeight = dp(54)
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Open recorder for custom fluid gestures"
+            setOnClickListener {
+                FluidGestureStudio(this@MainActivity, FluidGestures(this@MainActivity)) { action, x, y ->
+                    preview.triggerFluidEffect(action, x, y)
+                }.show()
+            }
+        }, LinearLayout.LayoutParams(-1, dp(54)).apply { topMargin = dp(12) })
+        panel.addView(text(
+            "One UI may intercept home-screen swipes. The in-app recorder always receives the full stroke.",
+            11f, secondary
+        ).apply { setPadding(0, dp(12), 0, 0) })
+        root.addView(panel)
     }
 
     private fun chooseWallpaperPhoto() {
@@ -1290,6 +1321,9 @@ class MainActivity : Activity() {
         // is enabled for photo mode, even if a previous procedural preset
         // stored touch interaction = true.
         panel.addView(View(this).apply { setBackgroundColor(borderColor) }, LinearLayout.LayoutParams(-1, dp(1)))
+        addToggle(panel, "Fluid touch gestures", "Allow recorded finger motions to trigger fluid effects when delivered by One UI", prefs.get().touch) {
+            prefs.setTouch(it)
+        }
         addToggle(panel, "Home-screen swipe", "Horizontal parallax when changing launcher pages", prefs.get().parallax) {
             prefs.setParallax(it)
         }
@@ -1325,7 +1359,7 @@ class MainActivity : Activity() {
     }
 
     private fun buildFooter(root: LinearLayout) {
-        root.addView(text("Eight living environments · Star Window · Saved colours.", 12f, subtle).apply {
+        root.addView(text("Six flowing environments · Star Window · Saved colours.", 12f, subtle).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(28), 0, 0)
         })
@@ -1366,7 +1400,8 @@ class MainActivity : Activity() {
         }
         if (::activeMechanicDescription.isInitialized) {
             activeMechanicDescription.text =
-                CalmSlateRenderer.description(selected)
+                FluidMotionRenderer.description(selected)
+                    ?: CalmSlateRenderer.description(selected)
                     ?: SmoothWallpaperRenderer.mechanicDescription(selected)
                     ?: MaterialXRenderer.description(selected)
                     ?: GlassOrbitCollectionRenderer.description(selected)
@@ -1390,7 +1425,7 @@ class MainActivity : Activity() {
                 View.VISIBLE else View.GONE
         }
         if (::effectPanel.isInitialized) {
-            effectPanel.visibility = if (CalmSlateRenderer.isCalm(selected)) View.VISIBLE else View.GONE
+            effectPanel.visibility = if (FluidMotionRenderer.isFluid(selected)) View.VISIBLE else View.GONE
         }
         if (::starControls.isInitialized) starControls.visibility =
             if (selected == StarWindowRenderer.SCENE_INDEX) View.VISIBLE else View.GONE
@@ -1673,7 +1708,8 @@ class MainActivity : Activity() {
     private inner class SceneTilePreview(private val sceneIndex: Int) : View(this@MainActivity) {
         private val renderer get() = originalTileRenderer
         private val animationStart = SystemClock.uptimeMillis()
-        private val animated = MaterialXRenderer.isMaterial(sceneIndex) ||
+        private val animated = FluidMotionRenderer.isFluid(sceneIndex) ||
+            MaterialXRenderer.isMaterial(sceneIndex) ||
             GlassOrbitCollectionRenderer.isGlassOrbit(sceneIndex) ||
             AuraCyberRenderer.isAuraCyber(sceneIndex) ||
             sceneIndex == BubbleGardenRenderer.SCENE_INDEX
@@ -1707,6 +1743,12 @@ class MainActivity : Activity() {
         private val renderer = HalynRenderer(this@MainActivity)
         private val clockRenderer = ClockOverlayRenderer(this@MainActivity)
         private val startTime = SystemClock.uptimeMillis()
+        private val fluidStroke = FluidStroke()
+        private val customGestures by lazy { FluidGestures(this@MainActivity) }
+        fun triggerFluidEffect(action: Int, x: Float, y: Float) {
+            renderer.triggerFluidGesture(action, x, y)
+            invalidate()
+        }
         private var touchX = .5f
         private var touchY = .5f
         private var pointerDownMs = 0L
@@ -1760,6 +1802,29 @@ class MainActivity : Activity() {
             if ((state.preset == StarWindowRenderer.SCENE_INDEX && !state.starTapTravel) ||
                 (state.preset != StarWindowRenderer.SCENE_INDEX && !state.touch)) {
                 return false
+            }
+            if (FluidMotionRenderer.isFluid(state.preset)) {
+                if (event.actionMasked == MotionEvent.ACTION_MOVE) {
+                    for (i in 0 until event.historySize) {
+                        fluidStroke.handle(MotionEvent.ACTION_MOVE,
+                            event.getHistoricalX(i) / width.coerceAtLeast(1),
+                            event.getHistoricalY(i) / height.coerceAtLeast(1))
+                    }
+                }
+                val complete = fluidStroke.handle(event.actionMasked,
+                    event.x / width.coerceAtLeast(1),
+                    event.y / height.coerceAtLeast(1))
+                if (complete) {
+                    val matched = customGestures.match(fluidStroke.points())
+                    if (matched != null) {
+                        renderer.triggerFluidGesture(matched.action,
+                            event.x / width.coerceAtLeast(1),
+                            event.y / height.coerceAtLeast(1))
+                        Toast.makeText(this@MainActivity,
+                            matched.name + " · " + FluidGestures.ACTIONS[matched.action],
+                            Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
             if (state.preset == BubbleGardenRenderer.SCENE_INDEX) {
                 renderer.onBubbleTouch(

@@ -52,13 +52,13 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='34'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='35'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.28.0-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.28.0-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.29.0-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.29.0-preview.apk > SHA256SUMS.txt)
 
-      - name: Verify curated living wallpapers and preserved space engine
+      - name: Verify fluid wallpapers, gesture capture, and preserved space
         shell: bash
         run: |
           set -euo pipefail
@@ -67,29 +67,28 @@ jobs:
           import re
           root = Path("app/src/main/java/com/oddf0x/halynmotion")
           ui = (root / "MainActivity.kt").read_text()
-          renderer = (root / "CalmSlateRenderer.kt").read_text()
           prefs = (root / "HalynRenderer.kt").read_text()
-          space = (root / "StarWindowRenderer.kt").read_text()
-          palette = (root / "SavedPalettes.kt").read_text()
-          assert "const val FIRST = 168" in renderer and "const val COUNT = 8" in renderer
-          assert len(re.findall(r'^\s*Scene\("', renderer, re.M)) == 8
-          assert "fun draw(canvas: Canvas, state: MotionState, seconds: Float, gyro: ParallaxPose)" in renderer
-          assert "swell(canvas" in renderer and "driftingFog(canvas" in renderer
-          assert "speckle(canvas" in renderer and "val speed = 390f" in renderer
-          assert "Moonrise" in renderer and "Midnight Sea" in renderer
-          assert 'buildOriginalRail(root, "Nature in motion"' in ui
+          flow = (root / "FluidMotionRenderer.kt").read_text()
+          store = (root / "FluidGestures.kt").read_text()
+          studio = (root / "FluidGestureStudio.kt").read_text()
+          wallpaper = (root / "HalynWallpaperService.kt").read_text()
+          assert "const val FIRST = 176" in flow and "const val COUNT = 6" in flow
+          assert len(re.findall(r'^\s*Scene\("', flow, re.M)) == 6
+          assert "RuntimeShader(AGSL)" in flow and "renderFallback" in flow
+          assert "u_action" in flow and "trigger(action: Int" in flow
+          assert 'buildOriginalRail(root, "Liquid, satin & ink"' in ui
           assert 'buildOriginalRail(root, "Star Window", listOf(StarWindowRenderer.SCENE_INDEX))' in ui
           assert len(re.findall(r'buildOriginalRail\(root,', ui)) == 2
-          assert 'buildOriginalRail(root, "The classics"' not in ui
-          assert "Movement strength" in ui and "Motion speed" in ui
-          sanitize = prefs.split("private fun sanitizePreset", 1)[1].split("fun setPreset", 1)[0]
-          assert "value == StarWindowRenderer.SCENE_INDEX" in sanitize
-          assert "CalmSlateRenderer.isCalm(value)" in sanitize
-          assert "SmoothWallpaperRenderer.isSmooth" not in sanitize
-          assert "fun draw(" in space and "SpaceNavigation" in (root / "MainActivity.kt").read_text()
-          assert "fun save(" in palette and "fun apply(" in palette and "fun remove(" in palette
-          assert 'versionCode = 34' in Path("app/build.gradle.kts").read_text()
-          print("Nine curated living/space scenes, real motion, saved palettes and old-ID migration verified")
+          assert "FluidGestureStudio" in ui and "fluidStroke.handle" in ui
+          assert "FluidMotionRenderer.isFluid(value)" in prefs
+          assert "StarWindowRenderer.SCENE_INDEX" in prefs
+          assert 'triggerFluidGesture' in prefs and 'FluidMotionRenderer.isFluid(settings.preset)' in wallpaper
+          assert 'fun match(raw: List<PointF>)' in store
+          assert 'fun save(name: String, action: Int' in store
+          assert 'GesturePad' in studio and 'Save gesture' in studio
+          assert "ClockFontStore.presetTypeface" in ui
+          assert 'versionCode = 35' in Path("app/build.gradle.kts").read_text()
+          print("Fluid v0.29: 6 GPU/Canvas scenes, recorded gesture matching, live touch dispatch, preserved Space")
           PY
 
       - name: Verify clock font storage and preset recovery
@@ -135,38 +134,36 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.28.0 Living Landscapes
+      - name: Publish HALYN v0.29.0 Fluid Motion
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.28.0-preview.1
+          TAG: v0.29.0-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.28.0-preview.apk
-          unzip -t dist/HALYN-Motion-v0.28.0-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.29.0-preview.apk
+          unzip -t dist/HALYN-Motion-v0.29.0-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN Motion v0.28.0 — Living Landscapes
+          # HALYN v0.29.0 — Fluid Motion + Custom Gestures
 
-          Curated selection: eight continuously moving, recognizable graphite
-          environments plus the original interactive Star Window space simulation.
-          Animated environments include layered drifting mountain fog, moonrise,
-          moving ocean swells, swaying pine forests, rainfall and pond ripples,
-          multi-depth snowfall, cloud passage and star valley with shooting stars.
+          Six new fluid scenes: Soft Current, Satin Flow, Liquid Ink,
+          Deep Ripple, Quiet Vortex, and Velvet Tide. All continuously
+          animate using a GPU liquid field with a Canvas fallback.
 
-          Retired abstract, glass and shader-heavy wallpaper collections are no
-          longer selectable. Legacy colour settings are not deleted.
-          Movement strength and speed are now adjustable on natural scenes.
-          Star Window, clock placement/fonts and reusable saved colour palettes
-          remain available. No new permissions.
+          Fluid Gesture Studio records one-finger paths, lets users
+          assign one of six visual effects, save up to twelve gestures,
+          test them in-app, and delete them. Gesture matching is local.
 
-          CI verifies the Android package and catalogue. Visual performance
-          and movement quality still need real-device review.
+          Retired landscapes and abstract wallpaper IDs are not selectable.
+          Interactive Star Window, colour presets, fonts and clocks survive.
+          Android launcher gesture forwarding varies and is not guaranteed.
+          No extra permissions; physical Galaxy A56 visual test still needed.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.28.0-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.29.0-preview.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.28.0 — Living Landscapes" \
+            --title "HALYN Motion v0.29.0 — Fluid Motion" \
             --notes-file notes.md --prerelease
