@@ -1740,6 +1740,12 @@ class MainActivity : Activity() {
         private val renderer = HalynRenderer(this@MainActivity)
         private val clockRenderer = ClockOverlayRenderer(this@MainActivity)
         private val startTime = SystemClock.uptimeMillis()
+        private val fluidStroke = FluidStroke()
+        private val customGestures by lazy { FluidGestures(this@MainActivity) }
+        fun triggerFluidEffect(action: Int, x: Float, y: Float) {
+            renderer.triggerFluidGesture(action, x, y)
+            invalidate()
+        }
         private var touchX = .5f
         private var touchY = .5f
         private var pointerDownMs = 0L
@@ -1793,6 +1799,29 @@ class MainActivity : Activity() {
             if ((state.preset == StarWindowRenderer.SCENE_INDEX && !state.starTapTravel) ||
                 (state.preset != StarWindowRenderer.SCENE_INDEX && !state.touch)) {
                 return false
+            }
+            if (FluidMotionRenderer.isFluid(state.preset)) {
+                if (event.actionMasked == MotionEvent.ACTION_MOVE) {
+                    for (i in 0 until event.historySize) {
+                        fluidStroke.handle(MotionEvent.ACTION_MOVE,
+                            event.getHistoricalX(i) / width.coerceAtLeast(1),
+                            event.getHistoricalY(i) / height.coerceAtLeast(1))
+                    }
+                }
+                val complete = fluidStroke.handle(event.actionMasked,
+                    event.x / width.coerceAtLeast(1),
+                    event.y / height.coerceAtLeast(1))
+                if (complete) {
+                    val matched = customGestures.match(fluidStroke.points())
+                    if (matched != null) {
+                        renderer.triggerFluidGesture(matched.action,
+                            event.x / width.coerceAtLeast(1),
+                            event.y / height.coerceAtLeast(1))
+                        Toast.makeText(this@MainActivity,
+                            matched.name + " · " + FluidGestures.ACTIONS[matched.action],
+                            Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
             if (state.preset == BubbleGardenRenderer.SCENE_INDEX) {
                 renderer.onBubbleTouch(
