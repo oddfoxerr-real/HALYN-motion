@@ -1,5 +1,37 @@
 # HALYN Motion
 
+## v0.31.0 — Real sourced artwork, no built-in wallpaper collection
+
+The previous bundled scene gallery was rejected as visually unconvincing.
+The **active wallpaper selection is now photo-only**. All procedural preset
+entries have been removed from the studio navigation, including Fluid, Space
+and Monolith. Legacy shader sources remain in the codebase temporarily for
+compatibility but can no longer be selected through app preferences or the UI.
+Existing personally imported/downloaded wallpaper files are **not deleted**.
+
+HALYN now opens on six researched 4K–6K photographs hosted by Wikimedia Commons.
+Each item is resolved live from the official imageinfo API, so the creator,
+license and original download URL cannot be invented. The image pages were
+checked individually; see [ARTWORK_SOURCES.md](ARTWORK_SOURCES.md).
+Thumbnails and original files are fetched only when using the gallery.
+An additional real Commons search remains available.
+
+The studio is reduced to a large image preview, real-photo gallery, image
+import, source attribution, a clock editor and optional foreground-depth
+compositing. Photographs are described as **static**, not deceptively sold
+as animated. Optional gyroscope parallax and the real-time clock remain.
+Automatic subject segmentation is not included.
+
+A successful APK build does not prove the visual results or source availability
+on a Galaxy A56. Verify artwork crops, network reliability, clock placement,
+depth masks and battery usage on the phone.
+
+> Earlier versions and their wallpapers remain documented below as historical
+> notes, not current catalogue entries.
+
+---
+
+
 ## v0.30.0 — Minimal Depth Studio (development preview)
 
 This version introduces three distinct directions in the currently focused HALYN gallery: existing Fluid Motion materials, the preserved interactive Space wallpaper, and new photographic Cinematic Depth plus a sculptural Minimal Architecture original.
