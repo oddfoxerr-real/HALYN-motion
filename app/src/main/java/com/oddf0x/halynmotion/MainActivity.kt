@@ -292,6 +292,9 @@ class MainActivity : Activity() {
         root.addView(section("Space Exploration",
             "The original interactive Star Window remains unchanged."))
         buildOriginalRail(root, "Star Window", listOf(StarWindowRenderer.SCENE_INDEX))
+        root.addView(section("Minimal Architecture",
+            "One original sculptural scene, with restrained light and slow dimensional motion."))
+        buildOriginalRail(root, "Graphite & light", listOf(MinimalArchitectureRenderer.SCENE_INDEX))
     }
 
     private fun buildDepthStudio(root: LinearLayout) {
@@ -1561,6 +1564,8 @@ class MainActivity : Activity() {
                     ?: MaterialXRenderer.description(selected)
                     ?: GlassOrbitCollectionRenderer.description(selected)
                     ?: AuraCyberRenderer.description(selected)
+                    ?: (if (selected == MinimalArchitectureRenderer.SCENE_INDEX)
+                        MinimalArchitectureRenderer.DESCRIPTION else null)
                     ?: (if (selected == BubbleGardenRenderer.SCENE_INDEX)
                         BubbleGardenRenderer.DESCRIPTION else null)
                     ?: if (selected == PhotoWallpaperStore.SCENE_INDEX)
@@ -1867,6 +1872,7 @@ class MainActivity : Activity() {
         private val renderer get() = originalTileRenderer
         private val animationStart = SystemClock.uptimeMillis()
         private val animated = FluidMotionRenderer.isFluid(sceneIndex) ||
+            sceneIndex == MinimalArchitectureRenderer.SCENE_INDEX ||
             MaterialXRenderer.isMaterial(sceneIndex) ||
             GlassOrbitCollectionRenderer.isGlassOrbit(sceneIndex) ||
             AuraCyberRenderer.isAuraCyber(sceneIndex) ||
