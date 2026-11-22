@@ -284,99 +284,22 @@ class MainActivity : Activity() {
     }
 
     private fun buildDepthStudio(root: LinearLayout) {
-        root.addView(section("Cinematic Depth",
-            "Your photography, licensed 4K artwork and a clock genuinely behind the subject."))
-        val panel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = rounded(cardColor, 22, borderColor)
-            setPadding(dp(17), dp(16), dp(17), dp(16))
-        }
-        fun action(title: String, description: String, block: () -> Unit) {
-            val button = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                isClickable = true
-                isFocusable = true
-                background = rounded(Color.rgb(38, 39, 45), 13, borderColor)
-                contentDescription = title + ". " + description
-                setPadding(dp(14), dp(12), dp(14), dp(12))
-                setOnClickListener { block() }
-            }
-            button.addView(text(title, 14f, ink, Typeface.BOLD))
-            button.addView(text(description, 12f, secondary).apply {
-                setPadding(0, dp(3), 0, 0)
-            })
-            panel.addView(button, LinearLayout.LayoutParams(-1, -2).apply {
-                bottomMargin = dp(9)
-            })
-        }
-        action("Import photograph", "Use an image from your device as the background") {
-            chooseWallpaperPhoto()
-        }
-        action("Use saved photograph", "Switch from Fluid or Space to your photo composition") {
-            if (PhotoWallpaperStore(this).available()) {
-                prefs.setPreset(PhotoWallpaperStore.SCENE_INDEX)
-                refreshScene()
-                syncMotionTracking()
-                preview.invalidate()
-            } else {
-                Toast.makeText(this, "Import a photograph first", Toast.LENGTH_SHORT).show()
-            }
-        }
-        action("Trace subject outline", "Cut out any foreground object on your chosen photo") {
-            DepthMaskEditor(this) {
-                prefs.setPreset(PhotoWallpaperStore.SCENE_INDEX)
-                refreshScene()
-                preview.invalidate()
-            }.show()
-        }
-        action("Import transparent foreground", "Use a full-frame PNG or WebP with an alpha channel") {
-            chooseDepthForeground()
-        }
-        action("Use Minimal Depth clock", "Oversized charcoal-and-white typography behind the subject") {
-            prefs.setPreset(PhotoWallpaperStore.SCENE_INDEX)
-            prefs.setClockStyle(6)
-            prefs.setClockPosition(1)
-            prefs.setClockSeconds(false)
-            prefs.setClockDate(true)
-            prefs.setDepthEnabled(true)
-            refreshScene()
-            refreshClockStyles()
-            refreshClockPositions()
-            preview.invalidate()
-        }
-        addToggle(panel, "Subject in front of clock",
-            "Enable the real foreground cutout, if one has been created",
-            prefs.get().depthEnabled) {
-            prefs.setDepthEnabled(it)
-            preview.invalidate()
-        }
-        addSlider(panel, "Subject parallax strength", prefs.get().depthStrength, 0f, 2f) {
-            prefs.setDepthStrength(it)
-            preview.invalidate()
-        }
-        action("Remove subject cutout", "Keep the photograph and clock; delete only the foreground") {
-            DepthLayerStore(applicationContext).clear()
-            prefs.setDepthEnabled(false)
-            preview.invalidate()
-            Toast.makeText(this, "Foreground removed", Toast.LENGTH_SHORT).show()
-        }
-        onlineCredit = text("", 12f, secondary).apply {
-            setPadding(dp(5), dp(7), dp(5), dp(12))
-            isFocusable = true
+        root.addView(section("Selected photography",
+            "Original high-resolution photographs. Every image has a real creator, source and reuse license."))
+        val import = text("Import photograph from device  ›", 14f, ink, Typeface.BOLD).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(17), dp(10), dp(17), dp(10))
+            minHeight = dp(54)
+            background = rounded(cardColor, 14, borderColor)
             isClickable = true
-            contentDescription = "Open original image source and license"
-            setOnClickListener {
-                val link = prefs.raw.getString("online_source", "").orEmpty()
-                if (link.startsWith("https://commons.wikimedia.org/")) {
-                    try {
-                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
-                    } catch (_: Exception) {
-                        Toast.makeText(this@MainActivity, "Cannot open source", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
+            isFocusable = true
+            contentDescription = "Import a photograph from the phone"
+            setOnClickListener { chooseWallpaperPhoto() }
         }
-        panel.addView(onlineCredit)
+        root.addView(import, LinearLayout.LayoutParams(-1, -2))
+
+        // Curated file titles resolve through the Commons API to current real thumbnails.
+        // No proprietary or generated wallpaper is bundled with the application.
         onlineGallery = CommonsGalleryView(this) { item ->
             prefs.raw.edit()
                 .putString("online_title", item.name)
@@ -384,22 +307,88 @@ class MainActivity : Activity() {
                 .putString("online_artist", item.artist)
                 .putString("online_license", item.license)
                 .putString("online_license_url", item.licenseUrl)
-                .putString("online_resolution", item.dimensionLabel).apply()
+                .putString("online_resolution", item.dimensionLabel)
+                .putBoolean("depth_enabled", false)
+                .apply()
             prefs.photoImported()
             refreshScene()
+            preview.invalidate()
+        }
+        root.addView(onlineGallery, LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = dp(13)
+        })
+        onlineGallery.loadInitial()
+
+        root.addView(section("Depth and clock",
+            "Optional subject layering. The clock is truly rendered between the photograph and cutout."))
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = rounded(cardColor, 22, borderColor)
+            setPadding(dp(17), dp(13), dp(17), dp(16))
+        }
+        onlineCredit = text("", 12f, secondary).apply {
+            isClickable = true
+            isFocusable = true
+            setPadding(dp(4), dp(7), dp(4), dp(12))
+            contentDescription = "Open artwork source and license"
+            setOnClickListener {
+                val link = prefs.raw.getString("online_source", "").orEmpty()
+                if (link.startsWith("https://commons.wikimedia.org/")) {
+                    try {
+                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
+                    } catch (_: Exception) {
+                        Toast.makeText(this@MainActivity, "Could not open source", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+        panel.addView(onlineCredit)
+        fun action(label: String, tip: String, click: () -> Unit) {
+            panel.addView(text(label + "  ›", 13f, ink, Typeface.BOLD).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(13), dp(12), dp(13), dp(12))
+                minHeight = dp(52)
+                background = rounded(Color.rgb(37, 39, 45), 12, borderColor)
+                isClickable = true
+                isFocusable = true
+                contentDescription = label + ". " + tip
+                setOnClickListener { click() }
+            }, LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = dp(8)
+            })
+        }
+        action("Trace subject", "Create a foreground mask by tracing around a subject") {
+            DepthMaskEditor(this) {
+                prefs.setDepthEnabled(true)
+                refreshScene()
+                preview.invalidate()
+            }.show()
+        }
+        action("Import transparent subject", "Use a prepared PNG or WebP with alpha") {
+            chooseDepthForeground()
+        }
+        action("Remove subject layer", "Remove the foreground without deleting the photo") {
+            DepthLayerStore(applicationContext).clear()
+            prefs.setDepthEnabled(false)
+            preview.invalidate()
+            Toast.makeText(this, "Subject removed", Toast.LENGTH_SHORT).show()
+        }
+        addToggle(panel, "Subject in front of clock",
+            "Enable the cutout when one has been created",
+            prefs.get().depthEnabled) {
+            prefs.setDepthEnabled(it)
+            preview.invalidate()
+        }
+        addToggle(panel, "Gentle parallax",
+            "Optional movement from the phone sensors",
+            prefs.get().gyroMode != 0) {
+            prefs.setGyroMode(if (it) 1 else 0)
             syncMotionTracking()
             preview.invalidate()
         }
-        onlineGallery.visibility = View.GONE
-        action("Browse licensed 4K photography", "Search Wikimedia Commons; creator, source and license are retained") {
-            if (onlineGallery.visibility == View.GONE) {
-                onlineGallery.visibility = View.VISIBLE
-                onlineGallery.loadInitial()
-            } else {
-                onlineGallery.visibility = View.GONE
-            }
+        addSlider(panel, "Depth response", prefs.get().depthStrength, 0f, 1.5f) {
+            prefs.setDepthStrength(it)
         }
-        panel.addView(onlineGallery)
         root.addView(panel)
     }
 
