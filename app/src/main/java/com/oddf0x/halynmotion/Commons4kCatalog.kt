@@ -165,12 +165,15 @@ class Commons4kCatalog {
     companion object {
         /**
          * 4K+ originals with recorded provenance:
-         * Ian Keefe (CC0); Alessio Lin (CC0); Ajepbah (CC BY-SA 3.0 DE);
+         * Anton Darius, Craig Whitehead, Eddy Lackmann (CC0); Ian Keefe (CC0); Alessio Lin (CC0); Ajepbah (CC BY-SA 3.0 DE);
          * Rich Lemonie (CC BY-SA 4.0); Rodrigo Argenton (CC BY-SA 4.0).
          *
          * License verification happens again at selection time via Commons API.
          */
         val FEATURED_TITLES = listOf(
+            "Portrait of Adolescence (Unsplash).jpg",
+            "Man in hat facing away (Unsplash).jpg",
+            "Hooded man near green thicket (Unsplash).jpg",
             "Spiral architecture and light (Unsplash).jpg",
             "Glass building wall in soho (Unsplash).jpg",
             "Faber-Hochhaus (Magdeburg-Altstadt).09.ajb.jpg",
