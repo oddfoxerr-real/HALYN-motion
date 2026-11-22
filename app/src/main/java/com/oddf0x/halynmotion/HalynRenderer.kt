@@ -13,7 +13,7 @@ import android.os.Build
  * All values are sanitized when read so old preferences cannot break the shader.
  */
 data class MotionState(
-    val preset: Int = FluidMotionRenderer.FIRST,
+    val preset: Int = PhotoWallpaperStore.SCENE_INDEX,
     val palette: Int = 0,
     val customColor: Int = Color.rgb(185, 174, 255),
     val fourColorsEnabled: Boolean = false,
@@ -108,12 +108,12 @@ class MotionPreferences(context: Context) {
             return if (result.isFinite()) result.coerceIn(min, max) else default
         }
         return MotionState(
-            preset = sanitizePreset(preferences.getInt("preset", FluidMotionRenderer.FIRST)),
-            fourColorsEnabled = enabledFor(sanitizePreset(preferences.getInt("preset", FluidMotionRenderer.FIRST))),
-            colorOne = colorFor(sanitizePreset(preferences.getInt("preset", FluidMotionRenderer.FIRST)), 0),
-            colorTwo = colorFor(sanitizePreset(preferences.getInt("preset", FluidMotionRenderer.FIRST)), 1),
-            colorThree = colorFor(sanitizePreset(preferences.getInt("preset", FluidMotionRenderer.FIRST)), 2),
-            colorFour = colorFor(sanitizePreset(preferences.getInt("preset", FluidMotionRenderer.FIRST)), 3),
+            preset = sanitizePreset(preferences.getInt("preset", PhotoWallpaperStore.SCENE_INDEX)),
+            fourColorsEnabled = enabledFor(sanitizePreset(preferences.getInt("preset", PhotoWallpaperStore.SCENE_INDEX))),
+            colorOne = colorFor(sanitizePreset(preferences.getInt("preset", PhotoWallpaperStore.SCENE_INDEX)), 0),
+            colorTwo = colorFor(sanitizePreset(preferences.getInt("preset", PhotoWallpaperStore.SCENE_INDEX)), 1),
+            colorThree = colorFor(sanitizePreset(preferences.getInt("preset", PhotoWallpaperStore.SCENE_INDEX)), 2),
+            colorFour = colorFor(sanitizePreset(preferences.getInt("preset", PhotoWallpaperStore.SCENE_INDEX)), 3),
             palette = preferences.getInt("palette", 0).coerceIn(0, 5),
             customColor = preferences.getInt("custom_color", Color.rgb(185, 174, 255)) or -0x1000000,
             intensity = float("intensity", 1f, .35f, 2.3f),
@@ -132,14 +132,14 @@ class MotionPreferences(context: Context) {
             touch = preferences.getBoolean("touch", true),
             starTapTravel = preferences.getBoolean("star_tap_travel", false),
             parallax = preferences.getBoolean("parallax", true),
-            gyroMode = preferences.getInt("gyro_mode", 1).coerceIn(0, 3),
+            gyroMode = preferences.getInt("gyro_mode", 0).coerceIn(0, 3),
             gyroStrength = float("gyro_strength", 1f, .5f, 1.8f),
             mountainDepth = float("mountain_depth", 1f, .5f, 1.6f),
-            clockStyle = preferences.getInt("clock_style", 0).coerceIn(0, 6),
+            clockStyle = preferences.getInt("clock_style", 6).coerceIn(0, 6),
             clockPosition = preferences.getInt("clock_position", 1).coerceIn(0, 2),
             clock24h = preferences.getBoolean("clock_24h", true),
             clockDate = preferences.getBoolean("clock_date", true),
-            clockSeconds = preferences.getBoolean("clock_seconds", true),
+            clockSeconds = preferences.getBoolean("clock_seconds", false),
             clockAccent = preferences.getBoolean("clock_accent", false),
             starSensitivity = float("star_sensitivity", .55f, .15f, 1.4f),
             starDensity = preferences.getInt("star_density", 1).coerceIn(0, 2),
@@ -161,15 +161,9 @@ class MotionPreferences(context: Context) {
         )
     }
 
-    // The focused gallery retains Fluid and Space, plus a real photographic depth studio.
-    // Preserve stored palettes for retired landscape, shader and photo IDs.
-    private fun sanitizePreset(value: Int): Int = when {
-        value == StarWindowRenderer.SCENE_INDEX -> value
-        value == PhotoWallpaperStore.SCENE_INDEX -> value
-        value == MinimalArchitectureRenderer.SCENE_INDEX -> value
-        FluidMotionRenderer.isFluid(value) -> value
-        else -> FluidMotionRenderer.FIRST
-    }
+    // All previously bundled presets are retired. Old saved scene values become
+    // photo mode without deleting the user's downloaded image or credits.
+    private fun sanitizePreset(value: Int): Int = PhotoWallpaperStore.SCENE_INDEX
 
     fun setPreset(value: Int) = preferences.edit().putInt("preset", sanitizePreset(value)).apply()
     fun photoImported() = preferences.edit()
