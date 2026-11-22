@@ -166,6 +166,7 @@ class MotionPreferences(context: Context) {
     private fun sanitizePreset(value: Int): Int = when {
         value == StarWindowRenderer.SCENE_INDEX -> value
         value == PhotoWallpaperStore.SCENE_INDEX -> value
+        value == MinimalArchitectureRenderer.SCENE_INDEX -> value
         FluidMotionRenderer.isFluid(value) -> value
         else -> FluidMotionRenderer.FIRST
     }
@@ -288,6 +289,7 @@ class HalynRenderer(private val context: Context) {
     private val mountainRenderer = MountainSceneRenderer()
     private val photoRenderer = PhotoWallpaperStore(context.applicationContext)
     private val depthLayerStore by lazy { DepthLayerStore(context.applicationContext) }
+    private val minimalArchitectureRenderer = MinimalArchitectureRenderer()
     private val smoothRenderer = SmoothWallpaperRenderer()
     private val materialXRenderer = MaterialXRenderer()
     private val calmSlateRenderer = CalmSlateRenderer()
@@ -429,6 +431,10 @@ class HalynRenderer(private val context: Context) {
         if (state.preset == PhotoWallpaperStore.SCENE_INDEX) {
             photoRenderer.draw(canvas, gyro)
             QuadColorSystem.drawOverlay(canvas, state, .20f)
+            return
+        }
+        if (state.preset == MinimalArchitectureRenderer.SCENE_INDEX) {
+            minimalArchitectureRenderer.draw(canvas, state, elapsedSeconds, gyro)
             return
         }
         if (FluidMotionRenderer.isFluid(state.preset)) {
@@ -579,7 +585,8 @@ class HalynRenderer(private val context: Context) {
             listOf(BubbleGardenRenderer.SCENE_NAME) +
             AuraCyberRenderer.SCENES.map { it.name } +
             CalmSlateRenderer.SCENES.map { it.name } +
-            FluidMotionRenderer.SCENES.map { it.name }
+            FluidMotionRenderer.SCENES.map { it.name } +
+            listOf(MinimalArchitectureRenderer.SCENE_NAME)
         val PALETTES = listOf(
             "Arctic", "Ultraviolet", "Ember", "Rose", "Verdant"
         )
