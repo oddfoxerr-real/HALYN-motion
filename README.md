@@ -1,5 +1,28 @@
 # HALYN Motion
 
+## v0.30.0 — Minimal Depth Studio (development preview)
+
+This version introduces three distinct directions in the currently focused HALYN gallery: existing Fluid Motion materials, the preserved interactive Space wallpaper, and new photographic Cinematic Depth plus a sculptural Minimal Architecture original.
+
+### Real subject-over-clock compositing
+- **Photo mode is selectable again.** v0.29's preset sanitizer unintentionally mapped the existing photo slot (ID 51) back to Fluid; HALYN now preserves it.
+- The **Minimal Depth** clock renders large four-digit condensed numerals and a locally formatted date in neutral monochrome. The real foreground layer renders **after** the clock, hiding only the portions overlapped by a subject.
+- Choose a photo from Android, or **browse 4K+ Wikimedia Commons** photography. Downloaded art retains its creator, source page, license and resolution in app preferences. The source and license are exposed from the editor, and remote content is fetched only on request.
+- Draw a continuous outline around a subject using **Trace subject outline**. The outline is mapped into original-image coordinates; HALYN creates an anti-aliased transparent PNG cutout offline on a worker thread. Alternatively, import a matching full-frame transparent PNG/WebP from another editor.
+- The foreground is stored offline and rendered with a small gyroscope parallax offset. Importing a new background invalidates an old cutout to prevent mismatched foregrounds. Enable/disable depth and adjust strength in the editor.
+- Automatic image segmentation is **not included**. Complex hair and translucent objects need a professionally prepared transparent overlay; a single finger outline is not equivalent to AI matting.
+
+### Original Minimal Architecture
+**Monolith Light** (scene 182) is an original dark graphite sculpture with slow viewpoint and gyro movement. The primary shader uses an analytic ray/box intersection with surface lighting and deterministic grain, avoiding an expensive ray-marching loop. It has a geometry-specific Canvas fallback; shader compilation and screenshot appearance still require Android hardware validation.
+
+The existing six Fluid materials and Star Window/Space are unchanged. No new permissions, continuous network activity, microphone access or camera capture is required.
+
+### Verification scope
+GitHub Actions should compile the APK and check the wiring of masking, clock layering, the new architecture scene and legacy presets. It **cannot** verify real subject edge quality, artwork taste, gyro feel, Samsung launcher cutout behavior, battery endurance or AGSL driver appearance. Test these on the Galaxy A56 before declaring visual quality complete.
+
+---
+
+
 ## v0.26.0 — Aura / Cyber rendering replacement (quality repair)
 
 The v0.25.0 Aura Battle / Cyber Systems collection used Android Canvas strokes, arcs and translucent flat gradients as its **primary** scene artwork. Although each preset had different motion curves, it did not provide the three-dimensional-feeling aura, filmic light or elegantly dense cyber surface the collection was supposed to deliver.

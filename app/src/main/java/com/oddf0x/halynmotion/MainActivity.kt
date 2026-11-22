@@ -120,6 +120,7 @@ class MainActivity : Activity() {
         buildHeader(column)
         buildPreview(column)
         buildScenes(column)
+        buildDepthStudio(column)
         buildFluidGestures(column)
         buildColours(column)
         buildClock(column)
@@ -157,11 +158,11 @@ class MainActivity : Activity() {
         })
         root.addView(top)
 
-        root.addView(text("Fluid. Made personal.", 32f, ink, Typeface.BOLD).apply {
+        root.addView(text("Motion. With depth.", 32f, ink, Typeface.BOLD).apply {
             setPadding(0, dp(20), 0, 0)
             letterSpacing = -.035f
         })
-        root.addView(text("Fluid wallpapers you can shape with your own gestures. Space stays.", 14f, secondary).apply {
+        root.addView(text("Cinematic subjects, fluid materials and the original Space.", 14f, secondary).apply {
             setPadding(0, dp(5), 0, dp(24))
         })
     }
@@ -291,6 +292,144 @@ class MainActivity : Activity() {
         root.addView(section("Space Exploration",
             "The original interactive Star Window remains unchanged."))
         buildOriginalRail(root, "Star Window", listOf(StarWindowRenderer.SCENE_INDEX))
+        root.addView(section("Minimal Architecture",
+            "One original sculptural scene, with restrained light and slow dimensional motion."))
+        buildOriginalRail(root, "Graphite & light", listOf(MinimalArchitectureRenderer.SCENE_INDEX))
+    }
+
+    private fun buildDepthStudio(root: LinearLayout) {
+        root.addView(section("Cinematic Depth",
+            "Your photography, licensed 4K artwork and a clock genuinely behind the subject."))
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = rounded(cardColor, 22, borderColor)
+            setPadding(dp(17), dp(16), dp(17), dp(16))
+        }
+        fun action(title: String, description: String, block: () -> Unit) {
+            val button = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                isClickable = true
+                isFocusable = true
+                background = rounded(Color.rgb(38, 39, 45), 13, borderColor)
+                contentDescription = title + ". " + description
+                setPadding(dp(14), dp(12), dp(14), dp(12))
+                setOnClickListener { block() }
+            }
+            button.addView(text(title, 14f, ink, Typeface.BOLD))
+            button.addView(text(description, 12f, secondary).apply {
+                setPadding(0, dp(3), 0, 0)
+            })
+            panel.addView(button, LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = dp(9)
+            })
+        }
+        action("Import photograph", "Use an image from your device as the background") {
+            chooseWallpaperPhoto()
+        }
+        action("Use saved photograph", "Switch from Fluid or Space to your photo composition") {
+            if (PhotoWallpaperStore(this).available()) {
+                prefs.setPreset(PhotoWallpaperStore.SCENE_INDEX)
+                refreshScene()
+                syncMotionTracking()
+                preview.invalidate()
+            } else {
+                Toast.makeText(this, "Import a photograph first", Toast.LENGTH_SHORT).show()
+            }
+        }
+        action("Trace subject outline", "Cut out any foreground object on your chosen photo") {
+            DepthMaskEditor(this) {
+                prefs.setPreset(PhotoWallpaperStore.SCENE_INDEX)
+                refreshScene()
+                preview.invalidate()
+            }.show()
+        }
+        action("Import transparent foreground", "Use a full-frame PNG or WebP with an alpha channel") {
+            chooseDepthForeground()
+        }
+        action("Use Minimal Depth clock", "Oversized charcoal-and-white typography behind the subject") {
+            prefs.setPreset(PhotoWallpaperStore.SCENE_INDEX)
+            prefs.setClockStyle(6)
+            prefs.setClockPosition(1)
+            prefs.setClockSeconds(false)
+            prefs.setClockDate(true)
+            prefs.setDepthEnabled(true)
+            refreshScene()
+            refreshClockStyles()
+            refreshClockPositions()
+            preview.invalidate()
+        }
+        addToggle(panel, "Subject in front of clock",
+            "Enable the real foreground cutout, if one has been created",
+            prefs.get().depthEnabled) {
+            prefs.setDepthEnabled(it)
+            preview.invalidate()
+        }
+        addSlider(panel, "Subject parallax strength", prefs.get().depthStrength, 0f, 2f) {
+            prefs.setDepthStrength(it)
+            preview.invalidate()
+        }
+        action("Remove subject cutout", "Keep the photograph and clock; delete only the foreground") {
+            DepthLayerStore(applicationContext).clear()
+            prefs.setDepthEnabled(false)
+            preview.invalidate()
+            Toast.makeText(this, "Foreground removed", Toast.LENGTH_SHORT).show()
+        }
+        onlineCredit = text("", 12f, secondary).apply {
+            setPadding(dp(5), dp(7), dp(5), dp(12))
+            isFocusable = true
+            isClickable = true
+            contentDescription = "Open original image source and license"
+            setOnClickListener {
+                val link = prefs.raw.getString("online_source", "").orEmpty()
+                if (link.startsWith("https://commons.wikimedia.org/")) {
+                    try {
+                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
+                    } catch (_: Exception) {
+                        Toast.makeText(this@MainActivity, "Cannot open source", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+        panel.addView(onlineCredit)
+        onlineGallery = CommonsGalleryView(this) { item ->
+            prefs.raw.edit()
+                .putString("online_title", item.name)
+                .putString("online_source", item.sourcePage)
+                .putString("online_artist", item.artist)
+                .putString("online_license", item.license)
+                .putString("online_license_url", item.licenseUrl)
+                .putString("online_resolution", item.dimensionLabel).apply()
+            prefs.photoImported()
+            refreshScene()
+            syncMotionTracking()
+            preview.invalidate()
+        }
+        onlineGallery.visibility = View.GONE
+        action("Browse licensed 4K photography", "Search Wikimedia Commons; creator, source and license are retained") {
+            if (onlineGallery.visibility == View.GONE) {
+                onlineGallery.visibility = View.VISIBLE
+                onlineGallery.loadInitial()
+            } else {
+                onlineGallery.visibility = View.GONE
+            }
+        }
+        panel.addView(onlineGallery)
+        root.addView(panel)
+    }
+
+    private fun chooseDepthForeground() {
+        if (!PhotoWallpaperStore(this).available()) {
+            Toast.makeText(this, "Choose a background photo first", Toast.LENGTH_LONG).show()
+            return
+        }
+        try {
+            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "image/*"
+            }, REQUEST_DEPTH_LAYER)
+        } catch (_: android.content.ActivityNotFoundException) {
+            Toast.makeText(this, "No image picker available", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun buildFluidGestures(root: LinearLayout) {
@@ -833,6 +972,25 @@ class MainActivity : Activity() {
             }.start()
             return
         }
+        if (requestCode == REQUEST_DEPTH_LAYER && resultCode == RESULT_OK && data?.data != null) {
+            val chosen = data.data!!
+            Thread {
+                val installed = DepthLayerStore(applicationContext).installTransparentLayer(chosen)
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    if (installed) {
+                        prefs.setDepthEnabled(true)
+                        prefs.setPreset(PhotoWallpaperStore.SCENE_INDEX)
+                        refreshScene()
+                        preview.invalidate()
+                        Toast.makeText(this, "Transparent subject installed", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this, "Use a transparent PNG or WebP matching the photo aspect ratio", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }.start()
+            return
+        }
         if (requestCode == REQUEST_CLOCK_FONT && resultCode == RESULT_OK && data != null) {
             val uris = linkedSetOf<Uri>()
             data.data?.let { uris.add(it) }
@@ -872,7 +1030,7 @@ class MainActivity : Activity() {
 
     private fun refreshClockStyles() {
         clockStyles.removeAllViews()
-        val names = listOf("Off", "Digital", "Stacked", "Mono", "Analogue", "Orbit")
+        val names = listOf("Off", "Digital", "Stacked", "Mono", "Analogue", "Orbit", "Minimal Depth")
         val selected = prefs.get().clockStyle
         names.forEachIndexed { index, name ->
             val active = index == selected
@@ -1406,9 +1564,13 @@ class MainActivity : Activity() {
                     ?: MaterialXRenderer.description(selected)
                     ?: GlassOrbitCollectionRenderer.description(selected)
                     ?: AuraCyberRenderer.description(selected)
+                    ?: (if (selected == MinimalArchitectureRenderer.SCENE_INDEX)
+                        MinimalArchitectureRenderer.DESCRIPTION else null)
                     ?: (if (selected == BubbleGardenRenderer.SCENE_INDEX)
                         BubbleGardenRenderer.DESCRIPTION else null)
-                    ?: "Live originals · 4K photography · Clock & motion"
+                    ?: if (selected == PhotoWallpaperStore.SCENE_INDEX)
+                        "Licensed or imported photography · real subject depth · custom clock"
+                    else "Live originals · 4K photography · Clock & motion"
         }
         if (::onlineCredit.isInitialized) {
             onlineCredit.visibility =
@@ -1678,6 +1840,7 @@ class MainActivity : Activity() {
     companion object {
         private const val REQUEST_CLOCK_FONT = 6208
         private const val REQUEST_WALLPAPER_IMAGE = 6209
+        private const val REQUEST_DEPTH_LAYER = 6210
     }
 
     override fun onDestroy() {
@@ -1709,6 +1872,7 @@ class MainActivity : Activity() {
         private val renderer get() = originalTileRenderer
         private val animationStart = SystemClock.uptimeMillis()
         private val animated = FluidMotionRenderer.isFluid(sceneIndex) ||
+            sceneIndex == MinimalArchitectureRenderer.SCENE_INDEX ||
             MaterialXRenderer.isMaterial(sceneIndex) ||
             GlassOrbitCollectionRenderer.isGlassOrbit(sceneIndex) ||
             AuraCyberRenderer.isAuraCyber(sceneIndex) ||

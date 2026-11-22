@@ -91,6 +91,9 @@ class PhotoWallpaperStore(private val context: Context) {
                 next.copyTo(target, overwrite = true)
                 next.delete()
             }
+            // An old cutout must never be applied to a newly selected photo.
+            // The original image and foreground are an inseparable pair.
+            File(context.filesDir, "halyn_subject_layer.png").delete()
             cached?.recycle()
             cached = null
             cachedModified = -1L
@@ -145,6 +148,40 @@ class PhotoWallpaperStore(private val context: Context) {
             (top + srcH).roundToInt().coerceAtMost(photo.height)
         )
         canvas.drawBitmap(photo, crop, RectF(0f, 0f, w, h), paint)
+    }
+
+    /**
+     * Draw the transparent cutout in precisely the same image-space crop as
+     * the backdrop, then move only the subject a few pixels with the gyro.
+     * This is rendered AFTER the clock to create real optical occlusion.
+     */
+    fun drawSubjectLayer(
+        canvas: Canvas, subject: Bitmap, gyro: ParallaxPose, strength: Float
+    ) {
+        if (subject.isRecycled) return
+        val w = canvas.width.toFloat().coerceAtLeast(1f)
+        val h = canvas.height.toFloat().coerceAtLeast(1f)
+        val bw = subject.width.toFloat()
+        val bh = subject.height.toFloat()
+        val scale = max(w / bw, h / bh) * 1.08f
+        val srcW = min(bw, w / scale)
+        val srcH = min(bh, h / scale)
+        val slackX = (bw - srcW) * .5f
+        val slackY = (bh - srcH) * .5f
+        val left = ((bw - srcW) * .5f + gyro.x * slackX * .9f)
+            .coerceIn(0f, (bw - srcW).coerceAtLeast(0f))
+        val top = ((bh - srcH) * .5f + gyro.y * slackY * .9f)
+            .coerceIn(0f, (bh - srcH).coerceAtLeast(0f))
+        val crop = Rect(
+            left.roundToInt(), top.roundToInt(),
+            (left + srcW).roundToInt().coerceAtMost(subject.width),
+            (top + srcH).roundToInt().coerceAtMost(subject.height)
+        )
+        canvas.save()
+        val motion = strength.coerceIn(0f, 2f)
+        canvas.translate(gyro.x * w * .018f * motion, gyro.y * h * .012f * motion)
+        canvas.drawBitmap(subject, crop, RectF(0f, 0f, w, h), paint)
+        canvas.restore()
     }
 
     companion object {
