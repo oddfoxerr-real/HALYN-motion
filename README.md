@@ -9,7 +9,7 @@ and Monolith. Legacy shader sources remain in the codebase temporarily for
 compatibility but can no longer be selected through app preferences or the UI.
 Existing personally imported/downloaded wallpaper files are **not deleted**.
 
-HALYN now opens on six researched 4K–6K photographs hosted by Wikimedia Commons.
+HALYN now opens on nine researched 4K–6K photographs hosted by Wikimedia Commons.
 Each item is resolved live from the official imageinfo API, so the creator,
 license and original download URL cannot be invented. The image pages were
 checked individually; see [ARTWORK_SOURCES.md](ARTWORK_SOURCES.md).
