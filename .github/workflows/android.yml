@@ -52,11 +52,11 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='40'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='41'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.34.0-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.34.0-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.35.0-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.35.0-preview.apk > SHA256SUMS.txt)
 
       - name: Verify sourced-only gallery, licensing and photo compositor
         shell: bash
@@ -93,7 +93,7 @@ jobs:
           assert "createCutout(points:" in depth
           assert "drawSubjectLayer" in photo
           assert "6 -> monumental(" in clock
-          assert 'versionCode = 40' in Path("app/build.gradle.kts").read_text()
+          assert 'versionCode = 41' in Path("app/build.gradle.kts").read_text()
           print("HALYN 0.33: stable imported-photo framing, sourced gallery and auto masking")
           PY
 
@@ -202,8 +202,51 @@ jobs:
           assert "SoftEdgeBitmap.create(photo)" in photo
           assert "PhotoFraming.FILL" in photo
           assert "repeat(3)" in blur
-          assert 'versionCode = 40' in Path("app/build.gradle.kts").read_text()
+          assert 'versionCode = 41' in Path("app/build.gradle.kts").read_text()
           print("Widget studio, live renderer, source-depth order and cached blurred margins verified")
+          PY
+
+      - name: Verify real Home-screen widget overlay and safety controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path("app/src/main/java/com/oddf0x/halynmotion")
+          service=(root/"HomeWidgetEditorService.kt").read_text()
+          main=(root/"MainActivity.kt").read_text()
+          grid=(root/"WidgetGridEditor.kt").read_text()
+          store=(root/"WallpaperWidgetStore.kt").read_text()
+          wallpaper=(root/"HalynWallpaperService.kt").read_text()
+          manifest=Path("app/src/main/AndroidManifest.xml").read_text()
+          assert 'requestHomeWidgetEditor()' in main
+          assert 'launchHomeWidgetEditor()' in main
+          assert 'Intent(this, HomeWidgetEditorService::class.java)' in main
+          assert 'CATEGORY_HOME' in main
+          assert 'ACTION_MANAGE_OVERLAY_PERMISSION' in main
+          assert 'android:name=".HomeWidgetEditorService"' in manifest
+          assert 'android:exported="false"' in manifest
+          assert 'android.permission.SYSTEM_ALERT_WINDOW' in manifest
+          assert 'TYPE_APPLICATION_OVERLAY' in service
+          assert 'FOREGROUND_SERVICE_TYPE_SPECIAL_USE' in service
+          assert 'ACTION_EXIT' in service
+          assert 'PendingIntent.getService' in service
+          assert 'Settings.canDrawOverlays' in service
+          assert 'WidgetGridEditor(' in service
+          assert 'widgets.activate(preferences.get())' in service
+          assert 'widgets.add(kind)' in service
+          assert 'widgets.delete(current.id)' in service
+          assert 'widget.copy(scale = value)' in service
+          assert 'widget.copy(rotation = value)' in service
+          assert 'widget.copy(color = shade)' not in service or 'color = shade' in service
+          assert 'inputDialog?.dismiss()' in service
+          assert 'dialog.window?.setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)' in service
+          assert 'handler.postDelayed(flushPending, 95L)' in service
+          assert 'onPreview' in grid and 'ACTION_POINTER_DOWN' in grid
+          assert 'widget_composer_enabled' in store
+          assert 'widgetRenderer.draw(canvas, settings, photoViewport)' in wallpaper
+          assert 'versionCode = 41' in Path("app/build.gradle.kts").read_text()
+          print("On-Home-screen editor: permission, service lifecycle, 6 widgets, live edits and Exit checks verified")
           PY
 
       - name: Compile isolated HALYN Repair Test APK
@@ -217,8 +260,8 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion.repairpreview'"
-          cp "$apk" dist/HALYN-v0.34-widget-test.apk
-          (cd dist && sha256sum HALYN-v0.34-widget-test.apk >> SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-v0.35-home-widget-test.apk
+          (cd dist && sha256sum HALYN-v0.35-home-widget-test.apk >> SHA256SUMS.txt)
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -237,46 +280,49 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.34.0 Widget Studio
+      - name: Publish HALYN v0.35.0 Home Widget Editor
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.34.0-preview.1
+          TAG: v0.35.0-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.34.0-preview.apk
-          test -s dist/HALYN-v0.34-widget-test.apk
-          unzip -t dist/HALYN-v0.34-widget-test.apk >/dev/null
-          unzip -t dist/HALYN-Motion-v0.34.0-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.35.0-preview.apk
+          test -s dist/HALYN-v0.35-home-widget-test.apk
+          unzip -t dist/HALYN-v0.35-home-widget-test.apk >/dev/null
+          unzip -t dist/HALYN-Motion-v0.35.0-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN v0.34 — Widget Composer + Soft Photo Edges
+          # HALYN v0.35 — Edit Widgets on Your Actual Home Screen
 
-          The wallpaper editor now has a live grid-based widget composer.
-          Add individually configurable clock, date, weekday, battery, text,
-          and divider elements. Drag to place, pinch or use handles to resize
-          and rotate, snap positions to a 5% grid, and pick individual colours
-          using presets or HALYN's HSV/HEX colour picker.
+          HALYN now opens a temporary transparent home-screen editor on top of
+          the live Samsung launcher, using the same optional Draw over apps
+          permission and foreground notification escape hatch as the existing
+          clock-placement overlay. The old clock-placement feature is preserved.
 
-          Clock widgets reuse the existing clock styles and custom font
-          library; migrating the existing clock into the widget studio does
-          not delete the user's imported photographs.
+          Launch from Widget Studio > Edit widgets on Home screen. HALYN returns
+          to the launcher and places a grid with resize and rotation handles
+          over its actual wallpaper-drawn elements. Add clocks, dates, weekdays,
+          battery indicators, custom text and dividers from the bottom tray.
+          Select, drag, pinch/rotate, adjust exact size and rotation, set colour
+          presets or enter a custom hex shade. Text has a direct editor too.
+          The background wallpaper redraws during drags via batched preference
+          commits; Done or the notification Exit removes the overlay entirely.
 
-          When an image's aspect ratio leaves blank margins, HALYN extends
-          the photo with a small, softly blurred and subdued copy instead of
-          abrupt black bars. Blur is calculated once per selected photo on
-          a tiny cache, not on every wallpaper render frame.
+          Samsung's own system launcher widgets, Spotify and other Android
+          AppWidgets are outside HALYN's wallpaper compositor and cannot be
+          moved by this tool. This overlays edits for HALYN-rendered widgets,
+          keeping existing imported artwork, clock fonts and depth masks.
 
-          A side-by-side Widget Test APK is also available to avoid damaging
-          existing app data if signing keys differ. Builds and structural
-          checks pass through GitHub Actions; physical Galaxy A56 and One UI
-          interaction testing remains required.
+          The v0.35 Home Widget Test APK can be installed alongside previous
+          HALYN versions. GitHub verifies compilation, package integrity and
+          overlay wiring; actual One UI gestures and IME need A56 device QA.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.34.0-preview.apk \
-            dist/HALYN-v0.34-widget-test.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.35.0-preview.apk \
+            dist/HALYN-v0.35-home-widget-test.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.34.0 — Widget Studio" \
+            --title "HALYN Motion v0.35.0 — Home Widget Editor" \
             --notes-file notes.md --prerelease
