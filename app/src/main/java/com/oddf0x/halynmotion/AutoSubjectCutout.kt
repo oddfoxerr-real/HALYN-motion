@@ -29,22 +29,30 @@ class AutoSubjectCutout(private val context: Context) {
     private val app = context.applicationContext
     private val main = Handler(Looper.getMainLooper())
     @Volatile private var busy = false
+    private var activeGeneration = Long.MIN_VALUE
+    private var queued: Pair<(String) -> Unit, (Boolean, String) -> Unit>? = null
 
     fun start(
         onProgress: (String) -> Unit,
         onComplete: (Boolean, String) -> Unit
     ) {
+        val store = PhotoWallpaperStore(app)
         if (busy) {
-            onComplete(false, "A subject cutout is already being processed.")
+            if (store.generation() != activeGeneration) {
+                queued = onProgress to onComplete
+                onProgress("New photo queued. Finishing the previous mask safely…")
+            } else {
+                onProgress("Already detecting the subject in this photo…")
+            }
             return
         }
-        val store = PhotoWallpaperStore(app)
         if (!store.available()) {
             onComplete(false, "Select a photo before using automatic cutout.")
             return
         }
         busy = true
         val expectedGeneration = store.generation()
+        activeGeneration = expectedGeneration
         val options = SubjectSegmenterOptions.Builder()
             .enableForegroundBitmap()
             .build()
@@ -59,8 +67,17 @@ class AutoSubjectCutout(private val context: Context) {
         fun finish(ok: Boolean, message: String) {
             main.post {
                 busy = false
+                activeGeneration = Long.MIN_VALUE
                 try { segmenter.close() } catch (_: Exception) { }
-                onComplete(ok, message)
+                val next = queued
+                queued = null
+                if (next != null) {
+                    // Suppress stale photo success/failure UI; continue using the
+                    // most recently selected image instead.
+                    start(next.first, next.second)
+                } else {
+                    onComplete(ok, message)
+                }
             }
         }
 
