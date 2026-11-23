@@ -150,7 +150,7 @@ jobs:
           assert "photoFitMode = preferences.getInt" in settings
           assert "setPhotoFitMode(value: Int)" in settings
           assert "PhotoFraming.viewport(" in service
-          assert "manager.defaultDisplay.getRealSize(point)" in service
+          assert "display.getRealSize(point)" in service
           assert "photoViewport = photoViewport" in service
           assert "photoViewport: RectF?" in clock
           assert "activeViewportWidth" in clock
