@@ -133,8 +133,16 @@ class PhotoWallpaperStore(private val context: Context) {
         val file = imageFile
         if (!file.isFile || file.length() < 1024L) return cached
         val newBitmap = try {
-            ImageDecoder.decodeBitmap(ImageDecoder.createSource(file)) { decoder, _, _ ->
+            ImageDecoder.decodeBitmap(ImageDecoder.createSource(file)) { decoder, info, _ ->
                 decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                // Keep the downloaded 4K file, but render near device resolution
+                // to reduce the live wallpaper's GPU/heap pressure.
+                val longest = max(info.size.width, info.size.height)
+                val factor = min(1f, 2560f / longest.coerceAtLeast(1))
+                decoder.setTargetSize(
+                    (info.size.width * factor).roundToInt().coerceAtLeast(1),
+                    (info.size.height * factor).roundToInt().coerceAtLeast(1)
+                )
             }
         } catch (_: Exception) { null }
         if (newBitmap != null) {
