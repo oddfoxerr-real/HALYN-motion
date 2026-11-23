@@ -128,6 +128,20 @@ jobs:
           print("HALYN 0.32: atomic photo replacement, stale mask isolation, and ML model wiring verified")
           PY
 
+      - name: Compile isolated HALYN Repair Test APK
+        run: gradle --no-daemon --stacktrace :app:assembleDebug -PrepairPreview=true
+
+      - name: Verify and collect side-by-side repair preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$apk"
+          unzip -t "$apk" >/dev/null
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion.repairpreview'"
+          cp "$apk" dist/HALYN-v0.32-repair-test.apk
+          (cd dist && sha256sum HALYN-v0.32-repair-test.apk >> SHA256SUMS.txt)
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -153,6 +167,8 @@ jobs:
         run: |
           set -euo pipefail
           test -s dist/HALYN-Motion-v0.32.0-preview.apk
+          test -s dist/HALYN-v0.32-repair-test.apk
+          unzip -t dist/HALYN-v0.32-repair-test.apk >/dev/null
           unzip -t dist/HALYN-Motion-v0.32.0-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
@@ -178,8 +194,14 @@ jobs:
           image in local storage. The licensed Wikimedia gallery and source
           credits remain. On-device A56 visual/interaction verification remains
           necessary: GitHub compilation cannot prove segmentation quality.
+
+          Two APKs are provided. The Repair Test package has a separate app ID
+          and can be installed next to the existing HALYN without wiping data.
+          The regular APK uses the original app ID; installation over old debug
+          builds can fail if their ephemeral signing keys differ.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.32.0-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.32.0-preview.apk \
+            dist/HALYN-v0.32-repair-test.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "HALYN Motion v0.32.0 — Photo Stability" \
             --notes-file notes.md --prerelease
