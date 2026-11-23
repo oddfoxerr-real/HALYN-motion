@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-    <!-- Optional and requested only when entering home-screen clock edit mode. -->
+    <!-- Optional and requested only for the clock or widget home-screen edit overlay. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
@@ -38,6 +38,15 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="User-requested short-lived draggable clock placement grid on the launcher; stops on X or notification Exit."/>
+        </service>
+        <service
+            android:name=".HomeWidgetEditorService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-initiated temporary home-screen overlay to add, reposition, resize, rotate and recolour HALYN wallpaper elements; ends on Done or notification Exit."/>
         </service>
         <service
             android:name=".HalynNotificationListener"
