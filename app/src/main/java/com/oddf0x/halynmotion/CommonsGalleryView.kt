@@ -42,6 +42,7 @@ class CommonsGalleryView(
     private var displayed = 0
     private var activeQuery = ""
     private var pending = false
+    private var downloading = false
     private var destroyed = false
 
     private val ink = Color.rgb(249, 249, 251)
@@ -76,6 +77,17 @@ class CommonsGalleryView(
                 "Nothing AI-generated or bundled. Credits stay with each image.",
             12f, muted
         ).apply { setPadding(0, 0, 0, dp(15)) })
+
+        addView(label("Reload selected artwork  ↻", 12f, blue, true).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            minHeight = dp(46)
+            setPadding(dp(12), 0, dp(12), 0)
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Reload curated Wikimedia Commons artwork"
+            background = bg(surface, 12, outline)
+            setOnClickListener { loadFeatured() }
+        }, LayoutParams(-1, dp(46)).apply { bottomMargin = dp(11) })
 
         val categories = listOf(
             "Portrait" to "black and white portrait",
@@ -178,7 +190,10 @@ class CommonsGalleryView(
     fun loadInitial() = loadFeatured()
 
     fun loadFeatured() {
-        if (destroyed || pending) return
+        if (destroyed) return
+        // Reloading supersedes any older gallery request; a stale callback may
+        // never overwrite the latest cards. Downloads are a separate operation.
+        if (downloading) return
         requestId++
         val token = requestId
         displayed = 0
@@ -213,7 +228,9 @@ class CommonsGalleryView(
     }
 
     private fun search(reset: Boolean) {
-        if (destroyed || pending) return
+        if (destroyed || downloading || (pending && !reset)) return
+        // A new search overrides in-flight featured/search work. The older
+        // operation finishes on its background thread but cannot touch UI.
         val term = query.text.toString().trim().ifBlank { "black and white photography" }
         if (reset) {
             requestId++
@@ -333,7 +350,8 @@ class CommonsGalleryView(
     }
 
     private fun download(item: Commons4kCatalog.Image) {
-        if (destroyed || pending) return
+        if (destroyed || downloading) return
+        downloading = true
         pending = true
         status.text = "Downloading real 4K original…"
         more.visibility = View.GONE
@@ -343,6 +361,7 @@ class CommonsGalleryView(
             } catch (_: Exception) { false }
             onUi {
                 pending = false
+                downloading = false
                 if (success) {
                     status.text = "Saved 4K wallpaper · " + item.name
                     onInstalled(item)

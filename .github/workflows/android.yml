@@ -52,11 +52,11 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='37'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='38'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.31.0-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.31.0-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.32.0-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.32.0-preview.apk > SHA256SUMS.txt)
 
       - name: Verify sourced-only gallery, licensing and photo compositor
         shell: bash
@@ -93,9 +93,54 @@ jobs:
           assert "createCutout(points:" in depth
           assert "drawSubjectLayer" in photo
           assert "6 -> monumental(" in clock
-          assert 'versionCode = 37' in Path("app/build.gradle.kts").read_text()
-          print("HALYN 0.31: no built-in presets selectable; Commons sources with attribution and depth clock")
+          assert 'versionCode = 38' in Path("app/build.gradle.kts").read_text()
+          print("HALYN 0.32: sourced gallery, atomic photo swaps and on-device auto mask")
           PY
+
+      - name: Verify photo swap generation safety and automatic subject masking
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          base = Path("app/src/main/java/com/oddf0x/halynmotion")
+          photo = (base / "PhotoWallpaperStore.kt").read_text()
+          depth = (base / "DepthLayerStore.kt").read_text()
+          auto = (base / "AutoSubjectCutout.kt").read_text()
+          ui = (base / "MainActivity.kt").read_text()
+          manifest = Path("app/src/main/AndroidManifest.xml").read_text()
+          gradle = Path("app/build.gradle.kts").read_text()
+          assert "File.createTempFile" in photo
+          assert "StandardCopyOption.ATOMIC_MOVE" in photo
+          assert "photo_generation" in photo
+          assert "cachedGeneration == generation" in photo
+          assert "depth_source_generation" in depth
+          assert "currentPhotoGeneration() != expectedGeneration" in depth
+          assert "installSegmentedForeground(" in depth
+          assert "SubjectSegmentation.getClient" in auto
+          assert "ModuleInstall.getClient" in auto
+          assert "enableForegroundBitmap()" in auto
+          assert "Auto detect subject" in ui
+          assert "auto_mask_on_import" in ui
+          assert "maybeAutoMaskAfterImport()" in ui
+          assert "subject_segment" in manifest
+          assert "play-services-mlkit-subject-segmentation:16.0.0-beta1" in gradle
+          print("HALYN 0.32: atomic photo replacement, stale mask isolation, and ML model wiring verified")
+          PY
+
+      - name: Compile isolated HALYN Repair Test APK
+        run: gradle --no-daemon --stacktrace :app:assembleDebug -PrepairPreview=true
+
+      - name: Verify and collect side-by-side repair preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$apk"
+          unzip -t "$apk" >/dev/null
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion.repairpreview'"
+          cp "$apk" dist/HALYN-v0.32-repair-test.apk
+          (cd dist && sha256sum HALYN-v0.32-repair-test.apk >> SHA256SUMS.txt)
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -114,40 +159,49 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.31.0 Sourced Artwork
+      - name: Publish HALYN v0.32.0 Photo Stability
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.31.0-preview.1
+          TAG: v0.32.0-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.31.0-preview.apk
-          unzip -t dist/HALYN-Motion-v0.31.0-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.32.0-preview.apk
+          test -s dist/HALYN-v0.32-repair-test.apk
+          unzip -t dist/HALYN-v0.32-repair-test.apk >/dev/null
+          unzip -t dist/HALYN-Motion-v0.32.0-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN v0.31.0 — Real Photography Collection
+          # HALYN v0.32.0 — Photo Stability + Auto Cutout
 
-          The generated and procedural wallpaper presets are retired from
-          active selection, including Space and Fluid. Existing downloaded
-          or personally imported artwork remains in device storage.
+          Fixes the 0.31 image-change instability by using unique temporary
+          files for each import and atomic replacement of the selected photo.
+          Photo caches use generations rather than filesystem timestamps, and
+          each foreground mask is bound to its source image revision. Stale
+          segmentation results cannot overwrite another selected photo.
 
-          Only sourced 4K–6K photography is offered. A six-photo editorial
-          selection uses exact Wikimedia Commons file titles, resolves each
-          artist, original media URL, dimensions and license live, and provides
-          source/license links. Additional Commons search is optional.
+          Adds automatic subject extraction using the on-device Google ML Kit
+          Subject Segmentation model. Users can run Auto detect subject or opt
+          into auto cutout after future image selections; manual tracing and
+          transparent PNG imports remain. The model is provided through Google
+          Play services and may require first-use download. Images are not
+          uploaded to HALYN or external masking services.
 
-          A reduced studio presents image preview, source gallery, optional
-          clock behind subject, manual foreground masking and gentle parallax.
-          No images are falsely labelled animated. Photographs are static;
-          only the optional clock and parallax have movement.
+          Reduces live bitmap memory use while preserving the original downloaded
+          image in local storage. The licensed Wikimedia gallery and source
+          credits remain. On-device A56 visual/interaction verification remains
+          necessary: GitHub compilation cannot prove segmentation quality.
 
-          Requires network access to browse; downloaded artwork works offline.
-          On-device Samsung A56 visual and battery testing is still required.
+          Two APKs are provided. The Repair Test package has a separate app ID
+          and can be installed next to the existing HALYN without wiping data.
+          The regular APK uses the original app ID; installation over old debug
+          builds can fail if their ephemeral signing keys differ.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.31.0-preview.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.32.0-preview.apk \
+            dist/HALYN-v0.32-repair-test.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.31.0 — Sourced Artwork" \
+            --title "HALYN Motion v0.32.0 — Photo Stability" \
             --notes-file notes.md --prerelease

@@ -18,6 +18,9 @@
         android:theme="@style/Theme.HalynMotion"
         android:usesCleartextTraffic="false"
         android:supportsRtl="true">
+        <!-- ML Kit's optional on-device subject model; prefetch when supported. -->
+        <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="subject_segment"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"

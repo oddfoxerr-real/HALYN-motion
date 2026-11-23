@@ -61,6 +61,9 @@ class MainActivity : Activity() {
     private lateinit var preview: LivePreview
     private lateinit var onlineGallery: CommonsGalleryView
     private lateinit var onlineCredit: TextView
+    private lateinit var maskStatus: TextView
+    private lateinit var depthToggle: Switch
+    private val autoSubject by lazy { AutoSubjectCutout(applicationContext) }
     private lateinit var clockStyles: LinearLayout
     private lateinit var clockPositions: LinearLayout
     private lateinit var clockFonts: LinearLayout
@@ -284,8 +287,8 @@ class MainActivity : Activity() {
     }
 
     private fun buildDepthStudio(root: LinearLayout) {
-        root.addView(section("Selected photography",
-            "Original high-resolution photographs. Every image has a real creator, source and reuse license."))
+        root.addView(section("Wallpaper editor",
+            "Choose your image, apply automatic depth, and control the clock."))
         val import = text("Import photograph from device  ›", 14f, ink, Typeface.BOLD).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(17), dp(10), dp(17), dp(10))
@@ -313,12 +316,8 @@ class MainActivity : Activity() {
             prefs.photoImported()
             refreshScene()
             preview.invalidate()
+            maybeAutoMaskAfterImport()
         }
-        root.addView(onlineGallery, LinearLayout.LayoutParams(-1, -2).apply {
-            topMargin = dp(13)
-        })
-        onlineGallery.loadInitial()
-
         root.addView(section("Depth and clock",
             "Optional subject layering. The clock is truly rendered between the photograph and cutout."))
         val panel = LinearLayout(this).apply {
@@ -357,6 +356,23 @@ class MainActivity : Activity() {
                 bottomMargin = dp(8)
             })
         }
+        action("Auto detect subject", "Separate the main person or object on-device with ML Kit") {
+            startAutomaticMask()
+        }
+        maskStatus = text(
+            "Auto detection runs locally. The model may download from Google Play services the first time.",
+            12f, secondary
+        ).apply {
+            setPadding(dp(4), dp(6), dp(4), dp(12))
+            isFocusable = true
+            contentDescription = "Automatic subject masking status"
+        }
+        panel.addView(maskStatus)
+        addToggle(panel, "Auto cutout after selecting an image",
+            "Try subject detection when you change photos; manual masking stays available",
+            prefs.raw.getBoolean("auto_mask_on_import", false)) {
+            prefs.raw.edit().putBoolean("auto_mask_on_import", it).apply()
+        }
         action("Trace subject", "Create a foreground mask by tracing around a subject") {
             DepthMaskEditor(this) {
                 prefs.setDepthEnabled(true)
@@ -370,15 +386,35 @@ class MainActivity : Activity() {
         action("Remove subject layer", "Remove the foreground without deleting the photo") {
             DepthLayerStore(applicationContext).clear()
             prefs.setDepthEnabled(false)
+            if (::depthToggle.isInitialized) depthToggle.isChecked = false
             preview.invalidate()
             Toast.makeText(this, "Subject removed", Toast.LENGTH_SHORT).show()
         }
-        addToggle(panel, "Subject in front of clock",
-            "Enable the cutout when one has been created",
-            prefs.get().depthEnabled) {
-            prefs.setDepthEnabled(it)
-            preview.invalidate()
+        val layerSwitchRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = dp(71)
         }
+        layerSwitchRow.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(text("Subject in front of clock", 14f, ink, Typeface.BOLD))
+            addView(text("Enable after an automatic or manual cutout", 12f, secondary))
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        depthToggle = Switch(this).apply {
+            isChecked = prefs.get().depthEnabled && DepthLayerStore(applicationContext).available()
+            contentDescription = "Subject foreground layer enabled"
+            setOnCheckedChangeListener { _, checked ->
+                if (checked && !DepthLayerStore(applicationContext).available()) {
+                    isChecked = false
+                    Toast.makeText(this@MainActivity, "Create a subject cutout first", Toast.LENGTH_SHORT).show()
+                } else {
+                    prefs.setDepthEnabled(checked)
+                    preview.invalidate()
+                }
+            }
+        }
+        layerSwitchRow.addView(depthToggle)
+        panel.addView(layerSwitchRow)
         addToggle(panel, "Gentle parallax",
             "Optional movement from the phone sensors",
             prefs.get().gyroMode != 0) {
@@ -390,6 +426,47 @@ class MainActivity : Activity() {
             prefs.setDepthStrength(it)
         }
         root.addView(panel)
+        root.addView(section("Explore photography",
+            "Curated, properly attributed artwork. Tap an image to preview its details and download."))
+        root.addView(onlineGallery, LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = dp(4)
+        })
+        onlineGallery.loadInitial()
+    }
+
+    private fun maybeAutoMaskAfterImport() {
+        // Auto detection is opt-in. Photo replacement itself never depends on ML.
+        if (prefs.raw.getBoolean("auto_mask_on_import", false)) startAutomaticMask()
+    }
+
+    private fun startAutomaticMask() {
+        if (!PhotoWallpaperStore(applicationContext).available()) {
+            Toast.makeText(this, "Select an image first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        autoSubject.start(
+            onProgress = { status ->
+                if (::maskStatus.isInitialized && !isFinishing && !isDestroyed) {
+                    maskStatus.text = status
+                }
+            },
+            onComplete = { success, status ->
+                if (isFinishing || isDestroyed) return@start
+                if (::maskStatus.isInitialized) maskStatus.text = status
+                if (success) {
+                    // The selected photo is still the same source generation.
+                    prefs.setClockStyle(6)
+                    prefs.setClockSeconds(false)
+                    prefs.setClockDate(true)
+                    if (::depthToggle.isInitialized) depthToggle.isChecked = true
+                    refreshClockStyles()
+                    refreshScene()
+                    preview.invalidate()
+                } else if (!status.contains("already being processed")) {
+                    Toast.makeText(this, status, Toast.LENGTH_LONG).show()
+                }
+            }
+        )
     }
 
     private fun chooseDepthForeground() {
@@ -939,6 +1016,7 @@ class MainActivity : Activity() {
                         syncStarTracking()
                         syncMotionTracking()
                         preview.invalidate()
+                        maybeAutoMaskAfterImport()
                         Toast.makeText(this, "Image saved offline at full quality", Toast.LENGTH_SHORT).show()
                     } else {
                         Toast.makeText(this, "Image import failed (48 MB limit)", Toast.LENGTH_LONG).show()
@@ -955,6 +1033,7 @@ class MainActivity : Activity() {
                     if (isFinishing || isDestroyed) return@runOnUiThread
                     if (installed) {
                         prefs.setDepthEnabled(true)
+                        if (::depthToggle.isInitialized) depthToggle.isChecked = true
                         prefs.setPreset(PhotoWallpaperStore.SCENE_INDEX)
                         refreshScene()
                         preview.invalidate()
@@ -1522,6 +1601,11 @@ class MainActivity : Activity() {
 
     private fun refreshScene() {
         val selected = prefs.get().preset
+        if (::depthToggle.isInitialized) {
+            val available = DepthLayerStore(applicationContext).available()
+            val active = prefs.get().depthEnabled && available
+            if (depthToggle.isChecked != active) depthToggle.isChecked = active
+        }
         if (::fourColorSwatches.isInitialized) refreshFourColors()
         val source = prefs.raw.getString("online_source", null)
         val ownPhoto = PhotoWallpaperStore(this).available()
