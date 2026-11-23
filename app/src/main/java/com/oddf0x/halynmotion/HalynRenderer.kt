@@ -64,6 +64,7 @@ data class MotionState(
 )
 
 class MotionPreferences(context: Context) {
+    private val widgetStore by lazy { WallpaperWidgetStore(context.applicationContext) }
     private val preferences = context.applicationContext
         .getSharedPreferences("halyn_motion_settings", Context.MODE_PRIVATE)
 
@@ -223,10 +224,23 @@ class MotionPreferences(context: Context) {
                 .apply()
         }
     }
-    fun setClockPlacement(x: Float, y: Float) = preferences.edit()
-        .putFloat("clock_x", x.coerceIn(.08f, .92f))
-        .putFloat("clock_y", y.coerceIn(.14f, .88f))
-        .putBoolean("clock_custom_placement", true).apply()
+    fun setClockPlacement(x: Float, y: Float) {
+        val safeX = x.coerceIn(.08f, .92f)
+        val safeY = y.coerceIn(.14f, .88f)
+        preferences.edit()
+            .putFloat("clock_x", safeX)
+            .putFloat("clock_y", safeY)
+            .putBoolean("clock_custom_placement", true)
+            .apply()
+        // Keep the existing home-screen clock placement overlay functional even
+        // after the new multi-widget composer was enabled.
+        if (widgetStore.active()) {
+            val clock = widgetStore.load().firstOrNull { it.kind == "clock" }
+            if (clock != null) widgetStore.update(clock.id) {
+                it.copy(x = safeX, y = safeY)
+            }
+        }
+    }
     fun setClock24h(value: Boolean) = preferences.edit().putBoolean("clock_24h", value).apply()
     fun setClockDate(value: Boolean) = preferences.edit().putBoolean("clock_date", value).apply()
     fun setClockSeconds(value: Boolean) = preferences.edit().putBoolean("clock_seconds", value).apply()
