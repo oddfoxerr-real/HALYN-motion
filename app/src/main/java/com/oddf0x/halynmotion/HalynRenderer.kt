@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.RuntimeShader
 import android.os.Build
 
@@ -57,6 +58,7 @@ data class MotionState(
     val clockX: Float = .5f,
     val clockY: Float = .68f,
     val photoRevision: Int = 0,
+    val photoFitMode: Int = PhotoFraming.FIT,
     val depthEnabled: Boolean = true,
     val depthStrength: Float = 1f
 )
@@ -156,6 +158,7 @@ class MotionPreferences(context: Context) {
             clockX = float("clock_x", .5f, .08f, .92f),
             clockY = float("clock_y", .68f, .14f, .88f),
             photoRevision = preferences.getInt("photo_revision", 0),
+            photoFitMode = preferences.getInt("photo_fit_mode", PhotoFraming.FIT).coerceIn(0, 2),
             depthEnabled = preferences.getBoolean("depth_enabled", true),
             depthStrength = float("depth_strength", 1f, 0f, 2f)
         )
@@ -169,6 +172,8 @@ class MotionPreferences(context: Context) {
     fun photoImported() = preferences.edit()
         .putInt("photo_revision", preferences.getInt("photo_revision", 0) + 1)
         .putInt("preset", PhotoWallpaperStore.SCENE_INDEX).apply()
+    fun setPhotoFitMode(value: Int) =
+        preferences.edit().putInt("photo_fit_mode", value.coerceIn(0, 2)).apply()
     fun setDepthEnabled(value: Boolean) =
         preferences.edit().putBoolean("depth_enabled", value).apply()
     fun setDepthStrength(value: Float) =
@@ -411,7 +416,8 @@ class HalynRenderer(private val context: Context) {
         starPose: StarPose? = null,
         gyro: ParallaxPose = ParallaxPose(),
         touchForce: Float = 0f,
-        reactions: SceneSignals = SceneSignals()
+        reactions: SceneSignals = SceneSignals(),
+        photoViewport: RectF? = null
     ) {
         if (state.preset == StarWindowRenderer.SCENE_INDEX) {
             starRenderer.draw(canvas, state, elapsedSeconds, starPose ?: StarPose())
@@ -424,8 +430,8 @@ class HalynRenderer(private val context: Context) {
             return
         }
         if (state.preset == PhotoWallpaperStore.SCENE_INDEX) {
-            photoRenderer.draw(canvas, gyro)
-            QuadColorSystem.drawOverlay(canvas, state, .20f)
+            // Show the chosen image as-is; do not recolour or zoom it with a shader.
+            photoRenderer.draw(canvas, gyro, photoViewport, state.photoFitMode)
             return
         }
         if (state.preset == MinimalArchitectureRenderer.SCENE_INDEX) {
@@ -545,13 +551,16 @@ class HalynRenderer(private val context: Context) {
 
     fun drawForeground(
         canvas: Canvas, state: MotionState,
-        gyro: ParallaxPose = ParallaxPose(), offsetX: Float = .5f
+        gyro: ParallaxPose = ParallaxPose(), offsetX: Float = .5f,
+        photoViewport: RectF? = null
     ) {
         if (MountainSceneRenderer.isMountain(state.preset)) {
             mountainRenderer.drawForeground(canvas, state, mountainPose(state, gyro, offsetX))
         }
         if (state.preset == PhotoWallpaperStore.SCENE_INDEX) {
-            depthLayerStore.draw(canvas, state, gyro, photoRenderer)
+            depthLayerStore.draw(
+                canvas, state, gyro, photoRenderer, photoViewport
+            )
         }
     }
 
