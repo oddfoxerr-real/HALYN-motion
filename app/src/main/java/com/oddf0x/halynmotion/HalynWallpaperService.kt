@@ -160,9 +160,8 @@ class HalynWallpaperService : WallpaperService() {
             physicalDisplayWidth = try {
                 val point = Point()
                 @Suppress("DEPRECATION")
-                val manager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-                @Suppress("DEPRECATION")
-                manager.defaultDisplay.getRealSize(point)
+                val display = (getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay
+                display.getRealSize(point)
                 point.x.coerceAtLeast(1)
             } catch (_: Exception) {
                 resources.displayMetrics.widthPixels.coerceAtLeast(1)
