@@ -287,8 +287,8 @@ class MainActivity : Activity() {
     }
 
     private fun buildDepthStudio(root: LinearLayout) {
-        root.addView(section("Selected photography",
-            "Original high-resolution photographs. Every image has a real creator, source and reuse license."))
+        root.addView(section("Wallpaper editor",
+            "Choose your image, apply automatic depth, and control the clock."))
         val import = text("Import photograph from device  ›", 14f, ink, Typeface.BOLD).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(17), dp(10), dp(17), dp(10))
@@ -318,11 +318,6 @@ class MainActivity : Activity() {
             preview.invalidate()
             maybeAutoMaskAfterImport()
         }
-        root.addView(onlineGallery, LinearLayout.LayoutParams(-1, -2).apply {
-            topMargin = dp(13)
-        })
-        onlineGallery.loadInitial()
-
         root.addView(section("Depth and clock",
             "Optional subject layering. The clock is truly rendered between the photograph and cutout."))
         val panel = LinearLayout(this).apply {
@@ -431,6 +426,12 @@ class MainActivity : Activity() {
             prefs.setDepthStrength(it)
         }
         root.addView(panel)
+        root.addView(section("Explore photography",
+            "Curated, properly attributed artwork. Tap an image to preview its details and download."))
+        root.addView(onlineGallery, LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = dp(4)
+        })
+        onlineGallery.loadInitial()
     }
 
     private fun maybeAutoMaskAfterImport() {
