@@ -29,8 +29,8 @@ android {
         }
         minSdk = 33
         targetSdk = 35
-        versionCode = 37
-        versionName = "0.31.0"
+        versionCode = 38
+        versionName = "0.32.0"
     }
     buildTypes {
         release {
@@ -42,4 +42,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+}
+
+dependencies {
+    implementation("com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1")
+    implementation("com.google.android.gms:play-services-base:18.11.1")
 }
