@@ -1,5 +1,37 @@
 # HALYN Motion
 
+## v0.34 — Widget Studio and Soft Wallpaper Edges
+
+HALYN's actual wallpaper editor now includes six lightweight **wallpaper-rendered
+widgets**: clock, date, weekday, battery, custom text and a separator. These are
+overlays painted into HALYN's live wallpaper, **not** Android home-screen
+AppWidgets, so they do not intercept your launcher or launch apps.
+
+Use **Edit widgets on preview** under the wallpaper preview. The editor draws
+a 5% snap grid; drag a selected widget to move it, pull the bottom-right handle
+to resize, pull the top-right handle to rotate, or use two-finger pinch/rotation.
+For exact values, use the Size and Rotation sliders underneath. Every element
+has its own colour: choose a swatch or open the full HSV/HEX picker. Text widgets
+have a 48-character label editor. All edits save in the same preferences as
+the wallpaper, independently per item. Existing clock faces and imported
+fonts remain available. The previous home-screen grid placement control also
+continues to move the clock in a composed layout.
+
+If a photo is shorter than the physical phone viewport, **Full image** keeps
+the original sharp and uncropped while filling its spare margins with a
+subdued blurred extension of the same photo. The extension is built once at a
+tiny resolution and cached, rather than running 4K blur every frame.
+
+The photo, widget overlays and optional foreground subject mask are composed
+in that order, enabling a clock to sit behind a dog or other cutout. For Android
+launchers with wide scrolling wallpaper surfaces, widgets use the physical
+screen viewport. This release is tested by GitHub Actions for compilation and
+wiring but still needs Samsung Galaxy A56 gesture, visual, battery and cropping
+QA.
+
+---
+
+
 ## v0.31.0 — Real sourced artwork, no built-in wallpaper collection
 
 The previous bundled scene gallery was rejected as visually unconvincing.

@@ -25,6 +25,7 @@ class HalynWallpaperService : WallpaperService() {
         private val preferences = MotionPreferences(this@HalynWallpaperService)
         private val renderer = HalynRenderer(this@HalynWallpaperService)
         private val clockRenderer = ClockOverlayRenderer(this@HalynWallpaperService)
+        private val widgetRenderer = WallpaperWidgetRenderer(this@HalynWallpaperService)
         private val spatialTracker = SpatialTracker(this@HalynWallpaperService)
         private val gyroParallax = GyroParallax(this@HalynWallpaperService)
         private val signalSampler = SceneSignalSampler(this@HalynWallpaperService, preferences.raw)
@@ -408,7 +409,11 @@ class HalynWallpaperService : WallpaperService() {
                     reactions = signalSampler.sample(),
                     photoViewport = photoViewport
                 )
-                clockRenderer.draw(canvas, settings, photoViewport = photoViewport)
+                if (widgetRenderer.active()) {
+                    widgetRenderer.draw(canvas, settings, photoViewport)
+                } else {
+                    clockRenderer.draw(canvas, settings, photoViewport = photoViewport)
+                }
                 // Reuse the exact same gyro pose for background/foreground;
                 // otherwise a moving ridge can visibly shear around the clock.
                 renderer.drawForeground(

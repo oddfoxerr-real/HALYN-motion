@@ -71,7 +71,8 @@ class ClockOverlayRenderer(private val context: Context) {
     fun draw(
         canvas: Canvas, state: MotionState,
         now: Long = System.currentTimeMillis(),
-        photoViewport: RectF? = null
+        photoViewport: RectF? = null,
+        overrideTint: Int? = null
     ) {
         if (state.clockStyle == 0) return
         if (lastFontStyle != state.clockFont || lastFontRevision != state.clockFontRevision) {
@@ -96,7 +97,7 @@ class ClockOverlayRenderer(private val context: Context) {
         }
         val size = min(w, h * .74f)
         val white = Color.rgb(252, 251, 253)
-        val tint = if (state.clockAccent) {
+        val tint = overrideTint ?: if (state.clockAccent) {
             if (state.palette == 5) state.customColor
             else HalynRenderer.PALETTE_COLORS[state.palette.coerceIn(0, 4)]
         } else white
