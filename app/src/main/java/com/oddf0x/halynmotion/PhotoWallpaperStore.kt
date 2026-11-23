@@ -24,14 +24,15 @@ import kotlin.math.roundToInt
 class PhotoWallpaperStore(private val context: Context) {
     private val imageFile get() = File(context.filesDir, "halyn_my_wallpaper.webp")
     private var cached: Bitmap? = null
-    private var cachedModified = -1L
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG)
 
     fun available(): Boolean = imageFile.isFile && imageFile.length() > 0
 
     fun install(uri: Uri): Boolean {
-        val mime = context.contentResolver.getType(uri) ?: return false
-        if (!mime.startsWith("image/")) return false
+        val mime = context.contentResolver.getType(uri).orEmpty()
+        // Some SAF providers omit MIME; the actual bytes are verified by ImageDecoder.
+        if (mime.isNotBlank() && !mime.startsWith("image/") &&
+            mime != "application/octet-stream") return false
         return try {
             context.contentResolver.openInputStream(uri)?.use {
                 installStream(it, 48L * 1024L * 1024L)
