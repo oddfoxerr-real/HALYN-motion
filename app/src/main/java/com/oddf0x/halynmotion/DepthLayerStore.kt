@@ -37,7 +37,8 @@ class DepthLayerStore(private val context: Context) {
         "halyn_motion_settings", Context.MODE_PRIVATE
     )
 
-    private fun currentPhotoGeneration() = PhotoWallpaperStore(context).generation()
+    private fun currentPhotoGeneration() =
+        settings().getLong("photo_generation", 0L)
 
     fun available(): Boolean {
         val prefs = settings()
@@ -58,7 +59,7 @@ class DepthLayerStore(private val context: Context) {
     }
 
     /** Decode with an upper bound so one photograph cannot exhaust the wallpaper process. */
-    private fun decode(file: File, longestEdge: Int = 3072): Bitmap =
+    private fun decode(file: File, longestEdge: Int = 2560): Bitmap =
         ImageDecoder.decodeBitmap(ImageDecoder.createSource(file)) { decoder, info, _ ->
             val length = max(info.size.width, info.size.height)
             require(info.size.width >= 32 && info.size.height >= 32 && length <= 30000)
@@ -237,7 +238,7 @@ class DepthLayerStore(private val context: Context) {
         if (!available()) return null
         val revision = settings().getLong("depth_generation", 0L)
         if (cachedRevision == revision && cached?.isRecycled == false) return cached
-        val decoded = try { decode(file) } catch (_: Exception) { null } ?: return cached
+        val decoded = try { decode(file) } catch (_: Exception) { null } ?: return null
         val old = cached
         cached = decoded
         cachedRevision = revision
