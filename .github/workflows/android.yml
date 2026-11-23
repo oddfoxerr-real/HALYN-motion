@@ -52,11 +52,11 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion'"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='38'"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "versionCode='39'"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml | grep -q "android.service.wallpaper.WallpaperService"
           mkdir -p dist
-          cp "$apk" dist/HALYN-Motion-v0.32.0-preview.apk
-          (cd dist && sha256sum HALYN-Motion-v0.32.0-preview.apk > SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-Motion-v0.33.0-preview.apk
+          (cd dist && sha256sum HALYN-Motion-v0.33.0-preview.apk > SHA256SUMS.txt)
 
       - name: Verify sourced-only gallery, licensing and photo compositor
         shell: bash
@@ -93,8 +93,8 @@ jobs:
           assert "createCutout(points:" in depth
           assert "drawSubjectLayer" in photo
           assert "6 -> monumental(" in clock
-          assert 'versionCode = 38' in Path("app/build.gradle.kts").read_text()
-          print("HALYN 0.32: sourced gallery, atomic photo swaps and on-device auto mask")
+          assert 'versionCode = 39' in Path("app/build.gradle.kts").read_text()
+          print("HALYN 0.33: stable imported-photo framing, sourced gallery and auto masking")
           PY
 
       - name: Verify photo swap generation safety and automatic subject masking
@@ -125,7 +125,49 @@ jobs:
           assert "maybeAutoMaskAfterImport()" in ui
           assert "subject_segment" in manifest
           assert "play-services-mlkit-subject-segmentation:16.0.0-beta1" in gradle
-          print("HALYN 0.32: atomic photo replacement, stale mask isolation, and ML model wiring verified")
+          print("HALYN 0.33: atomic photo replacement, stale mask isolation, and ML model wiring verified")
+          PY
+
+      - name: Verify physical-screen framing, clock and subject alignment
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          b = Path("app/src/main/java/com/oddf0x/halynmotion")
+          layout = (b / "PhotoFraming.kt").read_text()
+          photo = (b / "PhotoWallpaperStore.kt").read_text()
+          settings = (b / "HalynRenderer.kt").read_text()
+          service = (b / "HalynWallpaperService.kt").read_text()
+          clock = (b / "ClockOverlayRenderer.kt").read_text()
+          depth = (b / "DepthLayerStore.kt").read_text()
+          ui = (b / "MainActivity.kt").read_text()
+          assert "const val FIT = 0" in layout
+          assert "const val FILL = 1" in layout
+          assert "const val AUTO = 2" in layout
+          assert "val extra = (sw - vw)" in layout
+          assert "PhotoFraming.calculate(" in photo
+          assert "photoFitMode = preferences.getInt" in settings
+          assert "setPhotoFitMode(value: Int)" in settings
+          assert "PhotoFraming.viewport(" in service
+          assert "manager.defaultDisplay.getRealSize(point)" in service
+          assert "photoViewport = photoViewport" in service
+          assert "photoViewport: RectF?" in clock
+          assert "activeViewportWidth" in clock
+          assert "state.photoFitMode" in depth
+          assert '"Full image", "Fill screen", "Auto"' in ui
+          # Regression: the original portrait should fit a 709x1536 display,
+          # even when the wallpaper canvas is twice the visible width.
+          original_w, original_h = 940, 1672
+          visible_w, visible_h = 709, 1536
+          surface_w = 2 * visible_w
+          viewport_w = min(visible_w, surface_w)
+          scale = min(viewport_w / original_w, visible_h / original_h)
+          fitted_w, fitted_h = original_w * scale, original_h * scale
+          assert abs(fitted_w - visible_w) < 1.0
+          assert fitted_h <= visible_h
+          assert scale < 0.8  # Old canvas-based cover scale was ~1.55.
+          print("Photo fits physical display, not launcher scroll surface; clock and mask share viewport")
           PY
 
       - name: Compile isolated HALYN Repair Test APK
@@ -139,8 +181,8 @@ jobs:
           test -s "$apk"
           unzip -t "$apk" >/dev/null
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.oddf0x.halynmotion.repairpreview'"
-          cp "$apk" dist/HALYN-v0.32-repair-test.apk
-          (cd dist && sha256sum HALYN-v0.32-repair-test.apk >> SHA256SUMS.txt)
+          cp "$apk" dist/HALYN-v0.33-framing-test.apk
+          (cd dist && sha256sum HALYN-v0.33-framing-test.apk >> SHA256SUMS.txt)
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -159,49 +201,50 @@ jobs:
         with:
           name: HALYN-Motion-Android
           path: dist
-      - name: Publish HALYN v0.32.0 Photo Stability
+      - name: Publish HALYN v0.33.0 Image Framing
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v0.32.0-preview.1
+          TAG: v0.33.0-preview.1
         run: |
           set -euo pipefail
-          test -s dist/HALYN-Motion-v0.32.0-preview.apk
-          test -s dist/HALYN-v0.32-repair-test.apk
-          unzip -t dist/HALYN-v0.32-repair-test.apk >/dev/null
-          unzip -t dist/HALYN-Motion-v0.32.0-preview.apk >/dev/null
+          test -s dist/HALYN-Motion-v0.33.0-preview.apk
+          test -s dist/HALYN-v0.33-framing-test.apk
+          unzip -t dist/HALYN-v0.33-framing-test.apk >/dev/null
+          unzip -t dist/HALYN-Motion-v0.33.0-preview.apk >/dev/null
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "This exact release already exists. Keeping its original version."
             exit 0
           fi
           cat > notes.md <<'NOTES'
-          # HALYN v0.32.0 — Photo Stability + Auto Cutout
+          # HALYN v0.33 — Correct Photo Framing
 
-          Fixes the 0.31 image-change instability by using unique temporary
-          files for each import and atomic replacement of the selected photo.
-          Photo caches use generations rather than filesystem timestamps, and
-          each foreground mask is bound to its source image revision. Stale
-          segmentation results cannot overwrite another selected photo.
+          Fixes severe unexpected photo zoom on Android launchers which
+          request a wallpaper canvas wider than one physical screen. The old
+          image crop was computed for that oversized surface, making users'
+          photographs appear magnified or cut off.
 
-          Adds automatic subject extraction using the on-device Google ML Kit
-          Subject Segmentation model. Users can run Auto detect subject or opt
-          into auto cutout after future image selections; manual tracing and
-          transparent PNG imports remain. The model is provided through Google
-          Play services and may require first-use download. Images are not
-          uploaded to HALYN or external masking services.
+          The new PhotoFraming pipeline calculates one physical display
+          viewport from the device display size and launcher page offsets.
+          The background, clock and transparent subject share that same
+          viewport and compositing geometry.
 
-          Reduces live bitmap memory use while preserving the original downloaded
-          image in local storage. The licensed Wikimedia gallery and source
-          credits remain. On-device A56 visual/interaction verification remains
-          necessary: GitHub compilation cannot prove segmentation quality.
+          Full image is the default: show the complete photograph, using
+          neutral black letterboxing when necessary, with no cropping.
+          Fill screen deliberately crops edges, and Auto fills only when
+          aspect ratios differ by 6% or less. Imported artwork no longer
+          receives an additional arbitrary 8% zoom or colour overlay.
 
-          Two APKs are provided. The Repair Test package has a separate app ID
-          and can be installed next to the existing HALYN without wiping data.
-          The regular APK uses the original app ID; installation over old debug
-          builds can fail if their ephemeral signing keys differ.
+          This release retains v0.32 photo-switch safety and ML Kit
+          automatic/manual depth masking. Its second APK has a separate
+          repair-preview package ID, so it can be installed alongside the
+          existing HALYN without uninstalling or losing stored images.
+
+          Verified on GitHub: Android APK builds and packaging checks.
+          Still needs Galaxy A56 screenshot comparison and launcher QA.
           NOTES
-          gh release create "$TAG" dist/HALYN-Motion-v0.32.0-preview.apk \
-            dist/HALYN-v0.32-repair-test.apk dist/SHA256SUMS.txt \
+          gh release create "$TAG" dist/HALYN-Motion-v0.33.0-preview.apk \
+            dist/HALYN-v0.33-framing-test.apk dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "HALYN Motion v0.32.0 — Photo Stability" \
+            --title "HALYN Motion v0.33.0 — Correct Image Framing" \
             --notes-file notes.md --prerelease
