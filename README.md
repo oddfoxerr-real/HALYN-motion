@@ -1,5 +1,40 @@
 # HALYN Motion
 
+## v0.35 — Edit and add wallpaper widgets directly on the Home screen
+
+HALYN now has a **home-screen widget editor**, not just the in-app preview
+editor. Open **Widget Studio → Edit widgets on Home screen**, grant Android's
+optional Draw over apps permission when asked, and HALYN returns to the launcher
+with a transparent editing grid over the active wallpaper.
+
+**On the real Home screen:**
+- Add a Clock, Date, Weekday, Battery, Custom Text or Divider from the bottom tray.
+- Tap an existing HALYN element to select it.
+- Drag the element into position on the 5% snap grid, or turn snapping off.
+- Drag its corners to resize or rotate; two fingers can pinch/rotate.
+- Use the bottom Size and Rotation sliders for precise adjustments.
+- Choose an individual widget colour or type a custom **#RRGGBB** value.
+- Edit custom text directly in the overlay.
+- Tap **Done** or the foreground notification's **Exit editor** to save and
+  fully dismiss the temporary overlay.
+
+Edits are reflected in the **real HALYN wallpaper** underneath, not just the
+configuration preview. The overlay uses the same explicit permission and
+short-lived foreground-service model as the existing "Move clock on Home
+screen" feature; it does not intercept Home-screen touches while closed.
+
+This is **not a launcher widget manager**. Android/Samsung app widgets such as
+Spotify, third-party weather, and Samsung's own launcher clock remain under
+One UI's editing controls. Only HALYN-rendered wallpaper elements can be
+repositioned or restyled here. Imported pictures, prior masks, custom clock
+fonts and the earlier clock mover are retained.
+
+GitHub Actions verifies APK compilation and basic wiring. On-device A56 testing
+is still required for gesture placement, text input from the overlay, and
+Samsung-specific scrolling wallpaper offsets.
+
+---
+
 ## v0.34 — Widget Studio and Soft Wallpaper Edges
 
 HALYN's actual wallpaper editor now includes six lightweight **wallpaper-rendered
