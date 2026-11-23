@@ -24,6 +24,10 @@ import kotlin.math.roundToInt
 class PhotoWallpaperStore(private val context: Context) {
     private val imageFile get() = File(context.filesDir, "halyn_my_wallpaper.webp")
     private var cached: Bitmap? = null
+    private var cachedSoftEdge: Bitmap? = null
+    private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+        alpha = 175
+    }
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG)
 
     fun available(): Boolean = imageFile.isFile && imageFile.length() > 0
@@ -149,6 +153,8 @@ class PhotoWallpaperStore(private val context: Context) {
             val old = cached
             cached = newBitmap
             cachedGeneration = generation
+            cachedSoftEdge?.let { if (!it.isRecycled) it.recycle() }
+            cachedSoftEdge = null
             if (old !== newBitmap && old?.isRecycled == false) old.recycle()
         }
         return cached
@@ -181,6 +187,19 @@ class PhotoWallpaperStore(private val context: Context) {
         )
         canvas.save()
         canvas.clipRect(region)
+        val cropped = frame.destination
+        if (cropped.width() < region.width() - 1f ||
+            cropped.height() < region.height() - 1f
+        ) {
+            // A single low-resolution blurred background, cached until the next
+            // photo generation, replaces the hard black letterboxing.
+            val soft = cachedSoftEdge?.takeUnless { it.isRecycled }
+                ?: SoftEdgeBitmap.create(photo).also { cachedSoftEdge = it }
+            val filled = PhotoFraming.calculate(
+                soft.width, soft.height, region, PhotoFraming.FILL
+            )
+            canvas.drawBitmap(soft, filled.source, filled.destination, shadowPaint)
+        }
         canvas.drawBitmap(photo, frame.source, frame.destination, paint)
         canvas.restore()
     }
