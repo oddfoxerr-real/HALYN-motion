@@ -8,6 +8,7 @@ import android.graphics.ImageDecoder
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
+import android.graphics.RectF
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import android.net.Uri
@@ -228,10 +229,15 @@ class DepthLayerStore(private val context: Context) {
         }
     }
 
-    fun draw(canvas: Canvas, state: MotionState, gyro: ParallaxPose, photo: PhotoWallpaperStore) {
+    fun draw(
+        canvas: Canvas, state: MotionState, gyro: ParallaxPose,
+        photo: PhotoWallpaperStore, viewport: RectF? = null
+    ) {
         if (!state.depthEnabled) return
         val foreground = read() ?: return
-        photo.drawSubjectLayer(canvas, foreground, gyro, state.depthStrength)
+        photo.drawSubjectLayer(
+            canvas, foreground, gyro, state.depthStrength, viewport, state.photoFitMode
+        )
     }
 
     private fun read(): Bitmap? {

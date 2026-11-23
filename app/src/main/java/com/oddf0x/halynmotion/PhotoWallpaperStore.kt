@@ -160,65 +160,54 @@ class PhotoWallpaperStore(private val context: Context) {
         "halyn_motion_settings", Context.MODE_PRIVATE
     )
 
-    fun draw(canvas: Canvas, gyro: ParallaxPose) {
-        val w = canvas.width.toFloat().coerceAtLeast(1f)
-        val h = canvas.height.toFloat().coerceAtLeast(1f)
-        val photo = image()
-        if (photo == null) {
-            canvas.drawColor(Color.rgb(12, 16, 26))
-            return
-        }
-        val bw = photo.width.toFloat()
-        val bh = photo.height.toFloat()
-        // Fit centre crop + 8% overscan; clamp gyro to crop margins.
-        val scale = max(w / bw, h / bh) * 1.08f
-        val srcW = min(bw, w / scale)
-        val srcH = min(bh, h / scale)
-        val slackX = (bw - srcW) * .5f
-        val slackY = (bh - srcH) * .5f
-        val x = (bw - srcW) * .5f + gyro.x * slackX * .9f
-        val y = (bh - srcH) * .5f + gyro.y * slackY * .9f
-        val left = x.coerceIn(0f, (bw - srcW).coerceAtLeast(0f))
-        val top = y.coerceIn(0f, (bh - srcH).coerceAtLeast(0f))
-        val crop = Rect(
-            left.roundToInt(), top.roundToInt(),
-            (left + srcW).roundToInt().coerceAtMost(photo.width),
-            (top + srcH).roundToInt().coerceAtMost(photo.height)
+    /**
+     * The supplied viewport is the physical display area within a potentially
+     * much wider launcher wallpaper surface. Fit mode never crops the image.
+     * Fill and Auto are explicit choices and use the same framing as the
+     * cutout layer drawn after the clock.
+     */
+    fun draw(
+        canvas: Canvas, gyro: ParallaxPose,
+        viewport: RectF? = null, fitMode: Int = PhotoFraming.FIT
+    ) {
+        val region = viewport ?: RectF(
+            0f, 0f, canvas.width.toFloat(), canvas.height.toFloat()
         )
-        canvas.drawBitmap(photo, crop, RectF(0f, 0f, w, h), paint)
+        val photo = image()
+        canvas.drawColor(Color.BLACK)
+        if (photo == null) return
+        val frame = PhotoFraming.calculate(
+            photo.width, photo.height, region, fitMode, gyro.x, gyro.y
+        )
+        canvas.save()
+        canvas.clipRect(region)
+        canvas.drawBitmap(photo, frame.source, frame.destination, paint)
+        canvas.restore()
     }
 
     /**
-     * Draw the transparent cutout in precisely the same image-space crop as
-     * the backdrop, then move only the subject a few pixels with the gyro.
-     * This is rendered AFTER the clock to create real optical occlusion.
+     * Uses identical framing to the background, even if the ML mask was
+     * generated at lower resolution than the stored photograph.
      */
     fun drawSubjectLayer(
-        canvas: Canvas, subject: Bitmap, gyro: ParallaxPose, strength: Float
+        canvas: Canvas, subject: Bitmap, gyro: ParallaxPose, strength: Float,
+        viewport: RectF? = null, fitMode: Int = PhotoFraming.FIT
     ) {
         if (subject.isRecycled) return
-        val w = canvas.width.toFloat().coerceAtLeast(1f)
-        val h = canvas.height.toFloat().coerceAtLeast(1f)
-        val bw = subject.width.toFloat()
-        val bh = subject.height.toFloat()
-        val scale = max(w / bw, h / bh) * 1.08f
-        val srcW = min(bw, w / scale)
-        val srcH = min(bh, h / scale)
-        val slackX = (bw - srcW) * .5f
-        val slackY = (bh - srcH) * .5f
-        val left = ((bw - srcW) * .5f + gyro.x * slackX * .9f)
-            .coerceIn(0f, (bw - srcW).coerceAtLeast(0f))
-        val top = ((bh - srcH) * .5f + gyro.y * slackY * .9f)
-            .coerceIn(0f, (bh - srcH).coerceAtLeast(0f))
-        val crop = Rect(
-            left.roundToInt(), top.roundToInt(),
-            (left + srcW).roundToInt().coerceAtMost(subject.width),
-            (top + srcH).roundToInt().coerceAtMost(subject.height)
+        val region = viewport ?: RectF(
+            0f, 0f, canvas.width.toFloat(), canvas.height.toFloat()
         )
-        canvas.save()
+        val frame = PhotoFraming.calculate(
+            subject.width, subject.height, region, fitMode, gyro.x, gyro.y
+        )
         val motion = strength.coerceIn(0f, 2f)
-        canvas.translate(gyro.x * w * .018f * motion, gyro.y * h * .012f * motion)
-        canvas.drawBitmap(subject, crop, RectF(0f, 0f, w, h), paint)
+        canvas.save()
+        canvas.clipRect(region)
+        canvas.translate(
+            gyro.x.coerceIn(-1f, 1f) * region.width() * .009f * motion,
+            gyro.y.coerceIn(-1f, 1f) * region.height() * .006f * motion
+        )
+        canvas.drawBitmap(subject, frame.source, frame.destination, paint)
         canvas.restore()
     }
 

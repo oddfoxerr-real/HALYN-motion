@@ -64,6 +64,7 @@ class MainActivity : Activity() {
     private lateinit var maskStatus: TextView
     private lateinit var depthToggle: Switch
     private val autoSubject by lazy { AutoSubjectCutout(applicationContext) }
+    private lateinit var photoFitChoices: LinearLayout
     private lateinit var clockStyles: LinearLayout
     private lateinit var clockPositions: LinearLayout
     private lateinit var clockFonts: LinearLayout
@@ -286,6 +287,40 @@ class MainActivity : Activity() {
         buildOriginalRail(root, "Graphite & light", listOf(MinimalArchitectureRenderer.SCENE_INDEX))
     }
 
+    private fun refreshPhotoFitChoices() {
+        if (!::photoFitChoices.isInitialized) return
+        photoFitChoices.removeAllViews()
+        val names = listOf("Full image", "Fill screen", "Auto")
+        val current = prefs.get().photoFitMode
+        names.forEachIndexed { index, label ->
+            val selected = current == index
+            val chip = text(label, 12f,
+                if (selected) backgroundColor else ink,
+                if (selected) Typeface.BOLD else Typeface.NORMAL
+            ).apply {
+                gravity = Gravity.CENTER
+                background = rounded(
+                    if (selected) ink else cardColor, 13, borderColor
+                )
+                isClickable = true
+                isFocusable = true
+                contentDescription = "$label image scaling, " +
+                    if (selected) "selected" else "not selected"
+                setOnClickListener {
+                    prefs.setPhotoFitMode(index)
+                    refreshPhotoFitChoices()
+                    preview.invalidate()
+                }
+            }
+            photoFitChoices.addView(
+                chip,
+                LinearLayout.LayoutParams(0, dp(46), 1f).apply {
+                    if (index > 0) marginStart = dp(7)
+                }
+            )
+        }
+    }
+
     private fun buildDepthStudio(root: LinearLayout) {
         root.addView(section("Wallpaper editor",
             "Choose your image, apply automatic depth, and control the clock."))
@@ -300,6 +335,20 @@ class MainActivity : Activity() {
             setOnClickListener { chooseWallpaperPhoto() }
         }
         root.addView(import, LinearLayout.LayoutParams(-1, -2))
+        root.addView(text("IMAGE FRAMING", 11f, subtle, Typeface.BOLD).apply {
+            letterSpacing = .12f
+            setPadding(0, dp(17), 0, dp(10))
+        })
+        photoFitChoices = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        root.addView(photoFitChoices, LinearLayout.LayoutParams(-1, dp(48)))
+        refreshPhotoFitChoices()
+        root.addView(text(
+            "Full image preserves the complete picture. Auto only fills when cropping is negligible.",
+            12f, secondary
+        ).apply { setPadding(dp(2), dp(8), dp(2), dp(6)) })
 
         // Curated file titles resolve through the Commons API to current real thumbnails.
         // No proprietary or generated wallpaper is bundled with the application.

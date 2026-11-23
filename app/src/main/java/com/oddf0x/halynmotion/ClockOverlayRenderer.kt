@@ -32,6 +32,7 @@ class ClockOverlayRenderer(private val context: Context) {
     private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG)
     private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val rect = RectF()
+    private var activeViewportWidth = 1f
     private val dateFormatter = SimpleDateFormat("EEE, d MMM", Locale.getDefault())
     private val calendar = Calendar.getInstance()
     private var lastSecond = Long.MIN_VALUE
@@ -67,7 +68,11 @@ class ClockOverlayRenderer(private val context: Context) {
         date = dateFormatter.format(Date(now)).uppercase(Locale.getDefault())
     }
 
-    fun draw(canvas: Canvas, state: MotionState, now: Long = System.currentTimeMillis()) {
+    fun draw(
+        canvas: Canvas, state: MotionState,
+        now: Long = System.currentTimeMillis(),
+        photoViewport: RectF? = null
+    ) {
         if (state.clockStyle == 0) return
         if (lastFontStyle != state.clockFont || lastFontRevision != state.clockFontRevision) {
             lastFontStyle = state.clockFont
@@ -76,10 +81,13 @@ class ClockOverlayRenderer(private val context: Context) {
         }
         updateTime(now, state)
 
-        val w = canvas.width.toFloat().coerceAtLeast(1f)
-        val h = canvas.height.toFloat().coerceAtLeast(1f)
-        val centerX = if (state.clockCustomPlacement) w * state.clockX else w * .5f
-        val centerY = if (state.clockCustomPlacement) h * state.clockY else when (state.clockPosition) {
+        val w = (photoViewport?.width() ?: canvas.width.toFloat()).coerceAtLeast(1f)
+        val h = (photoViewport?.height() ?: canvas.height.toFloat()).coerceAtLeast(1f)
+        val originX = photoViewport?.left ?: 0f
+        val originY = photoViewport?.top ?: 0f
+        activeViewportWidth = w
+        val centerX = originX + if (state.clockCustomPlacement) w * state.clockX else w * .5f
+        val centerY = originY + if (state.clockCustomPlacement) h * state.clockY else when (state.clockPosition) {
             0 -> h * .265f
             2 -> h * .71f
             // Portrait depth puts type behind the top of the subject, not over the dock.
@@ -93,6 +101,7 @@ class ClockOverlayRenderer(private val context: Context) {
             else HalynRenderer.PALETTE_COLORS[state.palette.coerceIn(0, 4)]
         } else white
         canvas.save()
+        if (photoViewport != null) canvas.clipRect(photoViewport)
         val showDate = state.clockDate
         val progress = (second + (now % 1000L) / 1000f) / 60f
         when (state.clockStyle) {
@@ -119,13 +128,13 @@ class ClockOverlayRenderer(private val context: Context) {
         ink(tint, 242, size * .55f, font)
         labelPaint.typeface = selectedFont ?: font
         val measured = labelPaint.measureText(numbers)
-        if (measured > canvas.width * .94f && measured > 0f) {
-            labelPaint.textSize *= canvas.width * .94f / measured
+        if (measured > activeViewportWidth * .94f && measured > 0f) {
+            labelPaint.textSize *= activeViewportWidth * .94f / measured
         }
         canvas.drawText(numbers, x, y + size * .19f, labelPaint)
         if (showDate) {
             ink(tint, 230, size * .050f, typefaceMedium)
-            fittedText(canvas, date, x, y - size * .30f, canvas.width * .84f)
+            fittedText(canvas, date, x, y - size * .30f, activeViewportWidth * .84f)
         }
     }
 
@@ -164,8 +173,8 @@ class ClockOverlayRenderer(private val context: Context) {
     private fun date(canvas: Canvas, x: Float, y: Float, size: Float, color: Int) {
         ink(color, 205, size, typefaceMedium)
         // Avoid clipping localized dates on narrow wallpapers and studio previews.
-        if (labelPaint.measureText(date) > canvas.width * .85f) {
-            labelPaint.textSize *= (canvas.width * .85f / labelPaint.measureText(date))
+        if (labelPaint.measureText(date) > activeViewportWidth * .85f) {
+            labelPaint.textSize *= (activeViewportWidth * .85f / labelPaint.measureText(date))
         }
         canvas.drawText(date, x, y, labelPaint)
     }
@@ -174,7 +183,7 @@ class ClockOverlayRenderer(private val context: Context) {
         c: Canvas, x: Float, y: Float, size: Float, color: Int, showDate: Boolean, progress: Float
     ) {
         ink(color, 255, size * .204f, typefaceLight)
-        fittedText(c, time, x, y + size * .055f, c.width * .88f)
+        fittedText(c, time, x, y + size * .055f, activeViewportWidth * .88f)
         if (suffix.isNotEmpty()) {
             ink(color, 200, size * .031f, typefaceMedium)
             c.drawText(suffix, x + size * .32f, y - size * .045f, labelPaint)
@@ -192,8 +201,8 @@ class ClockOverlayRenderer(private val context: Context) {
     ) {
         val fontSize = size * .236f
         ink(color, 255, fontSize, typefaceLight)
-        fittedText(c, hours, x, y - size * .008f, c.width * .76f)
-        fittedText(c, minutes, x, y + size * .204f, c.width * .76f)
+        fittedText(c, hours, x, y - size * .008f, activeViewportWidth * .76f)
+        fittedText(c, minutes, x, y + size * .204f, activeViewportWidth * .76f)
         if (suffix.isNotEmpty()) {
             ink(color, 210, size * .032f, typefaceMedium)
             c.drawText(suffix, x + size * .23f, y + size * .015f, labelPaint)
@@ -207,7 +216,7 @@ class ClockOverlayRenderer(private val context: Context) {
         c: Canvas, x: Float, y: Float, size: Float, color: Int, showDate: Boolean, progress: Float
     ) {
         ink(color, 245, size * .11f, typefaceMono)
-        fittedText(c, time, x, y + size * .028f, c.width * .86f)
+        fittedText(c, time, x, y + size * .028f, activeViewportWidth * .86f)
         line(color, 180, size * .004f)
         c.drawLine(x - size * .245f, y + size * .080f,
             x - size * .245f + .49f * size * progress, y + size * .080f, linePaint)
@@ -282,7 +291,7 @@ class ClockOverlayRenderer(private val context: Context) {
         line(color, 255, size * .005f)
         c.drawArc(rect, -90f, (progress * 360f).coerceIn(0f, 359.99f), false, linePaint)
         ink(color, 255, size * .116f, typefaceLight)
-        fittedText(c, time, x, y + size * .028f, c.width * .86f)
+        fittedText(c, time, x, y + size * .028f, activeViewportWidth * .86f)
         if (showDate) date(c, x, y + size * .10f, size * .028f, color)
     }
 }
