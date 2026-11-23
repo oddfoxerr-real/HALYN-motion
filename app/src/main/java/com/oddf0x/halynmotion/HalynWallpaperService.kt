@@ -2,6 +2,9 @@ package com.oddf0x.halynmotion
 
 import android.content.SharedPreferences
 import android.graphics.Canvas
+import android.graphics.Point
+import android.content.Context
+import android.view.WindowManager
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -40,6 +43,7 @@ class HalynWallpaperService : WallpaperService() {
         private var surfaceReady = false
         private var surfaceWidth = 1
         private var surfaceHeight = 1
+        private var physicalDisplayWidth = resources.displayMetrics.widthPixels.coerceAtLeast(1)
         private var touchX = .5f
         private var touchY = .5f
         private var offsetX = .5f
@@ -150,8 +154,24 @@ class HalynWallpaperService : WallpaperService() {
             preferences.raw.registerOnSharedPreferenceChangeListener(this)
         }
 
+        private fun updatePhysicalDisplayWidth() {
+            // The wallpaper canvas may be twice as wide as one home screen.
+            // Query the real display, not the wallpaper surface or desired width.
+            physicalDisplayWidth = try {
+                val point = Point()
+                @Suppress("DEPRECATION")
+                val manager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+                @Suppress("DEPRECATION")
+                manager.defaultDisplay.getRealSize(point)
+                point.x.coerceAtLeast(1)
+            } catch (_: Exception) {
+                resources.displayMetrics.widthPixels.coerceAtLeast(1)
+            }
+        }
+
         override fun onSurfaceCreated(holder: SurfaceHolder) {
             super.onSurfaceCreated(holder)
+            updatePhysicalDisplayWidth()
             surfaceReady = true
             renderer.resetHardwareState()
             refresh()
@@ -161,6 +181,7 @@ class HalynWallpaperService : WallpaperService() {
             super.onSurfaceChanged(holder, format, width, height)
             surfaceWidth = width.coerceAtLeast(1)
             surfaceHeight = height.coerceAtLeast(1)
+            updatePhysicalDisplayWidth()
             gyroParallax.recenter()
             surfaceReady = true
             refresh()
@@ -185,7 +206,8 @@ class HalynWallpaperService : WallpaperService() {
         ) {
             super.onOffsetsChanged(xOffset, yOffset, xOffsetStep, yOffsetStep, xPixelOffset, yPixelOffset)
             offsetX = xOffset.coerceIn(0f, 1f)
-            if (isStillPhoto()) scheduleFrame(immediate = true)
+            if (settings.preset == PhotoWallpaperStore.SCENE_INDEX)
+                scheduleFrame(immediate = true)
         }
 
         override fun onTouchEvent(event: MotionEvent) {
@@ -369,6 +391,12 @@ class HalynWallpaperService : WallpaperService() {
                 } else {
                     gyroParallax.pose(settings)
                 }
+                val photoViewport =
+                    if (settings.preset == PhotoWallpaperStore.SCENE_INDEX)
+                        PhotoFraming.viewport(
+                            canvas.width, canvas.height, physicalDisplayWidth, offsetX
+                        )
+                    else null
                 renderer.draw(
                     canvas, settings,
                     (startedMs - startTimeMs) / 1000f,
@@ -378,12 +406,15 @@ class HalynWallpaperService : WallpaperService() {
                     touchForce = if (settings.touch && touchDownMs > 0L)
                         (1f - (startedMs - touchDownMs) / 2400f).coerceIn(0f, 1f)
                     else 0f,
-                    reactions = signalSampler.sample()
+                    reactions = signalSampler.sample(),
+                    photoViewport = photoViewport
                 )
-                clockRenderer.draw(canvas, settings)
+                clockRenderer.draw(canvas, settings, photoViewport = photoViewport)
                 // Reuse the exact same gyro pose for background/foreground;
                 // otherwise a moving ridge can visibly shear around the clock.
-                renderer.drawForeground(canvas, settings, tilt, offsetX)
+                renderer.drawForeground(
+                    canvas, settings, tilt, offsetX, photoViewport = photoViewport
+                )
             } catch (_: IllegalArgumentException) {
                 // The system may be replacing the wallpaper surface.
             } catch (_: IllegalStateException) {
