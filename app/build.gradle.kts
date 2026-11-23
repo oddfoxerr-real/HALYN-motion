@@ -7,21 +7,25 @@ android {
     compileSdk = 35
     defaultConfig {
         val previewBuild = project.findProperty("quietPreview")?.toString() == "true"
+        val repairPreview = project.findProperty("repairPreview")?.toString() == "true"
         val livingPreview = project.findProperty("livingPreview")?.toString() == "true"
         val fluidPreview = project.findProperty("fluidPreview")?.toString() == "true"
         applicationId = when {
+            repairPreview -> "com.oddf0x.halynmotion.repairpreview"
             fluidPreview -> "com.oddf0x.halynmotion.fluidpreview"
             livingPreview -> "com.oddf0x.halynmotion.livingpreview"
             previewBuild -> "com.oddf0x.halynmotion.quietpreview"
             else -> "com.oddf0x.halynmotion"
         }
         manifestPlaceholders["appTitle"] = when {
+            repairPreview -> "HALYN Repair Test"
             fluidPreview -> "HALYN Fluid Preview"
             livingPreview -> "HALYN Living Preview"
             previewBuild -> "HALYN Quiet Preview"
             else -> "@string/app_name"
         }
         manifestPlaceholders["wallpaperTitle"] = when {
+            repairPreview -> "HALYN Repair Wallpaper"
             fluidPreview -> "HALYN Fluid Wallpaper"
             livingPreview -> "HALYN Living Wallpaper"
             previewBuild -> "HALYN Quiet Preview Wallpaper"
