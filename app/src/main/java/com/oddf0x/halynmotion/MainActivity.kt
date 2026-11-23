@@ -78,6 +78,7 @@ class MainActivity : Activity() {
     private lateinit var fontLibraryButton: TextView
     private lateinit var clockPlacementToggle: Switch
     private var awaitingClockOverlayPermission = false
+    private var awaitingWidgetOverlayPermission = false
     private val originalCards = mutableListOf<Pair<Int, LinearLayout>>()
     private val originalTileRenderer by lazy { HalynRenderer(this) }
     private lateinit var effectPanel: LinearLayout
@@ -363,20 +364,35 @@ class MainActivity : Activity() {
             background = rounded(cardColor, 22, borderColor)
             setPadding(dp(16), dp(16), dp(16), dp(16))
         }
-        widgetEditButton = text("Edit widgets on preview  ↗", 14f, backgroundColor, Typeface.BOLD)
+        val homeEdit = text("Edit widgets on Home screen  ↗", 14f, backgroundColor, Typeface.BOLD)
             .apply {
                 gravity = Gravity.CENTER
-                minHeight = dp(52)
+                minHeight = dp(54)
                 background = rounded(ink, 14)
                 isClickable = true
                 isFocusable = true
-                contentDescription = "Open grid based wallpaper widget editor"
+                contentDescription = "Edit and add HALYN wallpaper widgets directly on the home screen"
+                setOnClickListener { requestHomeWidgetEditor() }
+            }
+        panel.addView(homeEdit, LinearLayout.LayoutParams(-1, dp(54)).apply {
+            bottomMargin = dp(9)
+        })
+
+        widgetEditButton = text("Edit widgets in preview  ↗", 14f, ink, Typeface.BOLD)
+            .apply {
+                gravity = Gravity.CENTER
+                minHeight = dp(52)
+                background = rounded(Color.rgb(38, 39, 45), 14, borderColor)
+                isClickable = true
+                isFocusable = true
+                contentDescription = "Open in-app preview widget editor"
                 setOnClickListener { toggleWidgetEditor() }
             }
         panel.addView(widgetEditButton, LinearLayout.LayoutParams(-1, dp(52)))
         panel.addView(text(
-            "Clock, date, battery, weekday, custom text and dividers. " +
-                "Drag to position, use corners to resize or rotate, or pinch with two fingers.",
+            "On Home screen: add widgets over your actual wallpaper. Drag to place, " +
+                "use corners to resize/rotate, pinch, and choose colours. " +
+                "Preview editing is optional.",
             12f, secondary
         ).apply { setPadding(dp(2), dp(12), dp(2), dp(12)) })
 
@@ -1343,6 +1359,39 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun requestHomeWidgetEditor() {
+        if (!Settings.canDrawOverlays(this)) {
+            awaitingWidgetOverlayPermission = true
+            Toast.makeText(this,
+                "Allow HALYN to draw over apps only while editing wallpaper widgets",
+                Toast.LENGTH_LONG).show()
+            try {
+                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + packageName)))
+            } catch (_: android.content.ActivityNotFoundException) {
+                awaitingWidgetOverlayPermission = false
+                Toast.makeText(this, "Overlay permission settings unavailable",
+                    Toast.LENGTH_LONG).show()
+            }
+            return
+        }
+        launchHomeWidgetEditor()
+    }
+
+    private fun launchHomeWidgetEditor() {
+        awaitingWidgetOverlayPermission = false
+        if (!Settings.canDrawOverlays(this)) return
+        try {
+            // Foreground overlay exists only during a user-initiated edit session.
+            startForegroundService(Intent(this, HomeWidgetEditorService::class.java))
+            startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (_: RuntimeException) {
+            Toast.makeText(this,
+                "Could not open the on-home-screen widget editor", Toast.LENGTH_LONG).show()
+        }
+    }
+
     private fun requestClockPlacement() {
         if (prefs.get().clockStyle == 0) {
             Toast.makeText(this, "Select a clock face first", Toast.LENGTH_SHORT).show()
@@ -2259,6 +2308,13 @@ class MainActivity : Activity() {
         if (::preview.isInitialized) preview.running = true
         syncStarTracking()
         syncMotionTracking()
+        if (awaitingWidgetOverlayPermission) {
+            if (Settings.canDrawOverlays(this)) {
+                launchHomeWidgetEditor()
+            } else {
+                awaitingWidgetOverlayPermission = false
+            }
+        }
         if (awaitingClockOverlayPermission) {
             if (Settings.canDrawOverlays(this)) launchClockPlacement()
             else {
