@@ -350,6 +350,313 @@ class MainActivity : Activity() {
         }
     }
 
+    /**
+     * Actual wallpaper widgets, independent of Samsung's launcher widgets.
+     * The grid lives directly over HALYN's preview; drag/pinch uses in-memory
+     * edits and only writes preferences when the gesture is complete.
+     */
+    private fun buildWidgetStudio(root: LinearLayout) {
+        root.addView(section("Widget studio",
+            "Move, resize and rotate wallpaper elements on a snap grid."))
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = rounded(cardColor, 22, borderColor)
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+        }
+        widgetEditButton = text("Edit widgets on preview  ↗", 14f, backgroundColor, Typeface.BOLD)
+            .apply {
+                gravity = Gravity.CENTER
+                minHeight = dp(52)
+                background = rounded(ink, 14)
+                isClickable = true
+                isFocusable = true
+                contentDescription = "Open grid based wallpaper widget editor"
+                setOnClickListener { toggleWidgetEditor() }
+            }
+        panel.addView(widgetEditButton, LinearLayout.LayoutParams(-1, dp(52)))
+        panel.addView(text(
+            "Clock, date, battery, weekday, custom text and dividers. " +
+                "Drag to position, use corners to resize or rotate, or pinch with two fingers.",
+            12f, secondary
+        ).apply { setPadding(dp(2), dp(12), dp(2), dp(12)) })
+
+        val snapRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = dp(48)
+            addView(text("Snap to 5% grid", 14f, ink, Typeface.BOLD),
+                LinearLayout.LayoutParams(0, -2, 1f))
+        }
+        val snapping = Switch(this).apply {
+            isChecked = true
+            contentDescription = "Snap widget positions to five percent grid"
+            setOnCheckedChangeListener { _, value ->
+                if (::widgetGrid.isInitialized) widgetGrid.snapEnabled = value
+            }
+        }
+        snapRow.addView(snapping)
+        panel.addView(snapRow)
+
+        val addLabel = text("ADD WIDGET", 10f, subtle, Typeface.BOLD).apply {
+            letterSpacing = .14f
+            setPadding(0, dp(13), 0, dp(9))
+        }
+        panel.addView(addLabel)
+
+        val addRail = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        for (kind in WallpaperWidget.KINDS) {
+            val label = WallpaperWidget.LABELS[kind] ?: kind
+            val chip = text("+ $label", 12f, ink, Typeface.BOLD).apply {
+                gravity = Gravity.CENTER
+                setPadding(dp(13), 0, dp(13), 0)
+                background = rounded(Color.rgb(38, 39, 45), 12, borderColor)
+                isClickable = true
+                isFocusable = true
+                contentDescription = "Add $label wallpaper widget"
+                setOnClickListener {
+                    if (!widgetStore.active()) widgetStore.activate(prefs.get())
+                    val added = widgetStore.add(kind)
+                    if (added == null) {
+                        Toast.makeText(this@MainActivity,
+                            "Maximum of 12 wallpaper elements", Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+                    selectedWidgetId = added.id
+                    if (!editingWidgets) enterWidgetEditor()
+                    stagedWidgets = widgetStore.load()
+                    widgetGrid.replace(stagedWidgets.orEmpty(), added.id)
+                    refreshWidgetControls()
+                    preview.invalidate()
+                }
+            }
+            addRail.addView(chip, LinearLayout.LayoutParams(-2, dp(44)).apply {
+                marginEnd = dp(7)
+            })
+        }
+        panel.addView(HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(addRail)
+        }, LinearLayout.LayoutParams(-1, dp(45)))
+
+        widgetControls = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        panel.addView(widgetControls, LinearLayout.LayoutParams(-1, -2))
+        root.addView(panel)
+        refreshWidgetControls()
+    }
+
+    private fun toggleWidgetEditor() {
+        if (editingWidgets) {
+            editingWidgets = false
+            widgetGrid.visibility = View.GONE
+            stagedWidgets = null
+            widgetEditButton.text = "Edit widgets on preview  ↗"
+            preview.invalidate()
+            refreshWidgetControls()
+        } else {
+            enterWidgetEditor()
+        }
+    }
+
+    private fun enterWidgetEditor() {
+        val items = widgetStore.activate(prefs.get())
+        editingWidgets = true
+        stagedWidgets = items
+        selectedWidgetId = selectedWidgetId?.takeIf { id ->
+            items.any { it.id == id }
+        } ?: items.firstOrNull()?.id
+        widgetGrid.replace(items, selectedWidgetId)
+        widgetGrid.visibility = View.VISIBLE
+        widgetEditButton.text = "Done editing  ✓"
+        refreshWidgetControls()
+        preview.invalidate()
+    }
+
+    private fun updateSelectedWidget(
+        save: Boolean = true, operation: (WallpaperWidget) -> WallpaperWidget
+    ) {
+        val selectedId = selectedWidgetId ?: return
+        val source = stagedWidgets ?: widgetStore.load()
+        val updated = source.map { item ->
+            if (item.id == selectedId) operation(item).safe() else item
+        }
+        stagedWidgets = updated
+        if (::widgetGrid.isInitialized && editingWidgets) {
+            widgetGrid.replace(updated, selectedId)
+        }
+        if (save) widgetStore.save(updated)
+        preview.invalidate()
+    }
+
+    private fun refreshWidgetControls() {
+        if (!::widgetControls.isInitialized) return
+        widgetControls.removeAllViews()
+        val selectedId = selectedWidgetId
+        val item = (stagedWidgets ?: widgetStore.load()).firstOrNull {
+            it.id == selectedId
+        }
+        if (item == null) {
+            widgetControls.addView(text(
+                if (editingWidgets) "Choose a widget or add one above."
+                else "Open Edit to place and customise wallpaper widgets.",
+                12f, secondary
+            ).apply { setPadding(0, dp(11), 0, dp(3)) })
+            return
+        }
+
+        val heading = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(15), 0, dp(8))
+        }
+        heading.addView(text(
+            "SELECTED · " + (WallpaperWidget.LABELS[item.kind] ?: item.kind).uppercase(Locale.getDefault()),
+            11f, subtle, Typeface.BOLD
+        ), LinearLayout.LayoutParams(0, -2, 1f))
+        val remove = text("Remove", 12f, ink, Typeface.BOLD).apply {
+            isClickable = true
+            isFocusable = true
+            setPadding(dp(10), dp(9), dp(10), dp(9))
+            contentDescription = "Remove selected wallpaper widget"
+            setOnClickListener {
+                widgetStore.delete(item.id)
+                val list = widgetStore.load()
+                stagedWidgets = list
+                selectedWidgetId = list.firstOrNull()?.id
+                if (::widgetGrid.isInitialized) widgetGrid.replace(list, selectedWidgetId)
+                refreshWidgetControls()
+                preview.invalidate()
+            }
+        }
+        heading.addView(remove)
+        widgetControls.addView(heading)
+
+        fun slider(title: String, current: Float, min: Float, max: Float,
+                   format: (Float) -> String,
+                   change: (WallpaperWidget, Float) -> WallpaperWidget) {
+            val labelRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            labelRow.addView(text(title, 13f, ink, Typeface.BOLD),
+                LinearLayout.LayoutParams(0, -2, 1f))
+            val readout = text(format(current), 12f, secondary)
+            labelRow.addView(readout)
+            widgetControls.addView(labelRow)
+            val seek = SeekBar(this).apply {
+                this.max = 100
+                progress = (((current-min)/(max-min))*100f)
+                    .roundToInt().coerceIn(0, 100)
+                progressTintList = ColorStateList.valueOf(ink)
+                thumbTintList = ColorStateList.valueOf(ink)
+                contentDescription = title + " for selected wallpaper widget"
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) {
+                        if (!fromUser) return
+                        val v = min + (max-min)*value/100f
+                        readout.text = format(v)
+                        updateSelectedWidget(save = false) { change(it, v) }
+                    }
+                    override fun onStartTrackingTouch(bar: SeekBar?) = Unit
+                    override fun onStopTrackingTouch(bar: SeekBar?) {
+                        stagedWidgets?.let { widgetStore.save(it) }
+                    }
+                })
+            }
+            widgetControls.addView(seek, LinearLayout.LayoutParams(-1, dp(45)))
+        }
+
+        slider("Size", item.scale, .35f, 2.5f,
+            { String.format(Locale.US, "%.0f%%", it*100) },
+            { w, value -> w.copy(scale = value) })
+        slider("Rotation", item.rotation, -180f, 180f,
+            { String.format(Locale.US, "%.0f°", it) },
+            { w, value -> w.copy(rotation = value) })
+
+        widgetControls.addView(text("COLOUR", 10f, subtle, Typeface.BOLD).apply {
+            letterSpacing = .13f
+            setPadding(0, dp(8), 0, dp(8))
+        })
+        val paletteRail = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        val shades = listOf(
+            Color.WHITE, Color.rgb(176, 182, 190),
+            Color.rgb(242, 185, 113), Color.rgb(241, 104, 112),
+            Color.rgb(140, 189, 251), Color.rgb(176, 153, 231)
+        )
+        shades.forEach { shade ->
+            val chip = View(this).apply {
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(shade)
+                    setStroke(dp(if (shade == item.color) 3 else 1),
+                        if (shade == item.color) ink else borderColor)
+                }
+                isClickable = true
+                isFocusable = true
+                contentDescription = "Use widget colour " + hex(shade)
+                setOnClickListener {
+                    updateSelectedWidget { it.copy(color = shade) }
+                    refreshWidgetControls()
+                }
+            }
+            paletteRail.addView(chip, LinearLayout.LayoutParams(dp(37), dp(37)).apply {
+                marginEnd = dp(9)
+            })
+        }
+        val custom = text("Custom…", 12f, ink, Typeface.BOLD).apply {
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                ColorPickerDialog(this@MainActivity, item.color) { shade ->
+                    updateSelectedWidget { it.copy(color = shade) }
+                    refreshWidgetControls()
+                }.show()
+            }
+        }
+        paletteRail.addView(custom, LinearLayout.LayoutParams(-2, dp(40)))
+        widgetControls.addView(HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(paletteRail)
+        }, LinearLayout.LayoutParams(-1, dp(43)))
+
+        if (item.kind == "text") {
+            val changeText = text("Edit label  ›  " + item.label, 13f, ink, Typeface.BOLD).apply {
+                minHeight = dp(48)
+                gravity = Gravity.CENTER_VERTICAL
+                isClickable = true
+                isFocusable = true
+                contentDescription = "Edit custom wallpaper text"
+                setOnClickListener {
+                    val input = EditText(this@MainActivity).apply {
+                        setText(item.label)
+                        setSelection(text.length)
+                        filters = arrayOf(android.text.InputFilter.LengthFilter(48))
+                        isSingleLine = true
+                    }
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle("Wallpaper label")
+                        .setView(input)
+                        .setPositiveButton("Save") { _, _ ->
+                            updateSelectedWidget {
+                                it.copy(label = input.text.toString().take(48))
+                            }
+                            refreshWidgetControls()
+                        }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                }
+            }
+            widgetControls.addView(changeText)
+        }
+    }
+
     private fun buildDepthStudio(root: LinearLayout) {
         root.addView(section("Wallpaper editor",
             "Choose your image, apply automatic depth, and control the clock."))
