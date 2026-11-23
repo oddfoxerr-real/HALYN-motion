@@ -72,6 +72,7 @@ class DepthLayerStore(private val context: Context) {
 
     /** The selected overlay must be transparent and match the full background aspect ratio. */
     fun installTransparentLayer(uri: Uri): Boolean {
+        val expectedGeneration = currentPhotoGeneration()
         var source: Bitmap? = null
         return try {
             val mime = context.contentResolver.getType(uri).orEmpty()
@@ -108,7 +109,7 @@ class DepthLayerStore(private val context: Context) {
                 }
             }
             if (!hasTransparency) return false
-            write(image, currentPhotoGeneration())
+            write(image, expectedGeneration)
         } catch (_: Exception) {
             false
         } finally {
