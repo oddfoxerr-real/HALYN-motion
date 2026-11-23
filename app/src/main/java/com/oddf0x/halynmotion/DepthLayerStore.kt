@@ -30,16 +30,31 @@ class DepthLayerStore(private val context: Context) {
     private val file get() = File(context.filesDir, "halyn_subject_layer.png")
     private val photoFile get() = File(context.filesDir, "halyn_my_wallpaper.webp")
     private var cached: Bitmap? = null
-    private var cachedModified = -1L
+    private var cachedRevision = Long.MIN_VALUE
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG)
 
-    fun available(): Boolean = file.isFile && file.length() > 1024L
+    private fun settings() = context.getSharedPreferences(
+        "halyn_motion_settings", Context.MODE_PRIVATE
+    )
+
+    private fun currentPhotoGeneration() = PhotoWallpaperStore(context).generation()
+
+    fun available(): Boolean {
+        val prefs = settings()
+        return file.isFile && file.length() > 1024L &&
+            prefs.getLong("depth_source_generation", -1L) == currentPhotoGeneration()
+    }
 
     fun clear() {
         file.delete()
         cached?.recycle()
         cached = null
-        cachedModified = -1L
+        cachedRevision = Long.MIN_VALUE
+        val prefs = settings()
+        prefs.edit()
+            .putLong("depth_source_generation", -1L)
+            .putLong("depth_generation", prefs.getLong("depth_generation", 0L) + 1L)
+            .apply()
     }
 
     /** Decode with an upper bound so one photograph cannot exhaust the wallpaper process. */
@@ -60,7 +75,7 @@ class DepthLayerStore(private val context: Context) {
         var source: Bitmap? = null
         return try {
             val mime = context.contentResolver.getType(uri).orEmpty()
-            if (mime !in setOf("image/png", "image/webp")) return false
+            if (mime.isNotBlank() && mime !in setOf("image/png", "image/webp", "application/octet-stream")) return false
             val image = ImageDecoder.decodeBitmap(
                 ImageDecoder.createSource(context.contentResolver, uri)
             ) { decoder, info, _ ->
@@ -93,7 +108,7 @@ class DepthLayerStore(private val context: Context) {
                 }
             }
             if (!hasTransparency) return false
-            write(image)
+            write(image, currentPhotoGeneration())
         } catch (_: Exception) {
             false
         } finally {
@@ -108,6 +123,7 @@ class DepthLayerStore(private val context: Context) {
      */
     fun createCutout(points: List<PointF>): Boolean {
         if (points.size < 8 || !photoFile.isFile) return false
+        val expectedGeneration = currentPhotoGeneration()
         var source: Bitmap? = null
         var output: Bitmap? = null
         return try {
@@ -131,7 +147,7 @@ class DepthLayerStore(private val context: Context) {
             mask.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
             canvas.drawBitmap(bitmap, 0f, 0f, mask)
             mask.xfermode = null
-            write(result)
+            write(result, expectedGeneration)
         } catch (_: Exception) {
             false
         } finally {
@@ -140,24 +156,73 @@ class DepthLayerStore(private val context: Context) {
         }
     }
 
-    private fun write(bitmap: Bitmap): Boolean {
-        val next = File(context.filesDir, "halyn_subject_layer.next.png")
+    /**
+     * Called by the on-device ML Kit subject detector. Segmented foregrounds
+     * use the original photo's aspect ratio, so no screen-coordinate scaling
+     * or user interaction is required. Never apply a stale ML result to a
+     * newly selected wallpaper.
+     */
+    fun installSegmentedForeground(
+        bitmap: Bitmap, expectedGeneration: Long
+    ): Boolean {
+        if (bitmap.isRecycled || !bitmap.hasAlpha() || !photoFile.isFile) return false
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(photoFile.absolutePath, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return false
+        val photoAspect = bounds.outWidth.toFloat() / bounds.outHeight
+        val maskAspect = bitmap.width.toFloat() / bitmap.height
+        if (kotlin.math.abs(photoAspect / maskAspect - 1f) > .03f) return false
+        val strideX = (bitmap.width / 32).coerceAtLeast(1)
+        val strideY = (bitmap.height / 32).coerceAtLeast(1)
+        var transparent = 0
+        var visible = 0
+        for (y in 0 until bitmap.height step strideY) for (x in 0 until bitmap.width step strideX) {
+            val alpha = android.graphics.Color.alpha(bitmap.getPixel(x, y))
+            if (alpha < 200) transparent++ else if (alpha > 50) visible++
+        }
+        // Reject blank or fully opaque ML outputs; they obscure the clock.
+        if (transparent < 3 || visible < 3) return false
+        return write(bitmap, expectedGeneration)
+    }
+
+    private fun write(bitmap: Bitmap, expectedGeneration: Long): Boolean {
+        val pending = File.createTempFile("halyn_depth_", ".png", context.filesDir)
         return try {
-            FileOutputStream(next).use { out ->
+            if (currentPhotoGeneration() != expectedGeneration) return false
+            FileOutputStream(pending).use { out ->
                 if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) return false
                 out.fd.sync()
             }
-            if (next.length() < 1024L) return false
-            if (!next.renameTo(file)) {
-                next.copyTo(file, overwrite = true)
-                next.delete()
+            if (pending.length() < 1024L || currentPhotoGeneration() != expectedGeneration) {
+                return false
             }
+            try {
+                java.nio.file.Files.move(
+                    pending.toPath(), file.toPath(),
+                    java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                )
+            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                java.nio.file.Files.move(
+                    pending.toPath(), file.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                )
+            }
+            // Source generation is checked both when saving and drawing.
+            // A concurrent image change cannot display the previous cutout.
+            val prefs = settings()
+            prefs.edit()
+                .putLong("depth_source_generation", expectedGeneration)
+                .putLong("depth_generation", prefs.getLong("depth_generation", 0L) + 1L)
+                .apply()
             cached?.recycle()
             cached = null
-            cachedModified = -1L
-            true
+            cachedRevision = Long.MIN_VALUE
+            currentPhotoGeneration() == expectedGeneration
+        } catch (_: Exception) {
+            false
         } finally {
-            next.delete()
+            pending.delete()
         }
     }
 
@@ -168,14 +233,15 @@ class DepthLayerStore(private val context: Context) {
     }
 
     private fun read(): Bitmap? {
-        val source = file
-        if (!source.isFile) return null
-        if (cached != null && !cached!!.isRecycled && cachedModified == source.lastModified()) {
-            return cached
-        }
-        cached?.recycle()
-        cached = try { decode(source) } catch (_: Exception) { null }
-        cachedModified = source.lastModified()
+        if (!available()) return null
+        val revision = settings().getLong("depth_generation", 0L)
+        if (cachedRevision == revision && cached?.isRecycled == false) return cached
+        val decoded = try { decode(file) } catch (_: Exception) { null } ?: return cached
+        val old = cached
+        cached = decoded
+        cachedRevision = revision
+        if (old !== decoded && old?.isRecycled == false) old.recycle()
         return cached
     }
+
 }
