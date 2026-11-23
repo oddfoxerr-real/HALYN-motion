@@ -59,6 +59,13 @@ class MainActivity : Activity() {
             })
     }
     private lateinit var preview: LivePreview
+    private val widgetStore by lazy { WallpaperWidgetStore(this) }
+    private lateinit var widgetGrid: WidgetGridEditor
+    private lateinit var widgetControls: LinearLayout
+    private lateinit var widgetEditButton: TextView
+    private var editingWidgets = false
+    private var selectedWidgetId: String? = null
+    private var stagedWidgets: List<WallpaperWidget>? = null
     private lateinit var onlineGallery: CommonsGalleryView
     private lateinit var onlineCredit: TextView
     private lateinit var maskStatus: TextView
@@ -123,6 +130,7 @@ class MainActivity : Activity() {
 
         buildHeader(column)
         buildPreview(column)
+        buildWidgetStudio(column)
         buildDepthStudio(column)
         buildClock(column)
         buildApplyBar(frame)
@@ -199,6 +207,27 @@ class MainActivity : Activity() {
         }
         foot.addView(activeMechanicDescription)
         shell.addView(foot, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
+
+        widgetGrid = WidgetGridEditor(
+            this,
+            onPreview = { working ->
+                stagedWidgets = working
+                preview.invalidate()
+            },
+            onCommit = { working ->
+                stagedWidgets = working
+                widgetStore.save(working)
+                refreshWidgetControls()
+                preview.invalidate()
+            },
+            onSelection = { id ->
+                selectedWidgetId = id
+                refreshWidgetControls()
+            }
+        ).apply {
+            visibility = View.GONE
+        }
+        shell.addView(widgetGrid, FrameLayout.LayoutParams(-1, -1))
 
         val density = resources.displayMetrics
         val availableWidth = (density.widthPixels / density.density).toInt() - 44
@@ -2018,6 +2047,7 @@ class MainActivity : Activity() {
     private inner class LivePreview : View(this@MainActivity) {
         private val renderer = HalynRenderer(this@MainActivity)
         private val clockRenderer = ClockOverlayRenderer(this@MainActivity)
+        private val widgetRenderer = WallpaperWidgetRenderer(this@MainActivity)
         private val startTime = SystemClock.uptimeMillis()
         private val fluidStroke = FluidStroke()
         private val customGestures by lazy { FluidGestures(this@MainActivity) }
@@ -2055,7 +2085,11 @@ class MainActivity : Activity() {
                 else 0f,
                 reactions = previewSignals.sample()
             )
-            clockRenderer.draw(canvas, state)
+            if (widgetRenderer.active()) {
+                widgetRenderer.draw(canvas, state, overrideItems = stagedWidgets)
+            } else {
+                clockRenderer.draw(canvas, state)
+            }
             renderer.drawForeground(canvas, state, tilt)
             if (running) {
                 // A motionless photo without a clock needs no redraw loop;
