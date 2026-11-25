@@ -18,6 +18,7 @@ final class WonderlandLayout {
     final int black=0xff080808, card=0xff252525, grey=0xff303030, blue=0xff3e91ff;
     String mode="canvas";
     Dialog activeLayerDialog;
+    AlertDialog widgetDialog;
     final Map<View,Scene.Layer> tileLayers=new HashMap<>();
     WonderlandLayout(Editor e) {
         this.e=e;
@@ -294,7 +295,7 @@ final class WonderlandLayout {
             }
         };
     }
-    void widgets(){String[] labels={"Digital clock","Analogue clock","Date","Battery"},types={"clock","analog","date","battery"};new AlertDialog.Builder(e).setTitle("Wallpaper widgets").setItems(labels,(d,i)->{e.add(types[i]);canvas();}).show();}
+    void widgets(){String[] labels={"Digital clock","Analogue clock","Date","Battery"},types={"clock","analog","date","battery"};widgetDialog=new AlertDialog.Builder(e).setTitle("Wallpaper widgets").setItems(labels,(d,i)->{e.add(types[i]);canvas();}).show();}
     void particlePresets(){String[] labels={"Snow","Warm dust","Blue sparks"};new AlertDialog.Builder(e).setTitle("Particle preset").setItems(labels,(d,i)->{e.add("particles");e.selected.color=new int[]{0xffffffff,0xfff2bc80,0xff84b7ff}[i];e.save(false);canvas();}).show();}
     boolean isBase(Scene.Layer l){return hasBase()&&e.scene.layers.get(0)==l;}
     void moveLayer(Scene.Layer source,Scene.Layer target){

@@ -39,6 +39,8 @@ PY
     adb shell input tap $xy
     sleep 1
 }
+tap_label "Project options"
+tap_label "Continue editing"
 tap_label "Image Settings"
 tap_label "Preview"
 tap_label "Apply"
