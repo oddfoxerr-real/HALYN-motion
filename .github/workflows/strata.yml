@@ -1,4 +1,4 @@
-name: Build HALYN Next APK
+name: Build STRATA APK
 on:
   push:
     branches: [strata-apk]
@@ -26,23 +26,20 @@ jobs:
           mkdir -p /tmp/strata
           tar -xJf strata/source.tar.xz -C /tmp/strata
           cd /tmp/strata
-          sed -i 's/android:label="Strata"/android:label="HALYN"/; s/android:label="Strata Live Wallpaper"/android:label="HALYN Live Wallpaper"/' app/src/main/AndroidManifest.xml
-          sed -i "s/applicationId 'studio.strata.wallpaper'/applicationId 'com.oddf0x.halynmotion.next'/" app/build.gradle
-          sed -i "s/rootProject.name = 'Strata'/rootProject.name = 'HALYN Next'/" settings.gradle
           gradle :app:assembleDebug --no-daemon --stacktrace
       - run: |
           mkdir -p dist
-          cp /tmp/strata/app/build/outputs/apk/debug/app-debug.apk dist/HALYN-Next-0.2.1-debug.apk
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose dist/HALYN-Next-0.2.1-debug.apk
+          cp /tmp/strata/app/build/outputs/apk/debug/app-debug.apk dist/Strata-0.2.1-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose dist/Strata-0.2.1-debug.apk
           (cd dist && sha256sum *.apk > SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
         with:
-          name: HALYN-Next-0.2.1-APK
+          name: Strata-0.2.1-APK
           path: dist/
           if-no-files-found: error
-      - name: Publish HALYN Next preview
+      - name: Publish STRATA preview
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="halyn-next-v0.2.1-preview.${GITHUB_RUN_NUMBER}"
-          gh release create "$tag" dist/HALYN-Next-0.2.1-debug.apk dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "HALYN Next 0.2.1 preview" --notes "Side-by-side debug preview of the new layered HALYN wallpaper editor. Device testing pending." --prerelease
+          tag="strata-v0.2.1-preview.${GITHUB_RUN_NUMBER}"
+          gh release create "$tag" dist/Strata-0.2.1-debug.apk dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "STRATA 0.2.1 preview" --notes "Side-by-side debug preview of the standalone layered STRATA wallpaper editor. Device testing pending." --prerelease
