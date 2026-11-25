@@ -30,3 +30,8 @@ s=s.replace('JSONArray a=j.getJSONArray("layers");','JSONArray a=j.getJSONArray(
 s=s.replace('gy*l.depth*h*.17f','gy*l.depthY*h*.17f')
 f.write_text(s)
 g=Path("app/build.gradle");s=g.read_text().replace("versionCode 3; versionName '0.2.1'","versionCode 4; versionName '0.3.0'");g.write_text(s)
+
+# Real instrumentation runner; test source is separate from the shipping APK.
+g=Path("app/build.gradle");s=g.read_text().replace("minSdk 26;", "minSdk 26; testInstrumentationRunner 'studio.strata.wallpaper.StrataQa';");g.write_text(s)
+# Base image must remain below ordinary layers, even when rearranged.
+e=p/"Editor.java";s=e.read_text().replace("if(j>=0&&j<scene.layers.size())", 'if(j>=0&&j<scene.layers.size()&&!(layout!=null&&layout.hasBase()&&(i==0||j==0)))');e.write_text(s)
