@@ -2,7 +2,7 @@ name: Build STRATA APK
 on:
   push:
     branches: [strata-apk]
-    paths: ['strata/source.tar.xz']
+    paths: ['strata/source.tar.xz', '.github/workflows/strata.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -15,10 +15,13 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.9'
-      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+          gradle-version: '8.11.1'
+      - run: sdkmanager --install 'platforms;android-35' 'build-tools;35.0.0'
       - run: |
           mkdir -p /tmp/strata
           tar -xJf strata/source.tar.xz -C /tmp/strata
