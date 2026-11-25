@@ -107,3 +107,39 @@ s=s.replace('if(state!=null)importingBase=state.getBoolean("importingBase");','i
 s=s.replace('state.putBoolean("importingBase",importingBase);','state.putBoolean("importingBase",importingBase);state.putString("replacingLayerId",replacingLayerId);')
 s=s.replace('super.onActivityResult(request,result,data);if(request!=42','super.onActivityResult(request,result,data);if(request==43){replaceImageResult(result,data);return;}if(request!=42')
 e.write_text(s)
+
+# Native project gallery and image library.
+e=p/"Editor.java";s=e.read_text().replace("WonderlandLayout layout; Scene scene;","WonderlandLayout layout; ProjectGallery gallery; Scene scene;")
+s=s.replace("layout=new WonderlandLayout(this);refresh();}","layout=new WonderlandLayout(this);gallery=new ProjectGallery(this);refresh();if(state==null)gallery.show();}")
+s=s.replace("if(layout!=null&&layout.back())return;super.onBackPressed();","if(gallery!=null&&gallery.open){super.onBackPressed();return;}if(layout!=null&&layout.back())return;if(gallery!=null){gallery.show();return;}super.onBackPressed();")
+s=s.replace("try{scene.save(this);if(toast)","try{scene.save(this);if(gallery!=null)gallery.persist();if(toast)")
+s=s.replace("void importPreset(", "void importPreset(")
+at=s.index("    void pickBase()")
+s=s[:at]+'''    void importPreset(String glyph,int color,boolean base){
+        try{
+            File f=new File(getCacheDir(),UUID.randomUUID()+".png");
+            Bitmap bitmap=Bitmap.createBitmap(512,512,Bitmap.Config.ARGB_8888);
+            Canvas canvas=new Canvas(bitmap);Paint paint=new Paint(3);paint.setColor(color);paint.setTypeface(Typeface.create("sans-serif",Typeface.NORMAL));paint.setTextSize(340);paint.setTextAlign(Paint.Align.CENTER);Paint.FontMetrics metrics=paint.getFontMetrics();canvas.drawText(glyph,256,256-(metrics.ascent+metrics.descent)/2,paint);
+            try(FileOutputStream out=new FileOutputStream(f)){bitmap.compress(Bitmap.CompressFormat.PNG,100,out);}bitmap.recycle();
+            importingBase=base;onActivityResult(42,RESULT_OK,new Intent().setData(Uri.fromFile(f)));if(!base&&selected!=null){selected.base.scale=.45f;save(false);preview.invalidate();}
+        }catch(Exception ex){Toast.makeText(this,"Unable to add image",Toast.LENGTH_SHORT).show();}
+    }
+'''+s[at:]
+# Rotate through pinch and direct drag. The original selection remains in the same renderer.
+s=s.replace("float lastX,lastY,lastSpan;boolean drag;","float lastX,lastY,lastSpan,lastAngle;boolean drag,rotating;")
+s=s.replace("case MotionEvent.ACTION_DOWN:playing=false;lastX=e.getX();lastY=e.getY();drag=true;return true;","case MotionEvent.ACTION_DOWN:playing=false;lastX=e.getX();lastY=e.getY();drag=true;rotating=handleHit(lastX,lastY,w,h);return true;")
+s=s.replace("case MotionEvent.ACTION_POINTER_DOWN:lastSpan=span(e);return true;","case MotionEvent.ACTION_POINTER_DOWN:lastSpan=span(e);lastAngle=angle(e);rotating=false;return true;")
+s=s.replace("p.scale=Math.max(.05f,Math.min(4,p.scale*sp/lastSpan));invalidate();","p.scale=Math.max(.05f,Math.min(4,p.scale*sp/lastSpan));float now=angle(e);p.rotation=normalize(p.rotation+normalize(now-lastAngle));lastAngle=now;invalidate();")
+s=s.replace("Scene.Pose p=editable();p.x=Math.max(-.5f", "Scene.Pose p=editable();if(rotating){float cx=(getWidth()-w)/2+p.x*w,cy=(getHeight()-h)/2+p.y*h;float a=(float)Math.toDegrees(Math.atan2(lastY-cy,lastX-cx)),b=(float)Math.toDegrees(Math.atan2(e.getY()-cy,e.getX()-cx));p.rotation=normalize(p.rotation+normalize(b-a));lastX=e.getX();lastY=e.getY();invalidate();return true;}p.x=Math.max(-.5f")
+s=s.replace("c.drawBitmap(frame,x,y,null);}","c.drawBitmap(frame,x,y,null);if(!playing&&!previewOnly&&selected!=null&&!selected.locked&&!\\\"Base image\\\".equals(selected.name))drawHandle(c,w,h);}".replace('\\\"','"'))
+a=s.index("      float span(MotionEvent")
+s=s[:a]+'''      float normalize(float a){return (a+540)%360-180;}
+      float angle(MotionEvent e){return (float)Math.toDegrees(Math.atan2(e.getY(1)-e.getY(0),e.getX(1)-e.getX(0)));}
+      float[] handle(float w,float h){Scene.Pose p=editable();float bw=w*.45f;if("image".equals(selected.kind)){Bitmap b=renderer.bitmap(selected.content);if(b!=null)bw=b.getWidth()*Math.min(w*.66f/b.getWidth(),h*.66f/b.getHeight());}float r=bw*p.scale/2,rad=(float)Math.toRadians(p.rotation);return new float[]{(getWidth()-w)/2+p.x*w+(float)Math.cos(rad)*r,(getHeight()-h)/2+p.y*h+(float)Math.sin(rad)*r};}
+      boolean handleHit(float x,float y,float w,float h){float[] a=handle(w,h);return Math.hypot(x-a[0],y-a[1])<dp(25);}
+      void drawHandle(Canvas c,float w,float h){float[] a=handle(w,h);Paint p=new Paint(3);p.setColor(0xffffca28);c.drawCircle(a[0],a[1],dp(3),p);p.setColor(0xffeeeeee);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp(1.5f));float r=dp(13);c.drawArc(a[0]-r,a[1]-r,a[0]+r,a[1]+r,-45,175,false,p);}
+'''+s[a:]
+e.write_text(s)
+f=p/"Scene.java";s=f.read_text().replace("paint.setColor(0xffe7faef);","paint.setColor(0xffffca28);")
+s=s.replace("bw=b.getWidth()*fit;bh=b.getHeight()*fit;","if(!\\\"Base image\\\".equals(l.name))fit=Math.min(w*.66f/b.getWidth(),h*.66f/b.getHeight());bw=b.getWidth()*fit;bh=b.getHeight()*fit;".replace('\\\"','"'))
+f.write_text(s)

@@ -67,7 +67,7 @@ public final class StrataQa extends Instrumentation {
         Bundle result=new Bundle();try{
             Context target=getTargetContext();dir=new File(target.getFilesDir(),"qa");if(!dir.exists()&&!dir.mkdirs())throw new IOException("QA directory");
             Intent launch=new Intent(Intent.ACTION_MAIN).setClassName(target.getPackageName(),"studio.strata.wallpaper.Editor").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            editor=(Editor)startActivitySync(launch);settle();
+            editor=(Editor)startActivitySync(launch);settle();main(()->{check(editor.gallery.open,"Project gallery shown on launch");editor.gallery.create();});settle();
             main(()->{check(editor.layout!=null,"Editor launched");check(editor.layout.mode.equals("background"),"Fresh project background chooser");check(find(editor.layout.overlay,"Gallery")!=null&&find(editor.layout.overlay,"Color")!=null,"Background choices");});
             settle();
             File base=image("base-test.png",540,1170),foreground=image("foreground-test.png",400,400);
@@ -113,7 +113,7 @@ public final class StrataQa extends Instrumentation {
                 check(!old.equals(before.content)&&editor.renderer.bitmap(before.content)!=null,"Reselect updates bitmap");
                 check(editor.scene.layers.size()==3&&editor.scene.layers.get(2)==before,"Reselect preserves layer order");
                 check(before.keys.size()==2&&Math.abs(before.base.rotation-15f)<.01f,"Reselect preserves transforms and keyframes");
-                check(find(editor.layout.rail,"Reselect image")!=null,"Selected foreground exposes image reselect button");
+                check(find(editor.layout.rail,"Remove layer")!=null,"Selected foreground exposes remove button");check(find(editor.layout.rail,"Reselect image")!=null,"Background exposes reselect button");
                 editor.layout.advanced("Transform");
             });
             settle();

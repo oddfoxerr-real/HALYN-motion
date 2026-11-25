@@ -1,0 +1,31 @@
+package studio.strata.wallpaper;
+import android.app.*;
+import android.graphics.*;
+import android.view.*;
+import android.widget.*;
+import org.json.*;
+import java.io.*;
+import java.util.*;
+final class ProjectGallery {
+    final Editor e; final File dir; String id,title; LinearLayout gallery; boolean open;
+    ProjectGallery(Editor editor){e=editor;dir=new File(e.getFilesDir(),"projects");dir.mkdirs();id=e.getPreferences(0).getString("projectId",UUID.randomUUID().toString());title=e.getPreferences(0).getString("projectTitle","Wallpaper");}
+    File file(String key){return new File(dir,key+".json");}
+    void persist(){if(open||(!e.scene.backgroundSet&&e.scene.layers.isEmpty()))return;try{write(file(id),new JSONObject().put("title",title).put("scene",e.scene.json()));e.getPreferences(0).edit().putString("projectId",id).putString("projectTitle",title).apply();}catch(Exception ex){android.util.Log.e("STRATA_PROJECT","Save",ex);}}
+    void write(File file,JSONObject data)throws Exception{android.util.AtomicFile f=new android.util.AtomicFile(file);FileOutputStream out=f.startWrite();try{out.write(data.toString().getBytes("UTF-8"));f.finishWrite(out);}catch(Exception ex){f.failWrite(out);throw ex;}}
+    JSONObject read(File file)throws Exception{try(InputStream in=new android.util.AtomicFile(file).openRead()){ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1)out.write(b,0,n);return new JSONObject(out.toString("UTF-8"));}}
+    Scene decode(JSONObject j)throws Exception{Scene s=new Scene();s.background=j.optInt("background",s.background);s.duration=j.optInt("duration",6000);JSONArray a=j.getJSONArray("layers");s.backgroundSet=j.optBoolean("backgroundSet",a.length()>0);for(int i=0;i<a.length();i++)s.layers.add(Scene.Layer.read(a.getJSONObject(i)));return s;}
+    void edit(Scene s,String key,String name){id=key;title=name;open=false;if(gallery!=null)e.root.removeView(gallery);e.layout.stage.setVisibility(View.VISIBLE);e.scene=s;e.selected=s.layers.isEmpty()?null:s.layers.get(s.layers.size()-1);e.playhead=0;e.keyMode=false;e.playing=false;e.timeline.setMax(s.duration);e.timeline.setProgress(0);e.showTime();if(s.backgroundSet)e.layout.canvas();else e.layout.background();e.refresh();e.save(false);}
+    void create(){edit(new Scene(),UUID.randomUUID().toString(),new java.text.SimpleDateFormat("yyyyMMddHHmmss",Locale.US).format(new Date()));}
+    void show(){if(open)return;persist();open=true;e.playing=false;e.layout.stage.setVisibility(View.GONE);gallery=e.column();gallery.setBackgroundColor(Color.BLACK);e.root.addView(gallery,new LinearLayout.LayoutParams(-1,0,1));ScrollView scroll=new ScrollView(e);gallery.addView(scroll);LinearLayout body=e.column();body.setPadding(e.dp(12),0,e.dp(12),e.dp(16));scroll.addView(body);
+        int width=e.getResources().getDisplayMetrics().widthPixels-2*e.dp(12);
+        LinearLayout heading=e.column();heading.setGravity(Gravity.CENTER);TextView name=e.text("STRATA",30,0xfffafafa);name.setTypeface(null,Typeface.BOLD);heading.addView(name);heading.addView(e.text("Create your own unique wallpaper.",15,0xffb5b5b5));body.addView(heading,new LinearLayout.LayoutParams(-1,Math.round(width*.56f)));
+        LinearLayout menu=e.row();menu.setGravity(Gravity.END);Button options=e.button("⋮",()->new AlertDialog.Builder(e).setItems(new String[]{"New wallpaper","Continue editing"},(d,i)->{if(i==0)create();else edit(e.scene,id,title);}).show());options.setBackgroundColor(Color.TRANSPARENT);menu.addView(options,new LinearLayout.LayoutParams(e.dp(44),e.dp(48)));body.addView(menu);
+        File[] items=dir.listFiles((d,n)->n.endsWith(".json"));if(items==null)items=new File[0];Arrays.sort(items,(a,b)->Long.compare(b.lastModified(),a.lastModified()));LinearLayout row=null;
+        for(int i=0;i<=items.length;i++){if(i%3==0){row=e.row();row.setGravity(Gravity.TOP);body.addView(row);}LinearLayout card=e.column();LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,-2,1);cp.setMargins(e.dp(2),e.dp(4),e.dp(2),e.dp(6));row.addView(card,cp);int height=Math.round(width/3f*1.7f);String label="New";
+            if(i==0){TextView plus=e.text("+",42,Color.WHITE);plus.setGravity(Gravity.CENTER);plus.setBackground(e.round(0xff19191b,4));card.addView(plus,new LinearLayout.LayoutParams(-1,height));card.setOnClickListener(v->create());}
+            else{File f=items[i-1];String key=f.getName().replaceFirst("\\.json$","");try{JSONObject rec=read(f);Scene s=decode(rec.getJSONObject("scene"));label=rec.optString("title","Wallpaper");ImageView thumb=new ImageView(e);thumb.setBackground(e.round(0xff19191b,4));thumb.setClipToOutline(true);thumb.setScaleType(ImageView.ScaleType.CENTER_CROP);Bitmap b=Bitmap.createBitmap(180,306,Bitmap.Config.ARGB_8888);e.renderer.draw(new Canvas(b),s,0,0,0,"");thumb.setImageBitmap(b);card.addView(thumb,new LinearLayout.LayoutParams(-1,height));final String saved=label;card.setOnClickListener(v->edit(s,key,saved));card.setOnLongClickListener(v->{new AlertDialog.Builder(e).setTitle(saved).setItems(new String[]{"Rename","Delete"},(d,n)->{if(n==0){EditText input=new EditText(e);input.setText(saved);new AlertDialog.Builder(e).setTitle("Rename wallpaper").setView(input).setNegativeButton("Cancel",null).setPositiveButton("Save",(dd,nn)->{try{String t=input.getText().toString().trim();if(!t.isEmpty()){rec.put("title",t);write(f,rec);if(key.equals(id))title=t;}reload();}catch(Exception ignored){}}).show();}else new AlertDialog.Builder(e).setTitle("Delete wallpaper?").setNegativeButton("Cancel",null).setPositiveButton("Delete",(dd,nn)->{f.delete();if(key.equals(id)){e.scene=new Scene();id=UUID.randomUUID().toString();title="Wallpaper";}reload();}).show();}).show();return true;});}catch(Exception ex){card.addView(e.text("Unable to open",12,e.muted),new LinearLayout.LayoutParams(-1,height));}}
+            TextView text=e.text(label,13,Color.WHITE);text.setSingleLine(true);text.setEllipsize(android.text.TextUtils.TruncateAt.END);text.setPadding(e.dp(6),e.dp(7),0,0);card.addView(text);
+        }if(row!=null)while(row.getChildCount()<3)row.addView(new Space(e),new LinearLayout.LayoutParams(0,1,1));
+    }
+    void reload(){if(gallery!=null)e.root.removeView(gallery);open=false;show();}
+}

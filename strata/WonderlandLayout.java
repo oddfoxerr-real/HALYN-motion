@@ -18,6 +18,7 @@ final class WonderlandLayout {
     final int black=0xff080808, card=0xff252525, grey=0xff303030, blue=0xff3e91ff;
     String mode="canvas";
     Dialog activeLayerDialog;
+    final Map<View,Scene.Layer> tileLayers=new HashMap<>();
     WonderlandLayout(Editor e) {
         this.e=e;
         e.root.setPadding(0,0,0,0);
@@ -45,6 +46,7 @@ final class WonderlandLayout {
         stage.addView(phone);
         railScroll=new ScrollView(e); railScroll.setFillViewport(false);railScroll.setClipChildren(false);railScroll.setClipToPadding(false); railScroll.setVerticalScrollBarEnabled(false);
         rail= e.column(); rail.setGravity(Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);
+        rail.setOnDragListener((v,event)->{if(!(event.getLocalState() instanceof Scene.Layer))return false;Scene.Layer source=(Scene.Layer)event.getLocalState();switch(event.getAction()){case DragEvent.ACTION_DRAG_STARTED:return !source.locked&&!isBase(source);case DragEvent.ACTION_DROP:Scene.Layer target=null;float best=Float.MAX_VALUE;for(Map.Entry<View,Scene.Layer> entry:tileLayers.entrySet()){float d=Math.abs(event.getY()-(entry.getKey().getTop()+entry.getKey().getBottom())/2f);if(d<best){best=d;target=entry.getValue();}}moveLayer(source,target);return true;default:return true;}});
         railScroll.addView(rail,new ScrollView.LayoutParams(-1,-2));rail.setClipChildren(false);rail.setClipToPadding(false);
         stage.addView(railScroll);
         action=pill("Image Settings",this::primary); stage.addView(action);
@@ -108,7 +110,7 @@ final class WonderlandLayout {
     }
     boolean hasBase(){return !e.scene.layers.isEmpty()&&"Base image".equals(e.scene.layers.get(0).name)&&"image".equals(e.scene.layers.get(0).kind);}
     void sync(){
-        rail.removeAllViews();
+        rail.removeAllViews();tileLayers.clear();
         int size=Math.max(e.dp(52),Math.round(stage.getWidth()*.18f));
         for(int i=e.scene.layers.size()-1;i>=0;i--){
             Scene.Layer l=e.scene.layers.get(i);
@@ -124,7 +126,7 @@ final class WonderlandLayout {
             if(!l.visible)thumb.setAlpha(.35f);
             thumb.setContentDescription(l.name+(l==e.selected?", selected":""));
             thumb.setOnClickListener(v->{e.selected=l;e.keyMode=false;if(mode.equals("settings"))settings();else if(mode.equals("advanced"))advanced(e.tab);else canvas();e.refresh();});
-            thumb.setOnLongClickListener(v->{e.selected=l;e.keyMode=false;layerOptions(l);return true;});
+            thumb.setOnLongClickListener(v->{if(l.locked||isBase(l)){layerOptions(l);return true;}return v.startDragAndDrop(ClipData.newPlainText("Layer",l.id),new View.DragShadowBuilder(v),l,0);});
             addTile(thumb,size,l==e.selected,l);
         }
         if(!hasBase()){
@@ -150,22 +152,23 @@ final class WonderlandLayout {
         FrameLayout border=new FrameLayout(e);border.setBackground(outline);border.setPadding(e.dp(1),e.dp(1),e.dp(1),e.dp(1));border.setClipToOutline(true);
         border.addView(v,new FrameLayout.LayoutParams(-1,-1));
         FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(thumbSize,thumbSize,Gravity.BOTTOM|Gravity.LEFT);cell.addView(border,bp);
-        if(selected&&layer!=null&&"image".equals(layer.kind)){
+        if(layer!=null&&(isBase(layer)||selected)){
             View change=new View(e){
                 final Paint pen=new Paint(Paint.ANTI_ALIAS_FLAG);
                 @Override protected void onDraw(Canvas canvas){
                     super.onDraw(canvas);float d=Math.min(getWidth(),getHeight()),x=getWidth()/2f,y=getHeight()/2f,r=d*.20f;
                     pen.setStyle(Paint.Style.FILL);pen.setColor(0xff050505);canvas.drawCircle(x,y,d*.5f,pen);
                     pen.setColor(0xffffffff);pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(d*.033f);pen.setStrokeCap(Paint.Cap.ROUND);pen.setStrokeJoin(Paint.Join.ROUND);
+                    if(!isBase(layer)){canvas.drawLine(x-r,y-r,x+r,y+r,pen);canvas.drawLine(x+r,y-r,x-r,y+r,pen);return;}
                     canvas.drawArc(x-r,y-r,x+r,y+r,45,295,false,pen);
                     double angle=Math.toRadians(340);float ax=x+r*(float)Math.cos(angle),ay=y+r*(float)Math.sin(angle);
                     Path arrow=new Path();arrow.moveTo(ax-d*.075f,ay-d*.035f);arrow.lineTo(ax,ay+d*.025f);arrow.lineTo(ax+d*.065f,ay-d*.055f);canvas.drawPath(arrow,pen);
                 }
             };
-            change.setContentDescription("Reselect image");change.setFocusable(true);change.setClickable(true);change.setOnClickListener(w->e.reselectImage(layer));
+            change.setContentDescription(isBase(layer)?"Reselect image":"Remove layer");change.setFocusable(true);change.setClickable(true);change.setOnClickListener(w->{if(isBase(layer))e.reselectImage(layer);else confirmRemove(layer);});
             int diameter=Math.round(size*27f/67f);FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(diameter,diameter,Gravity.TOP|Gravity.RIGHT);cell.addView(change,cp);
         }
-        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(size,size);p.topMargin=Math.max(e.dp(3),Math.round(size*5f/67f));rail.addView(cell,p);
+        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(size,size);p.topMargin=Math.max(e.dp(3),Math.round(size*5f/67f));rail.addView(cell,p);if(layer!=null)tileLayers.put(cell,layer);
     }
     void primary(){
         switch(mode){
@@ -186,7 +189,7 @@ final class WonderlandLayout {
         for(Button b:new Button[]{gallery,color}){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,e.dp(48));p.bottomMargin=e.dp(10);middle.addView(b,p);}
         FrameLayout.LayoutParams m=new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER);m.leftMargin=e.dp(38);m.rightMargin=e.dp(38);overlay.addView(middle,m);
         FrameLayout.LayoutParams more=new FrameLayout.LayoutParams(-1,e.dp(48),Gravity.BOTTOM);more.leftMargin=e.dp(38);more.rightMargin=e.dp(38);more.bottomMargin=e.dp(12);
-        overlay.addView(pill("More",()->advanced("Project")),more);position();
+        overlay.addView(pill("More",()->imageLibrary(true)),more);position();
     }
     void header(String title,Runnable close){
         LinearLayout r=e.row();r.setPadding(e.dp(24),0,e.dp(12),0);
@@ -229,8 +232,8 @@ final class WonderlandLayout {
         FrameLayout.LayoutParams p=new FrameLayout.LayoutParams(-1,-1);p.topMargin=e.dp(61);overlay.addView(controls,p);e.tab=tab;e.refresh();position();
     }
     void layerOptions(Scene.Layer l){
-        String[] items={"Image settings","Transform","Animation and keyframes","Layer order, visibility and lock","Reselect image / background","Project / save / apply"};
-        new AlertDialog.Builder(e).setTitle(l.name).setItems(items,(d,i)->{switch(i){case 0:settings();break;case 1:advanced("Transform");break;case 2:advanced("Motion");break;case 3:advanced("Layers");break;case 4:if("image".equals(l.kind))e.reselectImage(l);else background();break;default:advanced("Project");}}).show();
+        String[] items={"Image settings","Transform","Animation and keyframes","Layer order, visibility and lock","Reselect image / background","Project / save / apply","Remove layer"};
+        new AlertDialog.Builder(e).setTitle(l.name).setItems(items,(d,i)->{switch(i){case 0:settings();break;case 1:advanced("Transform");break;case 2:advanced("Motion");break;case 3:advanced("Layers");break;case 4:if("image".equals(l.kind))e.reselectImage(l);else background();break;case 6:confirmRemove(l);break;default:advanced("Project");}}).show();
     }
     void addMenu(){showLayerSheet(false);}
     void extraLayers(){showLayerSheet(true);}
@@ -251,7 +254,7 @@ final class WonderlandLayout {
             View icon=layerGlyph(name);r.addView(icon,new LinearLayout.LayoutParams(Math.round(w*.098f),-1));
             TextView t=e.text(name,17,0xffe5e5e5);t.setGravity(Gravity.CENTER_VERTICAL);t.setPadding(Math.round(w*.05f),0,0,0);r.addView(t,new LinearLayout.LayoutParams(0,-1,1));
             r.setContentDescription(name);r.setFocusable(true);r.setOnClickListener(v->{d.dismiss();switch(name){
-                case "Image":e.pick();break;
+                case "Image":imageLibrary(false);break;
                 case "Text":e.add("text");canvas();e.input("Text","Your text",x->e.selected.content=x);break;
                 case "Video":Toast.makeText(e,"Video layers are not supported in this preview",Toast.LENGTH_LONG).show();break;
                 case "Particle effect":e.add("particles");canvas();break;
@@ -293,5 +296,36 @@ final class WonderlandLayout {
     }
     void widgets(){String[] labels={"Digital clock","Analogue clock","Date","Battery"},types={"clock","analog","date","battery"};new AlertDialog.Builder(e).setTitle("Wallpaper widgets").setItems(labels,(d,i)->{e.add(types[i]);canvas();}).show();}
     void particlePresets(){String[] labels={"Snow","Warm dust","Blue sparks"};new AlertDialog.Builder(e).setTitle("Particle preset").setItems(labels,(d,i)->{e.add("particles");e.selected.color=new int[]{0xffffffff,0xfff2bc80,0xff84b7ff}[i];e.save(false);canvas();}).show();}
-    boolean back(){if(!mode.equals("canvas")){canvas();return true;}return false;}
+    boolean isBase(Scene.Layer l){return hasBase()&&e.scene.layers.get(0)==l;}
+    void moveLayer(Scene.Layer source,Scene.Layer target){
+        if(source==null||target==null||source==target||source.locked||isBase(source))return;
+        int from=e.scene.layers.indexOf(source),to=e.scene.layers.indexOf(target);
+        if(from<0||to<0)return;if(hasBase())to=Math.max(1,to);
+        e.scene.layers.remove(from);e.scene.layers.add(Math.min(to,e.scene.layers.size()),source);
+        e.selected=source;e.keyMode=false;canvas();e.refresh();e.save(false);
+    }
+    void confirmRemove(Scene.Layer layer){
+        if(layer==null||layer.locked||isBase(layer))return;
+        Dialog d=new Dialog(e);LinearLayout sheet=e.column();sheet.setPadding(e.dp(26),e.dp(18),e.dp(26),e.dp(12));sheet.setBackground(e.round(card,24));
+        TextView title=e.text("Remove this layer?",15,0xffe5e5e5);title.setGravity(Gravity.CENTER_VERTICAL);sheet.addView(title,new LinearLayout.LayoutParams(-1,e.dp(42)));
+        LinearLayout buttons=e.row();Button cancel=pill("Cancel",d::dismiss),remove=pill("Delete",()->{d.dismiss();if(layer.locked)return;e.scene.layers.remove(layer);e.selected=e.scene.layers.isEmpty()?null:e.scene.layers.get(e.scene.layers.size()-1);e.keyMode=false;canvas();e.refresh();e.save(false);});
+        cancel.setBackgroundColor(Color.TRANSPARENT);remove.setBackgroundColor(Color.TRANSPARENT);buttons.addView(cancel,new LinearLayout.LayoutParams(0,e.dp(48),1));View separator=new View(e);separator.setBackgroundColor(0xff454545);buttons.addView(separator,new LinearLayout.LayoutParams(e.dp(1),e.dp(18)));buttons.addView(remove,new LinearLayout.LayoutParams(0,e.dp(48),1));sheet.addView(buttons);
+        d.setContentView(sheet);d.show();Window w=d.getWindow();if(w!=null){w.setBackgroundDrawableResource(android.R.color.transparent);w.setGravity(Gravity.BOTTOM);w.setDimAmount(.45f);w.setLayout(stage.getWidth()-e.dp(20),-2);}
+    }
+    void imageLibrary(boolean base){
+        Dialog d=new Dialog(e);LinearLayout sheet=e.column();sheet.setPadding(e.dp(28),e.dp(22),e.dp(28),e.dp(12));sheet.setBackground(e.round(card,24));
+        TextView title=e.text("Image Library",22,0xfffafafa);title.setTypeface(null,Typeface.BOLD);sheet.addView(title,new LinearLayout.LayoutParams(-1,e.dp(48)));
+        LinearLayout tabs=e.row();LinearLayout grid=e.column();
+        Runnable first=()->populateLibrary(grid,d,base,0),second=()->populateLibrary(grid,d,base,1);
+        Button one=pill("Image 1",first),two=pill("Image 2",second);one.setBackgroundColor(Color.TRANSPARENT);two.setBackgroundColor(Color.TRANSPARENT);tabs.addView(one,new LinearLayout.LayoutParams(0,e.dp(48),1));tabs.addView(two,new LinearLayout.LayoutParams(0,e.dp(48),1));sheet.addView(tabs);
+        ScrollView sc=new ScrollView(e);sc.addView(grid);sheet.addView(sc,new LinearLayout.LayoutParams(-1,Math.min(e.dp(260),stage.getHeight()/3)));first.run();
+        Button back=pill("Back",d::dismiss);back.setBackgroundColor(Color.TRANSPARENT);back.setTextColor(blue);sheet.addView(back,new LinearLayout.LayoutParams(-1,e.dp(52)));
+        d.setContentView(sheet);d.show();Window w=d.getWindow();if(w!=null){w.setBackgroundDrawableResource(android.R.color.transparent);w.setGravity(Gravity.BOTTOM);w.setDimAmount(.45f);w.setLayout(stage.getWidth()-e.dp(20),-2);}
+    }
+    void populateLibrary(LinearLayout grid,Dialog dialog,boolean base,int page){
+        grid.removeAllViews();String[] icons=page==0?new String[]{"Gallery","✿","♥","☀","☁","✦","●","★","❀","◇","☾","♡"}:new String[]{"Gallery","✧","✳","✹","▲","◉","◈","❋","☽","♢","✺","✷"};
+        int[] colors={0xfffafafa,0xfff09a88,0xffec4646,0xffffca42,0xffa7d9f2,0xffaf9af1,0xff77b3a8,0xfff8b982};
+        for(int i=0;i<icons.length;i+=4){LinearLayout row=e.row();grid.addView(row);for(int k=i;k<Math.min(i+4,icons.length);k++){final int n=k;TextView tile=e.text(icons[k],k==0?12:32,k==0?0xfffafafa:colors[k%colors.length]);tile.setGravity(Gravity.CENTER);tile.setBackground(e.round(k==0?0xff252525:0xff4a4a4a,9));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,e.dp(65),1);p.setMargins(e.dp(4),e.dp(4),e.dp(4),e.dp(4));row.addView(tile,p);tile.setContentDescription(k==0?"Gallery":"Image preset "+(page*12+k));tile.setOnClickListener(v->{dialog.dismiss();if(n==0){if(base)e.pickBase();else e.pick();}else e.importPreset(icons[n],colors[n%colors.length],base);});}}
+    }
+    boolean back(){if(!mode.equals("canvas")&&!mode.equals("background")){canvas();return true;}return false;}
 }
