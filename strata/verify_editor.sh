@@ -60,10 +60,12 @@ if [[ -z "$picker" || "$picker" == *"$app/.Editor"* ]]; then
     exit 1
 fi
 # Actual system confirmation, if exposed by this Android image.
-for i in $(seq 1 4); do
+for i in $(seq 1 12); do
     adb shell dumpsys wallpaper > qa-results/wallpaper-state.txt
-    if grep -E 'mWallpaperComponent=|wallpaperComponent=' qa-results/wallpaper-state.txt | grep -q 'studio.strata.wallpaper'; then break; fi
-    tap_label "Strata Live Wallpaper" || tap_label "Strata" || tap_label "Set wallpaper" || tap_label "Apply" || tap_label "Home screen" || tap_label "Home screen and lock screen" || true
+    if grep -Ei 'mWallpaperComponent[=:]|wallpaperComponent[=:]' qa-results/wallpaper-state.txt | grep -q 'studio.strata.wallpaper'; then break; fi
+    adb shell uiautomator dump /sdcard/strata-picker.xml >/dev/null 2>&1 || true
+    adb pull /sdcard/strata-picker.xml "qa-results/picker-$i.xml" >/dev/null 2>&1 || true
+    tap_label "Home screen and lock screen" || tap_label "Home screen" || tap_label "Set wallpaper" || tap_label "Apply" || tap_label "Set Wallpaper" || tap_label "Strata Live Wallpaper" || tap_label "Strata" || true
     sleep 2
 done
 adb shell dumpsys wallpaper > qa-results/wallpaper-state.txt
@@ -71,5 +73,8 @@ if grep -E 'mWallpaperComponent=|wallpaperComponent=' qa-results/wallpaper-state
     echo "STRATA_WALLPAPER_APPLIED: Android reports STRATA as active wallpaper" | tee -a qa-results/instrumentation.log
 else
     echo "STRATA_PICKER_OPENED: system picker launched; final selection not confirmed" | tee -a qa-results/instrumentation.log
+    cat qa-results/wallpaper-state.txt
+    for xml in qa-results/picker-*.xml; do echo "$xml"; cat "$xml"; done
+    exit 1
 fi
 
