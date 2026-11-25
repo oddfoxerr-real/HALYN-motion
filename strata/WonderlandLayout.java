@@ -47,9 +47,19 @@ final class WonderlandLayout {
         railScroll.addView(rail,new ScrollView.LayoutParams(-1,-2));
         stage.addView(railScroll);
         action=pill("Image Settings",this::primary); stage.addView(action);
-        add=pill("+",this::addMenu); add.setTextSize(32);add.setContentDescription("Add to layer");stage.addView(add);
+        add=new Button(e){
+            final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
+            @Override protected void onDraw(Canvas c){
+                super.onDraw(c);float a=Math.min(getWidth(),getHeight())*.47f;
+                c.save();c.translate(getWidth()/2f-a/2,getHeight()/2f-a/2);c.scale(a/24,a/24);
+                p.setStyle(Paint.Style.FILL);p.setColor(0xfff5f5f5);c.drawRoundRect(0,0,20,20,2,2,p);
+                p.setColor(grey);c.drawCircle(5,5,2,p);Path mountain=new Path();mountain.moveTo(2,16);mountain.lineTo(8,9);mountain.lineTo(12,13);mountain.lineTo(15,10);mountain.lineTo(18,16);mountain.close();c.drawPath(mountain,p);
+                p.setColor(grey);c.drawCircle(19,19,6,p);p.setColor(0xfff5f5f5);p.setStrokeWidth(2.8f);p.setStrokeCap(Paint.Cap.ROUND);c.drawLine(15,19,23,19,p);c.drawLine(19,15,19,23,p);c.restore();
+            }
+        };
+        add.setBackground(e.round(0xff444444,100));add.setStateListAnimator(null);add.setMinWidth(0);add.setMinimumWidth(0);add.setContentDescription("Add to layer");add.setOnClickListener(v->addMenu());stage.addView(add);
         action.setOnLongClickListener(v->{advanced("Project");return true;});
-        stage.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(r-l!=or-ol||b-t!=ob-ot)position();});
+        stage.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(r-l!=or-ol||b-t!=ob-ot)sync();});
         e.panel=e.column();
         e.timeline=new SeekBar(e);e.timeline.setMax(e.scene.duration);
         e.timeline.setContentDescription("Animation timeline");
@@ -90,7 +100,7 @@ final class WonderlandLayout {
             int railH=Math.min(Math.round(h*.66f),count*(railW+e.dp(9)));
             int railBottom=actionY-e.dp(18);
             place(railScroll,railX,Math.max(y,railBottom-railH),railW,railH);
-            railScroll.setVisibility(View.VISIBLE);
+            railScroll.setVisibility(mode.equals("background")&&!e.scene.backgroundSet?View.INVISIBLE:View.VISIBLE);
             railScroll.post(()->railScroll.fullScroll(View.FOCUS_DOWN));
         }
         place(phone,x,y,cw,ch);
@@ -123,7 +133,7 @@ final class WonderlandLayout {
             thumb.setContentDescription("Background color");thumb.setOnClickListener(v->background());
             addTile(thumb,size,e.selected==null);
         }
-        if(mode.equals("canvas"))action.setText(e.selected==null?"Background":"Image Settings");
+        if(mode.equals("canvas"))action.setText(e.selected==null?"Background":e.selected.kind.equals("image")?"Image Settings":e.selected.name+" Settings");
         position();
     }
     FrameLayout tile(boolean selected,int size){
@@ -134,6 +144,7 @@ final class WonderlandLayout {
         d.setStroke(e.dp(selected?2:1),selected?0xffff3939:0xff3a3a3a);border.setBackground(d);
         border.setPadding(e.dp(3),e.dp(3),e.dp(3),e.dp(3));
         border.addView(v,new FrameLayout.LayoutParams(-1,-1));
+        if(selected&&hasBase()&&e.selected==e.scene.layers.get(0)&&v.getContentDescription()!=null&&v.getContentDescription().toString().startsWith("Base image")){TextView replace=e.text("⟳",18,0xffffffff);replace.setGravity(Gravity.CENTER);replace.setBackground(e.round(0xff050505,20));replace.setContentDescription("Replace background image");replace.setOnClickListener(w->e.pickBase());FrameLayout.LayoutParams rp=new FrameLayout.LayoutParams(e.dp(27),e.dp(27),Gravity.TOP|Gravity.RIGHT);border.addView(replace,rp);}
         LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(size,size);p.bottomMargin=e.dp(8);rail.addView(border,p);
     }
     void primary(){
