@@ -84,4 +84,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload "strata-v0.3.0-preview.${GITHUB_RUN_NUMBER}" screenshots/*.png --repo "$GITHUB_REPOSITORY"
+          gh release upload "strata-v0.3.0-preview.${GITHUB_RUN_NUMBER}" screenshots/0*.png screenshots/instrumentation.log --repo "$GITHUB_REPOSITORY"
+          gh release edit "strata-v0.3.0-preview.${GITHUB_RUN_NUMBER}" --repo "$GITHUB_REPOSITORY" --notes "Signed standalone STRATA preview. Native Android emulator checks passed for the tested import, layer, parallax, animation, persistence, and wallpaper-picker paths. Screenshots are actual Android captures. Physical Galaxy A56 testing and final wallpaper application remain pending."

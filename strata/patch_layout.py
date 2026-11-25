@@ -35,3 +35,8 @@ g=Path("app/build.gradle");s=g.read_text().replace("versionCode 3; versionName '
 g=Path("app/build.gradle");s=g.read_text().replace("minSdk 26;", "minSdk 26; testInstrumentationRunner 'studio.strata.wallpaper.StrataQa';");g.write_text(s)
 # Base image must remain below ordinary layers, even when rearranged.
 e=p/"Editor.java";s=e.read_text().replace("if(j>=0&&j<scene.layers.size())", 'if(j>=0&&j<scene.layers.size()&&!(layout!=null&&layout.hasBase()&&(i==0||j==0)))');e.write_text(s)
+
+# Keep base image filled when tilted, without changing independently selected foreground transforms.
+f=p/"Scene.java";s=f.read_text()
+s=s.replace('float fit=Math.max(w/b.getWidth(),h/b.getHeight());','float fit=Math.max(w/b.getWidth(),h/b.getHeight());if("Base image".equals(l.name)&&l.parallaxOn)fit*=1+0.34f*Math.max(Math.abs(l.depth),Math.abs(l.depthY));')
+f.write_text(s)

@@ -32,7 +32,7 @@ public final class StrataQa extends Instrumentation {
         b.recycle();
     }
     View find(View v,String name){
-        if(v instanceof TextView&&name.contentEquals(((TextView)v).getText()))return v;
+        if(v instanceof TextView&&name.contentEquals(((TextView)v).getText())&&!name.endsWith(" movement"))return v;
         if(v.getContentDescription()!=null&&name.contentEquals(v.getContentDescription()))return v;
         if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++){View x=find(g.getChildAt(i),name);if(x!=null)return x;}}
         return null;
@@ -82,7 +82,7 @@ public final class StrataQa extends Instrumentation {
             main(()->{check(editor.scene.layers.size()==1&&editor.layout.hasBase(),"Base image imported through activity result");check(editor.renderer.bitmap(editor.selected.content)!=null,"Imported bitmap decoded");check(editor.layout.mode.equals("canvas"),"Import returns to canvas");check(editor.layout.phone.getWidth()>0&&editor.layout.phone.getRight()<editor.layout.railScroll.getLeft(),"Canvas left of thumbnail rail");check(editor.layout.action.getTop()>editor.layout.phone.getBottom(),"Action below canvas");});
             snap("02-editor");
             main(()->click(editor.layout.action,"Image settings"));settle();
-            main(()->{check(editor.layout.mode.equals("settings"),"In-canvas image settings");Switch sw=(Switch)find(editor.layout.overlay,"Enable motion effect");click(sw,"Enable motion effect");});
+            main(()->{check(editor.layout.mode.equals("settings"),"In-canvas image settings");Switch sw=(Switch)find(editor.layout.overlay,"Enable motion effect");check(sw!=null&&sw.isEnabled()&&sw.isShown(),"Motion switch available");sw.performClick();check(editor.selected.parallaxOn,"Motion switch actually enabled parallax");});
             settle();
             main(()->{slide((SeekBar)find(editor.layout.overlay,"X movement"),.8f);slide((SeekBar)find(editor.layout.overlay,"Y movement"),.25f);check(editor.selected.parallaxOn&&editor.selected.depth>.3f&&editor.selected.depthY<-.2f,"Independent X/Y motion stored");});
             snap("03-motion-settings");
@@ -118,9 +118,9 @@ public final class StrataQa extends Instrumentation {
             snap("07-preview");
             main(()->{
                 Intent intent=new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,new ComponentName(editor,LiveWallpaper.class));
-                check(intent.resolveActivity(editor.getPackageManager())!=null,"Android live wallpaper picker resolves");editor.layout.action.performClick();
+                check(editor.layout.action.isEnabled(),"Apply action available");editor.layout.action.performClick();
             });
-            settle();snap("08-android-wallpaper-picker");
+            settle();AccessibilityNodeInfo picker=getUiAutomation().getRootInActiveWindow();check(picker!=null&&!getTargetContext().getPackageName().contentEquals(picker.getPackageName()),"Android wallpaper picker opened outside editor");snap("08-android-wallpaper-picker");
             result.putString("stream","\nSTRATA_QA_PASS "+checks+" checks; actual screenshots captured\n");finish(Activity.RESULT_OK,result);
         }catch(Throwable t){
             android.util.Log.e("STRATA_QA","QA failed",t);
