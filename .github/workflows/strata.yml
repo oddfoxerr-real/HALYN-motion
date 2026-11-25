@@ -81,8 +81,17 @@ jobs:
           path: screenshots/
           if-no-files-found: warn
       - name: Attach actual emulator captures to release
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload "strata-v0.3.0-preview.${GITHUB_RUN_NUMBER}" screenshots/0*.png screenshots/instrumentation.log --repo "$GITHUB_REPOSITORY"
-          gh release edit "strata-v0.3.0-preview.${GITHUB_RUN_NUMBER}" --repo "$GITHUB_REPOSITORY" --notes "Signed standalone STRATA preview. Native Android emulator checks passed for the tested import, layer, parallax, animation, persistence, and wallpaper-picker paths. Screenshots are actual Android captures. Physical Galaxy A56 testing and final wallpaper application remain pending."
+          shopt -s nullglob
+          tag="strata-v0.3.0-preview.${GITHUB_RUN_NUMBER}"
+          captures=(screenshots/0*.png)
+          if [ "${#captures[@]}" -gt 0 ]; then gh release upload "$tag" "${captures[@]}" --repo "$GITHUB_REPOSITORY" --clobber; fi
+          if [ -f screenshots/instrumentation.log ]; then gh release upload "$tag" screenshots/instrumentation.log --repo "$GITHUB_REPOSITORY" --clobber; fi
+          if grep -q STRATA_QA_PASS screenshots/instrumentation.log && grep -q STRATA_WALLPAPER_APPLIED screenshots/instrumentation.log; then
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --notes "Native editor checks passed and Android reported STRATA as the active wallpaper. Actual emulator screenshots attached. Physical Galaxy A56 testing remains pending."
+          elif grep -q STRATA_QA_PASS screenshots/instrumentation.log; then
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --notes "Native editor checks passed. Actual emulator screenshots attached. Final wallpaper application and physical Galaxy A56 testing not confirmed."
+          fi

@@ -40,3 +40,25 @@ e=p/"Editor.java";s=e.read_text().replace("if(j>=0&&j<scene.layers.size())", 'if
 f=p/"Scene.java";s=f.read_text()
 s=s.replace('float fit=Math.max(w/b.getWidth(),h/b.getHeight());','float fit=Math.max(w/b.getWidth(),h/b.getHeight());if("Base image".equals(l.name)&&l.parallaxOn)fit*=1+0.34f*Math.max(Math.abs(l.depth),Math.abs(l.depthY));')
 f.write_text(s)
+
+# Use the supported system live-wallpaper intents; do not silently swallow launch failure.
+e=p/"Editor.java";s=e.read_text()
+a=s.index("    void apply(){");b=s.index("\n",a)
+s=s[:a]+'''    void apply(){
+        try{scene.save(this);}catch(Exception failure){
+            new AlertDialog.Builder(this).setTitle("Unable to save wallpaper").setMessage(String.valueOf(failure.getMessage())).setPositiveButton("OK",null).show();return;
+        }
+        ComponentName component=new ComponentName(this,LiveWallpaper.class);
+        Intent direct=new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,component);
+        try{startActivity(direct);android.util.Log.i("STRATA_APPLY","Started live wallpaper preview");return;}
+        catch(ActivityNotFoundException|SecurityException ex){android.util.Log.w("STRATA_APPLY","Direct preview unavailable",ex);}
+        try{startActivity(new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER));android.util.Log.i("STRATA_APPLY","Started live wallpaper chooser");return;}
+        catch(ActivityNotFoundException|SecurityException ex){android.util.Log.w("STRATA_APPLY","Chooser unavailable",ex);}
+        try{startActivity(new Intent(Intent.ACTION_SET_WALLPAPER));android.util.Log.i("STRATA_APPLY","Started system wallpaper chooser");return;}
+        catch(ActivityNotFoundException|SecurityException ex){android.util.Log.e("STRATA_APPLY","No system wallpaper picker",ex);}
+        new AlertDialog.Builder(this).setTitle("Apply STRATA wallpaper").setMessage("Your project is saved. Open your phone's wallpaper settings, select Live wallpapers, and choose Strata Live Wallpaper. This Android device did not expose a wallpaper picker.").setPositiveButton("OK",null).show();
+    }'''+s[b:]
+e.write_text(s)
+manifest=Path("app/src/main/AndroidManifest.xml");s=manifest.read_text()
+s=s.replace('<application android:label="Strata"', '<queries><intent><action android:name="android.service.wallpaper.CHANGE_LIVE_WALLPAPER"/></intent><intent><action android:name="android.service.wallpaper.LIVE_WALLPAPER_CHOOSER"/></intent><intent><action android:name="android.intent.action.SET_WALLPAPER"/></intent></queries><application android:label="Strata"')
+manifest.write_text(s)
