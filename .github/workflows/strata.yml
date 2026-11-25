@@ -49,7 +49,7 @@ jobs:
           tag="strata-v0.3.0-preview.${GITHUB_RUN_NUMBER}"
           gh release create "$tag" dist/Strata-0.3.0-debug.apk dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "STRATA 0.3.0 preview" --notes "Side-by-side debug preview of the standalone layered STRATA wallpaper editor. Device testing pending." --prerelease
 
-  screenshots:
+  functional-tests:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -64,7 +64,7 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Capture actual Android editor screens
+      - name: Verify Android editor and wallpaper picker
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -73,25 +73,24 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: bash strata/capture_screens.sh
+          script: bash strata/verify_editor.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: STRATA-actual-screenshots
-          path: screenshots/
+          name: STRATA-functional-test-results
+          path: qa-results/
           if-no-files-found: warn
-      - name: Attach actual emulator captures to release
+      - name: Publish verification result
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          shopt -s nullglob
           tag="strata-v0.3.0-preview.${GITHUB_RUN_NUMBER}"
-          captures=(screenshots/0*.png)
-          if [ "${#captures[@]}" -gt 0 ]; then gh release upload "$tag" "${captures[@]}" --repo "$GITHUB_REPOSITORY" --clobber; fi
-          if [ -f screenshots/instrumentation.log ]; then gh release upload "$tag" screenshots/instrumentation.log --repo "$GITHUB_REPOSITORY" --clobber; fi
-          if grep -q STRATA_QA_PASS screenshots/instrumentation.log && grep -q STRATA_WALLPAPER_APPLIED screenshots/instrumentation.log; then
-            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --notes "Native editor checks passed and Android reported STRATA as the active wallpaper. Actual emulator screenshots attached. Physical Galaxy A56 testing remains pending."
-          elif grep -q STRATA_QA_PASS screenshots/instrumentation.log; then
-            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --notes "Native editor checks passed. Actual emulator screenshots attached. Final wallpaper application and physical Galaxy A56 testing not confirmed."
+          if [ -f qa-results/instrumentation.log ]; then
+            gh release upload "$tag" qa-results/instrumentation.log --repo "$GITHUB_REPOSITORY" --clobber
+            if grep -q STRATA_QA_PASS qa-results/instrumentation.log && grep -q STRATA_WALLPAPER_APPLIED qa-results/instrumentation.log; then
+              gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --notes "Signed standalone STRATA APK. Native Android editor checks passed, including image replacement, and Android reported STRATA as active wallpaper. Physical Galaxy A56 testing remains pending."
+            elif grep -q STRATA_QA_PASS qa-results/instrumentation.log && grep -q STRATA_PICKER_OPENED qa-results/instrumentation.log; then
+              gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --notes "Signed standalone STRATA APK. Native editor checks passed and system wallpaper picker opened. Final wallpaper selection and physical Galaxy A56 testing remain unconfirmed."
+            fi
           fi

@@ -24,13 +24,6 @@ public final class StrataQa extends Instrumentation {
         if(error.get()!=null)throw new AssertionError(error.get());
     }
     void settle(){waitForIdleSync();SystemClock.sleep(500);}
-    void snap(String name)throws Exception{
-        settle();
-        Bitmap b=getUiAutomation().takeScreenshot();
-        check(b!=null&&b.getWidth()>0,"Screenshot: "+name);
-        try(FileOutputStream out=new FileOutputStream(new File(dir,name+".png"))){if(!b.compress(Bitmap.CompressFormat.PNG,100,out))throw new IOException("PNG encode failed");}
-        b.recycle();
-    }
     View find(View v,String name){
         if(v instanceof TextView&&name.contentEquals(((TextView)v).getText())&&!name.endsWith(" movement"))return v;
         if(v.getContentDescription()!=null&&name.contentEquals(v.getContentDescription()))return v;
@@ -76,25 +69,25 @@ public final class StrataQa extends Instrumentation {
             Intent launch=new Intent(Intent.ACTION_MAIN).setClassName(target.getPackageName(),"studio.strata.wallpaper.Editor").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             editor=(Editor)startActivitySync(launch);settle();
             main(()->{check(editor.layout!=null,"Editor launched");check(editor.layout.mode.equals("background"),"Fresh project background chooser");check(find(editor.layout.overlay,"Gallery")!=null&&find(editor.layout.overlay,"Color")!=null,"Background choices");});
-            snap("01-background");
+            settle();
             File base=image("base-test.png",540,1170),foreground=image("foreground-test.png",400,400);
             importImage(base,true);
             main(()->{check(editor.scene.layers.size()==1&&editor.layout.hasBase(),"Base image imported through activity result");check(editor.renderer.bitmap(editor.selected.content)!=null,"Imported bitmap decoded");check(editor.layout.mode.equals("canvas"),"Import returns to canvas");check(editor.layout.phone.getWidth()>0&&editor.layout.phone.getRight()<editor.layout.railScroll.getLeft(),"Canvas left of thumbnail rail");check(editor.layout.action.getTop()>editor.layout.phone.getBottom(),"Action below canvas");});
-            snap("02-editor");
+            settle();
             main(()->click(editor.layout.action,"Image settings"));settle();
             main(()->{check(editor.layout.mode.equals("settings"),"In-canvas image settings");Switch sw=(Switch)find(editor.layout.overlay,"Enable motion effect");check(sw!=null&&sw.isEnabled()&&sw.isShown(),"Motion switch available");sw.performClick();check(editor.selected.parallaxOn,"Motion switch actually enabled parallax");});
             settle();
             main(()->{slide((SeekBar)find(editor.layout.overlay,"X movement"),.8f);slide((SeekBar)find(editor.layout.overlay,"Y movement"),.25f);check(editor.selected.parallaxOn&&editor.selected.depth>.3f&&editor.selected.depthY<-.2f,"Independent X/Y motion stored");});
-            snap("03-motion-settings");
+            settle();
             main(()->click(find(editor.layout.overlay,"Close settings"),"Close settings"));
             main(()->click(editor.layout.add,"Add to layer"));
-            snap("04-add-layer");
+            settle();
             main(()->{check(editor.layout.activeLayerDialog!=null,"Original five-item sheet is open");View decor=editor.layout.activeLayerDialog.getWindow().getDecorView();check(find(decor,"Image")!=null&&find(decor,"Particle preset")!=null&&find(decor,"Widget")==null,"Wonderland sheet retains its five original rows");editor.layout.activeLayerDialog.dismiss();check(editor.layout.add.performLongClick(),"Extra layer menu via long press");});
             settle();
             main(()->{Dialog dialog=editor.layout.activeLayerDialog;check(dialog!=null,"Extra layer menu opened");click(find(dialog.getWindow().getDecorView(),"Widget"),"Widget");});
             clickNode("Digital clock");settle();
             main(()->{check("clock".equals(editor.selected.kind),"Clock added through widget menu");check(editor.scene.layers.size()==2,"Widget is an independent layer");});
-            snap("05-widget");
+            settle();
             importImage(foreground,false);
             main(()->{
                 check(editor.scene.layers.size()==3&&"image".equals(editor.selected.kind),"Foreground image import");
@@ -123,7 +116,7 @@ public final class StrataQa extends Instrumentation {
                 check(find(editor.layout.rail,"Reselect image")!=null,"Selected foreground exposes image reselect button");
                 editor.layout.advanced("Transform");
             });
-            snap("06-animation-controls");
+            settle();
             main(()->{
                 Scene scene=editor.scene;Scene.Renderer renderer=editor.renderer;
                 Bitmap a=Bitmap.createBitmap(180,390,Bitmap.Config.ARGB_8888),b=Bitmap.createBitmap(180,390,Bitmap.Config.ARGB_8888);
@@ -131,12 +124,12 @@ public final class StrataQa extends Instrumentation {
                 check(!a.sameAs(b),"Renderer produces different animation/parallax frames");a.recycle();b.recycle();
                 editor.layout.preview();check(editor.previewOnly&&editor.playing,"Live preview playback");
             });
-            snap("07-preview");
+            settle();
             main(()->{check(editor.layout.action.isEnabled(),"Apply action available");editor.save(false);});
-            result.putString("stream","\nSTRATA_QA_PASS "+checks+" checks; actual screenshots captured\n");finish(Activity.RESULT_OK,result);
+            result.putString("stream","\nSTRATA_QA_PASS "+checks+" functional checks passed\n");finish(Activity.RESULT_OK,result);
         }catch(Throwable t){
             android.util.Log.e("STRATA_QA","QA failed",t);
-            try{if(dir!=null)snap("failure");}catch(Throwable ignored){}
+            
             result.putString("stream","\nSTRATA_QA_FAIL "+android.util.Log.getStackTraceString(t));finish(Activity.RESULT_CANCELED,result);
         }
     }
