@@ -89,7 +89,10 @@ public final class StrataQa extends Instrumentation {
             main(()->click(find(editor.layout.overlay,"Close settings"),"Close settings"));
             main(()->click(editor.layout.add,"Add to layer"));
             snap("04-add-layer");
-            clickNode("Widget");clickNode("Digital clock");settle();
+            main(()->{check(editor.layout.activeLayerDialog!=null,"Original five-item sheet is open");View decor=editor.layout.activeLayerDialog.getWindow().getDecorView();check(find(decor,"Image")!=null&&find(decor,"Particle preset")!=null&&find(decor,"Widget")==null,"Wonderland sheet retains its five original rows");editor.layout.activeLayerDialog.dismiss();check(editor.layout.add.performLongClick(),"Extra layer menu via long press");});
+            settle();
+            main(()->{Dialog dialog=editor.layout.activeLayerDialog;check(dialog!=null,"Extra layer menu opened");click(find(dialog.getWindow().getDecorView(),"Widget"),"Widget");});
+            clickNode("Digital clock");settle();
             main(()->{check("clock".equals(editor.selected.kind),"Clock added through widget menu");check(editor.scene.layers.size()==2,"Widget is an independent layer");});
             snap("05-widget");
             importImage(foreground,false);

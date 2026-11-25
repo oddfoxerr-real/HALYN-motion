@@ -17,6 +17,7 @@ final class WonderlandLayout {
     final Button action, add;
     final int black=0xff080808, card=0xff252525, grey=0xff303030, blue=0xff3e91ff;
     String mode="canvas";
+    Dialog activeLayerDialog;
     WonderlandLayout(Editor e) {
         this.e=e;
         e.root.setPadding(0,0,0,0);
@@ -42,9 +43,9 @@ final class WonderlandLayout {
         overlay=new FrameLayout(e); overlay.setBackgroundColor(0xff000000);
         overlay.setVisibility(View.GONE); phone.addView(overlay,new FrameLayout.LayoutParams(-1,-1));
         stage.addView(phone);
-        railScroll=new ScrollView(e); railScroll.setFillViewport(false); railScroll.setVerticalScrollBarEnabled(false);
+        railScroll=new ScrollView(e); railScroll.setFillViewport(false);railScroll.setClipChildren(false);railScroll.setClipToPadding(false); railScroll.setVerticalScrollBarEnabled(false);
         rail= e.column(); rail.setGravity(Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);
-        railScroll.addView(rail,new ScrollView.LayoutParams(-1,-2));
+        railScroll.addView(rail,new ScrollView.LayoutParams(-1,-2));rail.setClipChildren(false);rail.setClipToPadding(false);
         stage.addView(railScroll);
         action=pill("Image Settings",this::primary); stage.addView(action);
         add=new Button(e){
@@ -57,8 +58,8 @@ final class WonderlandLayout {
                 p.setColor(grey);c.drawCircle(19,19,6,p);p.setColor(0xfff5f5f5);p.setStrokeWidth(2.8f);p.setStrokeCap(Paint.Cap.ROUND);c.drawLine(15,19,23,19,p);c.drawLine(19,15,19,23,p);c.restore();
             }
         };
-        add.setBackground(e.round(0xff444444,100));add.setStateListAnimator(null);add.setMinWidth(0);add.setMinimumWidth(0);add.setContentDescription("Add to layer");add.setOnClickListener(v->addMenu());stage.addView(add);
-        action.setOnLongClickListener(v->{advanced("Project");return true;});
+        add.setBackground(e.round(0xff4a4a4a,100));add.setStateListAnimator(null);add.setMinWidth(0);add.setMinimumWidth(0);add.setContentDescription("Add to layer");add.setOnClickListener(v->addMenu());add.setOnLongClickListener(v->{extraLayers();return true;});stage.addView(add);
+        action.setOnLongClickListener(v->{advanced(mode.equals("settings")?"Motion":"Project");return true;});
         stage.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(r-l!=or-ol||b-t!=ob-ot)sync();});
         e.panel=e.column();
         e.timeline=new SeekBar(e);e.timeline.setMax(e.scene.duration);
@@ -85,7 +86,7 @@ final class WonderlandLayout {
         int ch=Math.round(cw*19.5f/9);
         int x=Math.round(w*.078f),y=Math.round(h*.078f);
         int actionY=Math.round(h*.88f),buttonH=Math.max(e.dp(48),Math.round(h*.062f));
-        int railX=Math.round(w*.765f),railW=Math.round(w*.17f);
+        int railX=Math.round(w*.765f),railW=Math.round(w*.18f);
         if(mode.equals("preview")){
             cw=Math.min(Math.round(w*.94f),Math.round(h*.82f*9/19.5f));ch=Math.round(cw*19.5f/9);
             x=(w-cw)/2;y=Math.max(0,(actionY-ch)/2);
@@ -97,7 +98,7 @@ final class WonderlandLayout {
             place(add,railX+(railW-size)/2,actionY-(size-buttonH)/2,size,size);
             add.setVisibility(View.VISIBLE);
             int count=Math.max(1,e.scene.layers.size()+(hasBase()?0:1));
-            int railH=Math.min(Math.round(h*.66f),count*(railW+e.dp(9)));
+            int railH=Math.min(Math.round(h*.66f),count*(railW+Math.round(railW*5f/67f)));
             int railBottom=actionY-e.dp(18);
             place(railScroll,railX,Math.max(y,railBottom-railH),railW,railH);
             railScroll.setVisibility(mode.equals("background")&&!e.scene.backgroundSet?View.INVISIBLE:View.VISIBLE);
@@ -108,7 +109,7 @@ final class WonderlandLayout {
     boolean hasBase(){return !e.scene.layers.isEmpty()&&"Base image".equals(e.scene.layers.get(0).name)&&"image".equals(e.scene.layers.get(0).kind);}
     void sync(){
         rail.removeAllViews();
-        int size=Math.max(e.dp(52),Math.round(stage.getWidth()*.16f));
+        int size=Math.max(e.dp(52),Math.round(stage.getWidth()*.18f));
         for(int i=e.scene.layers.size()-1;i>=0;i--){
             Scene.Layer l=e.scene.layers.get(i);
             FrameLayout thumb=tile(l==e.selected,size);
@@ -143,10 +144,10 @@ final class WonderlandLayout {
         // Geometry follows Wonderland 1.6.28's layer_list_item resource:
         // 67-unit cell, 60-unit thumbnail, 27-unit image-change control.
         FrameLayout cell=new FrameLayout(e);cell.setClipChildren(false);cell.setClipToPadding(false);
-        int thumbSize=Math.round(size*60f/67f),radius=Math.round(thumbSize*.20f);
+        int thumbSize=Math.round(size*60f/67f),radius=Math.round(size*13f/67f);
         GradientDrawable outline=e.round(0xff4a4a4a,Math.max(1,Math.round(radius/e.getResources().getDisplayMetrics().density)));
         outline.setStroke(Math.max(e.dp(1),Math.round(size*2f/67f)),selected?0xfff50000:0xff3a3a3a);
-        FrameLayout border=new FrameLayout(e);border.setBackground(outline);border.setPadding(e.dp(2),e.dp(2),e.dp(2),e.dp(2));border.setClipToOutline(true);
+        FrameLayout border=new FrameLayout(e);border.setBackground(outline);border.setPadding(e.dp(1),e.dp(1),e.dp(1),e.dp(1));border.setClipToOutline(true);
         border.addView(v,new FrameLayout.LayoutParams(-1,-1));
         FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(thumbSize,thumbSize,Gravity.BOTTOM|Gravity.LEFT);cell.addView(border,bp);
         if(selected&&layer!=null&&"image".equals(layer.kind)){
@@ -198,7 +199,7 @@ final class WonderlandLayout {
         mode="settings";e.playing=false;e.previewOnly=false;overlay.removeAllViews();overlay.setVisibility(View.VISIBLE);stage.setBackgroundColor(black);action.setEnabled(true);action.setAlpha(1);add.setEnabled(true);add.setAlpha(1);action.setText("Preview");
         Scene.Layer l=e.selected;header(l.kind.equals("image")?"Image Settings":l.name+" Settings",this::canvas);
         LinearLayout c=e.column();c.setPadding(e.dp(21),e.dp(14),e.dp(21),e.dp(14));c.setBackground(e.round(card,19));
-        Switch sw=new Switch(e);sw.setText("Enable motion effect");sw.setTextColor(e.fg);sw.setTextSize(15);sw.setTypeface(null,Typeface.BOLD);sw.setChecked(l.parallaxOn);sw.setEnabled(!l.locked);
+        Switch sw=new Switch(e);sw.setText("Enable motion effect");sw.setTextColor(0xfffafafa);sw.setShowText(false);sw.setThumbTintList(ColorStateList.valueOf(0xfffafafa));sw.setTrackTintList(new ColorStateList(new int[][]{new int[]{android.R.attr.state_checked},new int[]{}},new int[]{blue,0xff808080}));sw.setTextSize(15);sw.setTypeface(null,Typeface.BOLD);sw.setChecked(l.parallaxOn);sw.setEnabled(!l.locked);
         c.addView(sw,new LinearLayout.LayoutParams(-1,e.dp(47)));
         LinearLayout motion=e.column();TextView title=e.text("Motion",16,e.fg);title.setTypeface(null,Typeface.BOLD);motion.addView(title);
         axis(motion,"X movement",l.depth,x->l.depth=x,l.parallaxOn&&!l.locked);
@@ -206,15 +207,14 @@ final class WonderlandLayout {
         motion.setAlpha(l.parallaxOn?1:.34f);c.addView(motion);
         sw.setOnCheckedChangeListener((b,on)->{l.parallaxOn=on;e.save(false);settings();e.preview.invalidate();});
         FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(-1,-2,Gravity.TOP);cp.topMargin=e.dp(61);overlay.addView(c,cp);
-        Button more=pill("More settings",()->advanced("Motion"));more.setTextSize(13);
-        FrameLayout.LayoutParams mp=new FrameLayout.LayoutParams(-1,e.dp(44),Gravity.BOTTOM);mp.leftMargin=e.dp(20);mp.rightMargin=e.dp(20);mp.bottomMargin=e.dp(14);overlay.addView(more,mp);
+        overlay.setOnLongClickListener(v->{advanced("Motion");return true;});
         position();
     }
     void axis(LinearLayout c,String name,float val,java.util.function.Consumer<Float> change,boolean enabled){
         LinearLayout r=e.row();r.setPadding(0,e.dp(8),0,0);TextView t=e.text(name,13,e.fg),n=e.text(String.valueOf(Math.round(val*100)),13,e.fg);
         r.addView(t,new LinearLayout.LayoutParams(0,-2,1));r.addView(n);c.addView(r);
         SeekBar bar=new SeekBar(e);bar.setMax(200);bar.setProgress(Math.round(val*100)+100);bar.setEnabled(enabled);bar.setContentDescription(name);
-        bar.setProgressTintList(ColorStateList.valueOf(blue));bar.setThumbTintList(ColorStateList.valueOf(blue));c.addView(bar,new LinearLayout.LayoutParams(-1,e.dp(38)));
+        bar.setProgressTintList(ColorStateList.valueOf(enabled?blue:0xff777777));bar.setProgressBackgroundTintList(ColorStateList.valueOf(enabled?0xff515151:0xff777777));bar.setThumbTintList(ColorStateList.valueOf(enabled?blue:0xff888888));c.addView(bar,new LinearLayout.LayoutParams(-1,e.dp(38)));
         bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar b){}public void onStopTrackingTouch(SeekBar b){e.save(false);}public void onProgressChanged(SeekBar b,int p,boolean user){if(user){n.setText(""+(p-100));change.accept((p-100)/100f);e.preview.invalidate();}}});
     }
     void advanced(String tab){
@@ -232,19 +232,64 @@ final class WonderlandLayout {
         String[] items={"Image settings","Transform","Animation and keyframes","Layer order, visibility and lock","Reselect image / background","Project / save / apply"};
         new AlertDialog.Builder(e).setTitle(l.name).setItems(items,(d,i)->{switch(i){case 0:settings();break;case 1:advanced("Transform");break;case 2:advanced("Motion");break;case 3:advanced("Layers");break;case 4:if("image".equals(l.kind))e.reselectImage(l);else background();break;default:advanced("Project");}}).show();
     }
-    void addMenu(){
-        Dialog d=new Dialog(e);LinearLayout sheet=e.column();sheet.setPadding(e.dp(32),e.dp(20),e.dp(32),e.dp(15));sheet.setBackground(e.round(card,24));
-        TextView title=e.text("Add to Layer",22,e.fg);title.setTypeface(null,Typeface.BOLD);sheet.addView(title,new LinearLayout.LayoutParams(-1,e.dp(53)));
-        String[] names={"Image","Text","Video","Particle effect","Particle preset","Widget","Shape"};
-        String[] icons={"▧","T","▶","✣","✦","◷","●"};
-        for(int i=0;i<names.length;i++){final int index=i;LinearLayout r=e.row();TextView icon=e.text(icons[i],24,blue);icon.setGravity(Gravity.CENTER);r.addView(icon,new LinearLayout.LayoutParams(e.dp(43),-1));TextView t=e.text(names[i],17,e.fg);t.setGravity(Gravity.CENTER_VERTICAL);t.setPadding(e.dp(16),0,0,0);r.addView(t,new LinearLayout.LayoutParams(0,-1,1));
-            r.setContentDescription(names[i]);r.setOnClickListener(v->{d.dismiss();switch(index){case 0:e.pick();break;case 1:e.add("text");canvas();e.input("Text","Your text",x->e.selected.content=x);break;case 2:Toast.makeText(e,"Video layers are not supported in this preview",Toast.LENGTH_LONG).show();break;case 3:e.add("particles");canvas();break;case 4:particlePresets();break;case 5:widgets();break;case 6:e.add("shape");canvas();break;}});
-            sheet.addView(r,new LinearLayout.LayoutParams(-1,e.dp(56)));
+    void addMenu(){showLayerSheet(false);}
+    void extraLayers(){showLayerSheet(true);}
+    void showLayerSheet(boolean extra){
+        Dialog d=new Dialog(e);activeLayerDialog=d;
+        LinearLayout sheet=e.column();
+        int w=stage.getWidth(),h=stage.getHeight();
+        int side=Math.round(w*.025f), pad=Math.round(w*.089f);
+        sheet.setPadding(pad,Math.round(w*.045f),pad,Math.round(w*.025f));
+        sheet.setBackground(e.round(card,20));
+        TextView title=e.text(extra?"More layers":"Add to Layer",22,0xfffafafa);
+        title.setTypeface(null,Typeface.BOLD);title.setGravity(Gravity.CENTER_VERTICAL);
+        int titleH=Math.round(w*.135f),rowH=Math.round(w*.148f),cancelH=Math.round(w*.135f);
+        sheet.addView(title,new LinearLayout.LayoutParams(-1,titleH));
+        String[] names=extra?new String[]{"Widget","Shape"}:new String[]{"Image","Text","Video","Particle effect","Particle preset"};
+        for(int i=0;i<names.length;i++){
+            final String name=names[i];LinearLayout r=e.row();r.setGravity(Gravity.CENTER_VERTICAL);
+            View icon=layerGlyph(name);r.addView(icon,new LinearLayout.LayoutParams(Math.round(w*.098f),-1));
+            TextView t=e.text(name,17,0xffe5e5e5);t.setGravity(Gravity.CENTER_VERTICAL);t.setPadding(Math.round(w*.05f),0,0,0);r.addView(t,new LinearLayout.LayoutParams(0,-1,1));
+            r.setContentDescription(name);r.setFocusable(true);r.setOnClickListener(v->{d.dismiss();switch(name){
+                case "Image":e.pick();break;
+                case "Text":e.add("text");canvas();e.input("Text","Your text",x->e.selected.content=x);break;
+                case "Video":Toast.makeText(e,"Video layers are not supported in this preview",Toast.LENGTH_LONG).show();break;
+                case "Particle effect":e.add("particles");canvas();break;
+                case "Particle preset":particlePresets();break;
+                case "Widget":widgets();break;
+                case "Shape":e.add("shape");canvas();break;
+            }});
+            sheet.addView(r,new LinearLayout.LayoutParams(-1,rowH));
         }
-        Button cancel=pill("Cancel",d::dismiss);cancel.setBackgroundColor(Color.TRANSPARENT);cancel.setTextColor(blue);sheet.addView(cancel,new LinearLayout.LayoutParams(-1,e.dp(52)));
-        ScrollView sc=new ScrollView(e);sc.setFillViewport(true);sc.addView(sheet);
-        d.setContentView(sc);Window w=d.getWindow();if(w!=null){w.setBackgroundDrawableResource(android.R.color.transparent);w.setGravity(Gravity.BOTTOM);w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);w.setDimAmount(.65f);}
-        d.show();if(w!=null)w.setLayout(stage.getWidth()-e.dp(20),Math.min(stage.getHeight(),e.dp(530)));
+        Button cancel=pill("Cancel",d::dismiss);cancel.setBackgroundColor(Color.TRANSPARENT);cancel.setTextColor(blue);cancel.setTypeface(null,Typeface.NORMAL);sheet.addView(cancel,new LinearLayout.LayoutParams(-1,cancelH));
+        ScrollView sc=new ScrollView(e);sc.setFillViewport(false);sc.setVerticalScrollBarEnabled(false);sc.addView(sheet);d.setContentView(sc);
+        Window win=d.getWindow();if(win!=null){win.setBackgroundDrawableResource(android.R.color.transparent);win.setGravity(Gravity.BOTTOM);win.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);win.setDimAmount(.45f);}
+        d.setOnDismissListener(dialog->{if(activeLayerDialog==d)activeLayerDialog=null;});
+        d.show();if(win!=null)win.setLayout(w-2*side,Math.min(h,titleH+names.length*rowH+cancelH+sheet.getPaddingTop()+sheet.getPaddingBottom()));
+    }
+    View layerGlyph(String name){
+        return new View(e){
+            final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
+            @Override protected void onDraw(Canvas c){
+                float size=Math.min(getWidth(),getHeight())*.64f;c.save();c.translate((getWidth()-size)/2,(getHeight()-size)/2);c.scale(size/24,size/24);
+                p.setColor(blue);p.setStrokeWidth(2);p.setStrokeCap(Paint.Cap.ROUND);p.setStyle(Paint.Style.FILL);
+                switch(name){
+                    case "Image":
+                        c.drawRoundRect(1,1,23,23,2,2,p);p.setColor(card);c.drawCircle(7,7,2.5f,p);
+                        Path hills=new Path();hills.moveTo(3,20);hills.lineTo(10,12);hills.lineTo(14,16);hills.lineTo(18,10);hills.lineTo(21,20);hills.close();c.drawPath(hills,p);break;
+                    case "Text":
+                        p.setStyle(Paint.Style.STROKE);c.drawLine(5,5,19,5,p);c.drawLine(12,5,12,20,p);c.drawLine(8,20,16,20,p);c.drawLine(5,5,5,8,p);c.drawLine(19,5,19,8,p);break;
+                    case "Video":
+                        c.drawRoundRect(1,1,23,23,1.5f,1.5f,p);p.setColor(card);
+                        for(int i=3;i<22;i+=4){c.drawRect(i,3,i+2,5,p);c.drawRect(i,19,i+2,21,p);}
+                        Path play=new Path();play.moveTo(9,7);play.lineTo(17,12);play.lineTo(9,17);play.close();c.drawPath(play,p);break;
+                    case "Widget":
+                        p.setStyle(Paint.Style.STROKE);c.drawCircle(12,12,10,p);c.drawLine(12,5,12,12,p);c.drawLine(12,12,18,12,p);break;
+                    case "Shape":c.drawCircle(12,12,9,p);break;
+                    default:c.drawCircle(7,16,6,p);c.drawCircle(17,8,4.7f,p);c.drawCircle(18,19,2.8f,p);c.drawCircle(5,5,2.7f,p);c.drawCircle(12,2,1.5f,p);break;
+                }c.restore();
+            }
+        };
     }
     void widgets(){String[] labels={"Digital clock","Analogue clock","Date","Battery"},types={"clock","analog","date","battery"};new AlertDialog.Builder(e).setTitle("Wallpaper widgets").setItems(labels,(d,i)->{e.add(types[i]);canvas();}).show();}
     void particlePresets(){String[] labels={"Snow","Warm dust","Blue sparks"};new AlertDialog.Builder(e).setTitle("Particle preset").setItems(labels,(d,i)->{e.add("particles");e.selected.color=new int[]{0xffffffff,0xfff2bc80,0xff84b7ff}[i];e.save(false);canvas();}).show();}

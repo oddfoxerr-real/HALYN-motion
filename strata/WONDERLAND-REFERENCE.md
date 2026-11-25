@@ -10,3 +10,5 @@ Reference: user-provided com.samsung.android.wonderland.wallpaper_1.6.28 APK, in
 - Original reference has X/Y/Z motion labels; STRATA retains independent X/Y controls per requested screenshot.
 
 Use these structural measurements rather than a wholesale copy of Samsung's app or dependency on Samsung-specific UI classes.
+
+Additional decoded reference layouts: crop_image_settings_layout (EL.xml), crop_image_settings_sub_transform (qV.xml), settings_panel_title (_w.xml), layer_setup_dialog_line_layout (Ij.xml), add-layer drawable (Le.xml). The five original add-layer rows remain unchanged; STRATA extras appear via long press on add. Motion card has no additional visible button; long press on Preview opens advanced motion controls. Sheet dim amount is 0.45 (resource #73000000). Native glyphs drawn independently rather than copying Samsung vector path data.
