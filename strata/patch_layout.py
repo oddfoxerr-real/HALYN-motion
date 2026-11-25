@@ -143,3 +143,31 @@ e.write_text(s)
 f=p/"Scene.java";s=f.read_text().replace("paint.setColor(0xffe7faef);","paint.setColor(0xffffca28);")
 s=s.replace("bw=b.getWidth()*fit;bh=b.getHeight()*fit;","if(!\\\"Base image\\\".equals(l.name))fit=Math.min(w*.66f/b.getWidth(),h*.66f/b.getHeight());bw=b.getWidth()*fit;bh=b.getHeight()*fit;".replace('\\\"','"'))
 f.write_text(s)
+
+# Persist particle settings and text formatting in the real shared renderer.
+f=p/"Scene.java";s=f.read_text()
+s=s.replace('int color=0xff99aea5;', 'ParticleConfig particles=new ParticleConfig();boolean bold=false,italic=false,underline=false,strike=false;String font="system";int color=0xff99aea5;')
+s=s.replace('.put("color",color).put("visible"', '.put("color",color).put("particles",particles.json()).put("bold",bold).put("italic",italic).put("underline",underline).put("strike",strike).put("font",font).put("visible"')
+s=s.replace('l.color=j.optInt("color",l.color);','l.color=j.optInt("color",l.color);l.particles=ParticleConfig.read(j.optJSONObject("particles"));l.bold=j.optBoolean("bold");l.italic=j.optBoolean("italic");l.underline=j.optBoolean("underline");l.strike=j.optBoolean("strike");l.font=j.optString("font","system");')
+s=s.replace('final Context context;final Paint paint=', 'long particleTouchTime=0;float particleTouchX=.5f,particleTouchY=.5f;void touch(float x,float y){particleTouchX=x;particleTouchY=y;particleTouchTime=android.os.SystemClock.uptimeMillis();} final Context context;final Paint paint=')
+a=s.index('case "particles":bw=');b=s.index('case "analog":',a)
+s=s[:a]+'''case "particles":bw=w;bh=h;c.restore();c.save();c.translate(w/2,h/2);l.particles.draw(c,this,l,p,s.background,w,h,l.animate?t:0);break;
+                '''+s[b:]
+s=s.replace('paint.setTypeface(Typeface.create("sans-serif-light",Typeface.NORMAL));','paint.setTypeface(Typeface.create(l.kind.equals("text")?(l.font.equals("system")?"sans-serif":l.font):"sans-serif-light",(l.bold?Typeface.BOLD:0)|(l.italic?Typeface.ITALIC:0)));paint.setUnderlineText(l.underline);paint.setStrikeThruText(l.strike);')
+s=s.replace('c.drawText(str,0,-(fm.ascent+fm.descent)/2,paint);break;', 'c.drawText(str,0,-(fm.ascent+fm.descent)/2,paint);paint.setUnderlineText(false);paint.setStrikeThruText(false);break;')
+f.write_text(s)
+e=p/"Editor.java";s=e.read_text()
+a=s.index("    void importPreset(")
+s=s[:a]+'''    String particlePickId;
+    void pickParticle(Scene.Layer layer){particlePickId=layer.id;Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("image/*");try{startActivityForResult(i,45);}catch(ActivityNotFoundException ex){particlePickId=null;}}
+    void particleResult(int result,Intent data){String id=particlePickId;particlePickId=null;if(result!=RESULT_OK||data==null||data.getData()==null)return;for(Scene.Layer layer:scene.layers){if(!layer.id.equals(id)||!layer.kind.equals("particles"))continue;String name=UUID.randomUUID()+".img";File f=new File(getFilesDir(),name);try(InputStream in=getContentResolver().openInputStream(data.getData());OutputStream out=new FileOutputStream(f)){if(in==null)throw new IOException("No image");byte[] b=new byte[8192];int n;long total=0;while((n=in.read(b))!=-1){total+=n;if(total>64L*1024*1024)throw new IOException("Image too large");out.write(b,0,n);}}catch(Exception ex){f.delete();Toast.makeText(this,"Image import failed",Toast.LENGTH_SHORT).show();return;}if(renderer.bitmap(name)==null){f.delete();return;}layer.particles.sprite=name;selected=layer;save(false);layout.sync();layout.detail.particlePanel(layer);return;}}
+'''+s[a:]
+s=s.replace('if(request==43){replaceImageResult(result,data);return;}','if(request==45){particleResult(result,data);return;}if(request==43){replaceImageResult(result,data);return;}')
+s=s.replace('replacingLayerId=state.getString("replacingLayerId");','replacingLayerId=state.getString("replacingLayerId");particlePickId=state.getString("particlePickId");')
+s=s.replace('state.putString("replacingLayerId",replacingLayerId);','state.putString("replacingLayerId",replacingLayerId);state.putString("particlePickId",particlePickId);')
+s=s.replace('if(previewOnly||selected==null||selected.locked||"Base image".equals(selected.name))return false;','if(previewOnly){if(e.getActionMasked()==MotionEvent.ACTION_DOWN){renderer.touch(e.getX()/getWidth(),e.getY()/getHeight());invalidate();}return true;}if(selected==null||selected.locked||"Base image".equals(selected.name))return false;')
+s=s.replace('panel.addView(button("Edit text",()->input("Text",selected.content,v->selected.content=v)))','panel.addView(button("Edit text",()->layout.detail.textDialog(selected)))')
+e.write_text(s)
+f=p/"LiveWallpaper.java";s=f.read_text().replace('super.onCreate(holder);manager=', 'super.onCreate(holder);setTouchEventsEnabled(true);manager=')
+s=s.replace('void draw(){h.removeCallbacks(frame);','@Override public void onTouchEvent(android.view.MotionEvent event){if(event.getActionMasked()==android.view.MotionEvent.ACTION_DOWN){android.graphics.Rect bounds=getSurfaceHolder().getSurfaceFrame();renderer.touch(event.getX()/Math.max(1,bounds.width()),event.getY()/Math.max(1,bounds.height()));}super.onTouchEvent(event);}\n        void draw(){h.removeCallbacks(frame);')
+f.write_text(s)

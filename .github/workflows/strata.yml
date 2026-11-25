@@ -25,7 +25,7 @@ jobs:
       - run: |
           mkdir -p /tmp/strata
           tar -xJf strata/source.tar.xz -C /tmp/strata
-          cp strata/WonderlandLayout.java strata/ProjectGallery.java /tmp/strata/app/src/main/java/studio/strata/wallpaper/
+          cp strata/WonderlandLayout.java strata/ProjectGallery.java strata/LayerSettings.java strata/ParticleConfig.java /tmp/strata/app/src/main/java/studio/strata/wallpaper/
           mkdir -p /tmp/strata/app/src/androidTest/java/studio/strata/wallpaper
           cp strata/StrataQa.java /tmp/strata/app/src/androidTest/java/studio/strata/wallpaper/
           cd /tmp/strata

@@ -11,6 +11,7 @@ import java.util.*;
 
 final class WonderlandLayout {
     final Editor e;
+    final LayerSettings detail;
     final FrameLayout stage, phone, overlay;
     final LinearLayout rail;
     final ScrollView railScroll;
@@ -21,7 +22,7 @@ final class WonderlandLayout {
     AlertDialog widgetDialog;
     final Map<View,Scene.Layer> tileLayers=new HashMap<>();
     WonderlandLayout(Editor e) {
-        this.e=e;
+        this.e=e;detail=new LayerSettings(this);
         e.root.setPadding(0,0,0,0);
         e.root.setBackgroundColor(black);
         e.root.setOnApplyWindowInsetsListener((v,i)->{
@@ -200,6 +201,8 @@ final class WonderlandLayout {
     }
     void settings(){
         if(e.selected==null){background();return;}
+        if("particles".equals(e.selected.kind)){detail.particlePanel(e.selected);return;}
+        if("text".equals(e.selected.kind)){detail.textDialog(e.selected);return;}
         mode="settings";e.playing=false;e.previewOnly=false;overlay.removeAllViews();overlay.setVisibility(View.VISIBLE);stage.setBackgroundColor(black);action.setEnabled(true);action.setAlpha(1);add.setEnabled(true);add.setAlpha(1);action.setText("Preview");
         Scene.Layer l=e.selected;header(l.kind.equals("image")?"Image Settings":l.name+" Settings",this::canvas);
         LinearLayout c=e.column();c.setPadding(e.dp(21),e.dp(14),e.dp(21),e.dp(14));c.setBackground(e.round(card,19));
@@ -256,10 +259,10 @@ final class WonderlandLayout {
             TextView t=e.text(name,17,0xffe5e5e5);t.setGravity(Gravity.CENTER_VERTICAL);t.setPadding(Math.round(w*.05f),0,0,0);r.addView(t,new LinearLayout.LayoutParams(0,-1,1));
             r.setContentDescription(name);r.setFocusable(true);r.setOnClickListener(v->{d.dismiss();switch(name){
                 case "Image":imageLibrary(false);break;
-                case "Text":e.add("text");canvas();e.input("Text","Your text",x->e.selected.content=x);break;
+                case "Text":detail.textDialog(null);break;
                 case "Video":Toast.makeText(e,"Video layers are not supported in this preview",Toast.LENGTH_LONG).show();break;
-                case "Particle effect":e.add("particles");canvas();break;
-                case "Particle preset":particlePresets();break;
+                case "Particle effect":detail.library(null);break;
+                case "Particle preset":detail.presets();break;
                 case "Widget":widgets();break;
                 case "Shape":e.add("shape");canvas();break;
             }});
@@ -328,5 +331,5 @@ final class WonderlandLayout {
         int[] colors={0xfffafafa,0xfff09a88,0xffec4646,0xffffca42,0xffa7d9f2,0xffaf9af1,0xff77b3a8,0xfff8b982};
         for(int i=0;i<icons.length;i+=4){LinearLayout row=e.row();grid.addView(row);for(int k=i;k<Math.min(i+4,icons.length);k++){final int n=k;TextView tile=e.text(icons[k],k==0?12:32,k==0?0xfffafafa:colors[k%colors.length]);tile.setGravity(Gravity.CENTER);tile.setBackground(e.round(k==0?0xff252525:0xff4a4a4a,9));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,e.dp(65),1);p.setMargins(e.dp(4),e.dp(4),e.dp(4),e.dp(4));row.addView(tile,p);tile.setContentDescription(k==0?"Gallery":"Image preset "+(page*12+k));tile.setOnClickListener(v->{dialog.dismiss();if(n==0){if(base)e.pickBase();else e.pick();}else e.importPreset(icons[n],colors[n%colors.length],base);});}}
     }
-    boolean back(){if(!mode.equals("canvas")&&!mode.equals("background")){canvas();return true;}return false;}
+    boolean back(){if(!mode.equals("canvas")&&!mode.equals("background")){canvas();return true;}detail.finish();return true;}
 }

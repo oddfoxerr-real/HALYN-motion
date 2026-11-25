@@ -125,7 +125,7 @@ public final class StrataQa extends Instrumentation {
                 editor.layout.preview();check(editor.previewOnly&&editor.playing,"Live preview playback");
             });
             settle();
-            main(()->{check(editor.layout.action.isEnabled(),"Apply action available");editor.save(false);});
+            main(()->{check(editor.layout.action.isEnabled(),"Apply action available");editor.layout.canvas();editor.add("particles");Scene.Layer particle=editor.selected;particle.particles=ParticleConfig.preset(1,2);particle.particles.bounceX=true;particle.particles.xVariation=.3f;particle.particles.life=new float[]{.4f,2};editor.save(false);Scene restored=Scene.read(editor);Scene.Layer last=restored.layers.get(restored.layers.size()-1);check(last.particles.count==85&&last.particles.bounceX&&Math.abs(last.particles.life[0]-.4f)<.001f,"Particle settings persist");editor.layout.settings();check(find(editor.layout.overlay,"Collision horizontally")!=null,"Particle panel renders");editor.scene.layers.remove(particle);editor.selected=editor.scene.layers.get(editor.scene.layers.size()-1);editor.layout.canvas();editor.save(false);});
             result.putString("stream","\nSTRATA_QA_PASS "+checks+" functional checks passed\n");finish(Activity.RESULT_OK,result);
         }catch(Throwable t){
             android.util.Log.e("STRATA_QA","QA failed",t);
