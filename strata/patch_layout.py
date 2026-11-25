@@ -62,3 +62,48 @@ e.write_text(s)
 manifest=Path("app/src/main/AndroidManifest.xml");s=manifest.read_text()
 s=s.replace('<application android:label="Strata"', '<queries><intent><action android:name="android.service.wallpaper.CHANGE_LIVE_WALLPAPER"/></intent><intent><action android:name="android.service.wallpaper.LIVE_WALLPAPER_CHOOSER"/></intent><intent><action android:name="android.intent.action.SET_WALLPAPER"/></intent></queries><application android:label="Strata"')
 manifest.write_text(s)
+
+# Replace the contents of the selected image layer, never recreate its identity.
+e=p/"Editor.java";s=e.read_text()
+s=s.replace('boolean importingBase=false;', '''boolean importingBase=false;
+    String replacingLayerId=null;
+    void reselectImage(Scene.Layer layer){
+        if(layer==null||!"image".equals(layer.kind)||layer.locked)return;
+        replacingLayerId=layer.id;
+        save(false);
+        Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("image/*");
+        try{startActivityForResult(intent,43);}
+        catch(ActivityNotFoundException ex){replacingLayerId=null;Toast.makeText(this,"No image picker available",Toast.LENGTH_LONG).show();}
+    }
+    void replaceImageResult(int result,Intent data){
+        String id=replacingLayerId;replacingLayerId=null;
+        if(result!=RESULT_OK||data==null||data.getData()==null||id==null)return;
+        Scene.Layer target=null;
+        for(Scene.Layer layer:scene.layers)if(id.equals(layer.id)&&"image".equals(layer.kind)){target=layer;break;}
+        if(target==null||target.locked)return;
+        String name=UUID.randomUUID()+".img";
+        File file=new File(getFilesDir(),name);
+        try(InputStream in=getContentResolver().openInputStream(data.getData());OutputStream out=new FileOutputStream(file)){
+            if(in==null)throw new IOException("No image data");
+            byte[] bytes=new byte[16384];int count;long total=0;
+            while((count=in.read(bytes))!=-1){
+                total+=count;if(total>128L*1024*1024)throw new IOException("Image exceeds 128 MB");
+                out.write(bytes,0,count);
+            }
+        }catch(Exception ex){file.delete();Toast.makeText(this,"Image replacement failed: "+ex.getMessage(),Toast.LENGTH_LONG).show();return;}
+        if(renderer.bitmap(name)==null){file.delete();Toast.makeText(this,"Unsupported image",Toast.LENGTH_LONG).show();return;}
+        String previous=target.content;target.content=name;
+        try{scene.save(this);}catch(Exception ex){
+            target.content=previous;file.delete();Toast.makeText(this,"Unable to save replacement",Toast.LENGTH_LONG).show();return;
+        }
+        selected=target;keyMode=false;
+        if(layout!=null)layout.canvas();
+        refresh();preview.invalidate();
+    }
+''')
+s=s.replace('if(state!=null)importingBase=state.getBoolean("importingBase");','if(state!=null){importingBase=state.getBoolean("importingBase");replacingLayerId=state.getString("replacingLayerId");}')
+s=s.replace('state.putBoolean("importingBase",importingBase);','state.putBoolean("importingBase",importingBase);state.putString("replacingLayerId",replacingLayerId);')
+s=s.replace('super.onActivityResult(request,result,data);if(request!=42','super.onActivityResult(request,result,data);if(request==43){replaceImageResult(result,data);return;}if(request!=42')
+e.write_text(s)

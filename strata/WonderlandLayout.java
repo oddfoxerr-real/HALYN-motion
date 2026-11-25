@@ -15,7 +15,7 @@ final class WonderlandLayout {
     final LinearLayout rail;
     final ScrollView railScroll;
     final Button action, add;
-    final int black=0xff080808, card=0xff242424, grey=0xff303030, blue=0xff5298ec;
+    final int black=0xff080808, card=0xff252525, grey=0xff303030, blue=0xff3e91ff;
     String mode="canvas";
     WonderlandLayout(Editor e) {
         this.e=e;
@@ -124,14 +124,14 @@ final class WonderlandLayout {
             thumb.setContentDescription(l.name+(l==e.selected?", selected":""));
             thumb.setOnClickListener(v->{e.selected=l;e.keyMode=false;if(mode.equals("settings"))settings();else if(mode.equals("advanced"))advanced(e.tab);else canvas();e.refresh();});
             thumb.setOnLongClickListener(v->{e.selected=l;e.keyMode=false;layerOptions(l);return true;});
-            addTile(thumb,size,l==e.selected);
+            addTile(thumb,size,l==e.selected,l);
         }
         if(!hasBase()){
             FrameLayout thumb=tile(e.selected==null,size);
             TextView label=e.text("▧",26,0xffeeeeee);label.setGravity(Gravity.CENTER);label.setBackgroundColor(e.scene.background);
             thumb.addView(label,new FrameLayout.LayoutParams(-1,-1));
             thumb.setContentDescription("Background color");thumb.setOnClickListener(v->background());
-            addTile(thumb,size,e.selected==null);
+            addTile(thumb,size,e.selected==null,null);
         }
         if(mode.equals("canvas"))action.setText(e.selected==null?"Background":e.selected.kind.equals("image")?"Image Settings":e.selected.name+" Settings");
         position();
@@ -139,13 +139,32 @@ final class WonderlandLayout {
     FrameLayout tile(boolean selected,int size){
         FrameLayout v=new FrameLayout(e);v.setBackground(e.round(0xff151515,14));v.setClipToOutline(true);return v;
     }
-    void addTile(FrameLayout v,int size,boolean selected){
-        FrameLayout border=new FrameLayout(e);GradientDrawable d=e.round(0xff252525,15);
-        d.setStroke(e.dp(selected?2:1),selected?0xffff3939:0xff3a3a3a);border.setBackground(d);
-        border.setPadding(e.dp(3),e.dp(3),e.dp(3),e.dp(3));
+    void addTile(FrameLayout v,int size,boolean selected,Scene.Layer layer){
+        // Geometry follows Wonderland 1.6.28's layer_list_item resource:
+        // 67-unit cell, 60-unit thumbnail, 27-unit image-change control.
+        FrameLayout cell=new FrameLayout(e);cell.setClipChildren(false);cell.setClipToPadding(false);
+        int thumbSize=Math.round(size*60f/67f),radius=Math.round(thumbSize*.20f);
+        GradientDrawable outline=e.round(0xff4a4a4a,Math.max(1,Math.round(radius/e.getResources().getDisplayMetrics().density)));
+        outline.setStroke(Math.max(e.dp(1),Math.round(size*2f/67f)),selected?0xfff50000:0xff3a3a3a);
+        FrameLayout border=new FrameLayout(e);border.setBackground(outline);border.setPadding(e.dp(2),e.dp(2),e.dp(2),e.dp(2));border.setClipToOutline(true);
         border.addView(v,new FrameLayout.LayoutParams(-1,-1));
-        if(selected&&hasBase()&&e.selected==e.scene.layers.get(0)&&v.getContentDescription()!=null&&v.getContentDescription().toString().startsWith("Base image")){TextView replace=e.text("⟳",18,0xffffffff);replace.setGravity(Gravity.CENTER);replace.setBackground(e.round(0xff050505,20));replace.setContentDescription("Replace background image");replace.setOnClickListener(w->e.pickBase());FrameLayout.LayoutParams rp=new FrameLayout.LayoutParams(e.dp(27),e.dp(27),Gravity.TOP|Gravity.RIGHT);border.addView(replace,rp);}
-        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(size,size);p.bottomMargin=e.dp(8);rail.addView(border,p);
+        FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(thumbSize,thumbSize,Gravity.BOTTOM|Gravity.LEFT);cell.addView(border,bp);
+        if(selected&&layer!=null&&"image".equals(layer.kind)){
+            View change=new View(e){
+                final Paint pen=new Paint(Paint.ANTI_ALIAS_FLAG);
+                @Override protected void onDraw(Canvas canvas){
+                    super.onDraw(canvas);float d=Math.min(getWidth(),getHeight()),x=getWidth()/2f,y=getHeight()/2f,r=d*.20f;
+                    pen.setStyle(Paint.Style.FILL);pen.setColor(0xff050505);canvas.drawCircle(x,y,d*.5f,pen);
+                    pen.setColor(0xffffffff);pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(d*.033f);pen.setStrokeCap(Paint.Cap.ROUND);pen.setStrokeJoin(Paint.Join.ROUND);
+                    canvas.drawArc(x-r,y-r,x+r,y+r,45,295,false,pen);
+                    double angle=Math.toRadians(340);float ax=x+r*(float)Math.cos(angle),ay=y+r*(float)Math.sin(angle);
+                    Path arrow=new Path();arrow.moveTo(ax-d*.075f,ay-d*.035f);arrow.lineTo(ax,ay+d*.025f);arrow.lineTo(ax+d*.065f,ay-d*.055f);canvas.drawPath(arrow,pen);
+                }
+            };
+            change.setContentDescription("Reselect image");change.setFocusable(true);change.setClickable(true);change.setOnClickListener(w->e.reselectImage(layer));
+            int diameter=Math.round(size*27f/67f);FrameLayout.LayoutParams cp=new FrameLayout.LayoutParams(diameter,diameter,Gravity.TOP|Gravity.RIGHT);cell.addView(change,cp);
+        }
+        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(size,size);p.topMargin=Math.max(e.dp(3),Math.round(size*5f/67f));rail.addView(cell,p);
     }
     void primary(){
         switch(mode){
@@ -210,8 +229,8 @@ final class WonderlandLayout {
         FrameLayout.LayoutParams p=new FrameLayout.LayoutParams(-1,-1);p.topMargin=e.dp(61);overlay.addView(controls,p);e.tab=tab;e.refresh();position();
     }
     void layerOptions(Scene.Layer l){
-        String[] items={"Image settings","Transform","Animation and keyframes","Layer order, visibility and lock","Replace background","Project / save / apply"};
-        new AlertDialog.Builder(e).setTitle(l.name).setItems(items,(d,i)->{switch(i){case 0:settings();break;case 1:advanced("Transform");break;case 2:advanced("Motion");break;case 3:advanced("Layers");break;case 4:background();break;default:advanced("Project");}}).show();
+        String[] items={"Image settings","Transform","Animation and keyframes","Layer order, visibility and lock","Reselect image / background","Project / save / apply"};
+        new AlertDialog.Builder(e).setTitle(l.name).setItems(items,(d,i)->{switch(i){case 0:settings();break;case 1:advanced("Transform");break;case 2:advanced("Motion");break;case 3:advanced("Layers");break;case 4:if("image".equals(l.kind))e.reselectImage(l);else background();break;default:advanced("Project");}}).show();
     }
     void addMenu(){
         Dialog d=new Dialog(e);LinearLayout sheet=e.column();sheet.setPadding(e.dp(32),e.dp(20),e.dp(32),e.dp(15));sheet.setBackground(e.round(card,24));

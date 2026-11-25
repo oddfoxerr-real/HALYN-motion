@@ -107,6 +107,19 @@ public final class StrataQa extends Instrumentation {
                 check(loaded.layers.get(0).depth>.3f&&loaded.layers.get(0).depthY<-.2f,"Independent motion persists");
                 check(Math.abs(loaded.layers.get(2).base.rotation-15f)<.01f,"Transform persists");
             });
+            // Replace a foreground layer after keyframes have been stored.
+            File replacement=image("replacement-test.png",320,640);
+            main(()->{
+                Scene.Layer before=editor.selected;String id=before.id,old=before.content;
+                editor.replacingLayerId=id;
+                editor.onActivityResult(43,Activity.RESULT_OK,new Intent().setData(Uri.fromFile(replacement)));
+                check(editor.selected==before&&id.equals(editor.selected.id),"Reselect preserves exact layer identity");
+                check(!old.equals(before.content)&&editor.renderer.bitmap(before.content)!=null,"Reselect updates bitmap");
+                check(editor.scene.layers.size()==3&&editor.scene.layers.get(2)==before,"Reselect preserves layer order");
+                check(before.keys.size()==2&&Math.abs(before.base.rotation-15f)<.01f,"Reselect preserves transforms and keyframes");
+                check(find(editor.layout.rail,"Reselect image")!=null,"Selected foreground exposes image reselect button");
+                editor.layout.advanced("Transform");
+            });
             snap("06-animation-controls");
             main(()->{
                 Scene scene=editor.scene;Scene.Renderer renderer=editor.renderer;
